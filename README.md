@@ -1,8 +1,20 @@
 # SR-IOV CNI plugin
 
+If you do not know CNI. Please read [here](https://github.com/containernetworking/cni) at first.
+
 NIC with [SR-IOV](http://blog.scottlowe.org/2009/12/02/what-is-sr-iov/) capabilities works by introducing the idea of physical functions (PFs) and virtual functions (VFs). 
 
 PF is used by host.Each VFs can be treated as a separate physical NIC and assigned to one container, and configured with separate MAC, VLAN and IP, etc.
+
+## Build
+
+This plugin requires Go 1.5+ to build.
+
+Go 1.5 users will need to set `GO15VENDOREXPERIMENT=1` to get vendored dependencies. This flag is set by default in 1.6.
+
+```
+#./build
+```
 
 ## Enable SR-IOV
 
@@ -67,3 +79,5 @@ lo        Link encap:Local Loopback
           collisions:0 txqueuelen:0 
           RX bytes:0 (0.0 b)  TX bytes:0 (0.0 b)
 ```
+
+[More info](https://github.com/containernetworking/cni/pull/259).

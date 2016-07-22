@@ -130,7 +130,7 @@ func releaseVF(conf *NetConf, ifName string, netns ns.NetNS) error {
 
 	// shutdown VF device
 	if err = netlink.LinkSetDown(vfDev); err != nil {
-		return fmt.Errorf("failed to down vf % device: %v", conf.VF, err)
+		return fmt.Errorf("failed to down vf %d device: %v", conf.VF, err)
 	}
 
 	// rename VF device
