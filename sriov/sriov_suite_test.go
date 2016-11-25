@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestMacvlan(t *testing.T) {
+func TestSriov(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "sriov Suite")
 }
