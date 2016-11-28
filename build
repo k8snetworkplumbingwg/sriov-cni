@@ -15,3 +15,4 @@ export GOPATH=${PWD}/gopath
 
 echo "Building plugins"
 go install "$@" ${REPO_PATH}/sriov
+go install "$@" ${REPO_PATH}/fixipam

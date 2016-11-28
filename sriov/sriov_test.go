@@ -14,7 +14,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-const MASTER_NAME = "eth0"
+const MASTER_NAME = "eth1"
 
 var _ = Describe("sriov Operations", func() {
 	var originalNS ns.NetNS
@@ -52,10 +52,12 @@ var _ = Describe("sriov Operations", func() {
     "name": "mynet",
     "type": "sriov",
     "master": "%s",
+    "mac":"66:77:88:99:aa:bb",
     "vf": 1,
     "ipam": {
-        "type": "host-local",
-        "subnet": "10.1.2.0/24"
+        "type": "fixipam",
+        "subnet": "192.168.1.0/24",
+        "gateway": "192.168.1.1"
     }
 }`, MASTER_NAME)
 
@@ -73,7 +75,10 @@ var _ = Describe("sriov Operations", func() {
 		// Make sure sriov link exists in the target namespace
 		err = originalNS.Do(func(ns.NetNS) error {
 			defer GinkgoRecover()
-
+			os.Setenv("CNI_ARGS", "IP=192.168.1.3")
+			defer func() {
+				os.Unsetenv("CNI_ARGS")
+			}()
 			_, err := testutils.CmdAddWithResult(targetNs.Path(), IFNAME, func() error {
 				return cmdAdd(args)
 			})
