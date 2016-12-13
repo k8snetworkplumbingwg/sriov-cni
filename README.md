@@ -13,6 +13,7 @@ This plugin requires Go 1.5+ to build.
 Go 1.5 users will need to set `GO15VENDOREXPERIMENT=1` to get vendored dependencies. This flag is set by default in 1.6.
 
 ```
+# git checkout -b sriovk8sfeatures
 #./build
 ```
 
