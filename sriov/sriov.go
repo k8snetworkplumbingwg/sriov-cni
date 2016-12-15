@@ -20,7 +20,7 @@ type NetConf struct {
 	types.NetConf
 	Master string `json:"master"`
 	MAC    string `json:"mac"`
-	VF     int    `json:"vf"`
+	VF     *int   `json:"vf"`
 	Vlan   int    `json:"vlan"`
 }
 
@@ -43,9 +43,12 @@ func loadConf(bytes []byte) (*NetConf, error) {
 }
 
 func setupVF(conf *NetConf, ifName string, netns ns.NetNS) error {
-
+	vfIdx := 0
 	masterName := conf.Master
-	vfIdx := conf.VF
+	if conf.VF != nil {
+		vfIdx = *conf.VF
+	}
+	// TODO: if conf.VF == nil, alloc vf randomly
 
 	m, err := netlink.LinkByName(masterName)
 	if err != nil {
@@ -63,7 +66,7 @@ func setupVF(conf *NetConf, ifName string, netns ns.NetNS) error {
 	}
 
 	if len(infos) != 1 {
-		return fmt.Errorf("Mutiple network devices in directory %s", vfDir)
+		return fmt.Errorf("no network devices in directory %s", vfDir)
 	}
 
 	// VF NIC name
@@ -79,36 +82,41 @@ func setupVF(conf *NetConf, ifName string, netns ns.NetNS) error {
 		if err != nil {
 			return err
 		}
-		if err = netlink.LinkSetVfHardwareAddr(m, conf.VF, macAddr); err != nil {
-			return fmt.Errorf("failed to set vf %d macaddress: %v", conf.VF, err)
+		if err = netlink.LinkSetVfHardwareAddr(m, vfIdx, macAddr); err != nil {
+			return fmt.Errorf("failed to set vf %d macaddress: %v", vfIdx, err)
 		}
 	}
 
 	if conf.Vlan != 0 {
-		if err = netlink.LinkSetVfVlan(m, conf.VF, conf.Vlan); err != nil {
-			return fmt.Errorf("failed to set vf %d vlan: %v", conf.VF, err)
+		if err = netlink.LinkSetVfVlan(m, vfIdx, conf.Vlan); err != nil {
+			return fmt.Errorf("failed to set vf %d vlan: %v", vfIdx, err)
 		}
 	}
 
 	if err = netlink.LinkSetUp(vfDev); err != nil {
-		return fmt.Errorf("failed to setup vf %d device: %v", conf.VF, err)
+		return fmt.Errorf("failed to setup vf %d device: %v", vfIdx, err)
 	}
 
 	// move VF device to ns
 	if err = netlink.LinkSetNsFd(vfDev, int(netns.Fd())); err != nil {
-		return fmt.Errorf("failed to move vf %d to netns: %v", conf.VF, err)
+		return fmt.Errorf("failed to move vf %d to netns: %v", vfIdx, err)
 	}
 
 	return netns.Do(func(_ ns.NetNS) error {
 		err := renameLink(vfDevName, ifName)
 		if err != nil {
-			return fmt.Errorf("failed to rename vf %d device %q to %q: %v", conf.VF, vfDevName, ifName, err)
+			return fmt.Errorf("failed to rename vf %d device %q to %q: %v", vfIdx, vfDevName, ifName, err)
 		}
 		return nil
 	})
 }
 
 func releaseVF(conf *NetConf, ifName string, netns ns.NetNS) error {
+	vfIdx := 0
+	if conf.VF != nil {
+		vfIdx = *conf.VF
+	}
+
 	initns, err := ns.GetCurrentNS()
 	if err != nil {
 		return fmt.Errorf("failed to get init netns: %v", err)
@@ -121,7 +129,7 @@ func releaseVF(conf *NetConf, ifName string, netns ns.NetNS) error {
 	// get VF device
 	vfDev, err := netlink.LinkByName(ifName)
 	if err != nil {
-		return fmt.Errorf("failed to lookup vf %d device %q: %v", conf.VF, ifName, err)
+		return fmt.Errorf("failed to lookup vf %d device %q: %v", vfIdx, ifName, err)
 	}
 
 	// device name in init netns
@@ -130,18 +138,18 @@ func releaseVF(conf *NetConf, ifName string, netns ns.NetNS) error {
 
 	// shutdown VF device
 	if err = netlink.LinkSetDown(vfDev); err != nil {
-		return fmt.Errorf("failed to down vf %d device: %v", conf.VF, err)
+		return fmt.Errorf("failed to down vf %d device: %v", vfIdx, err)
 	}
 
 	// rename VF device
 	err = renameLink(ifName, devName)
 	if err != nil {
-		return fmt.Errorf("failed to rename vf %d evice %q to %q: %v", conf.VF, ifName, devName, err)
+		return fmt.Errorf("failed to rename vf %d evice %q to %q: %v", vfIdx, ifName, devName, err)
 	}
 
 	// move VF device to init netns
 	if err = netlink.LinkSetNsFd(vfDev, int(initns.Fd())); err != nil {
-		return fmt.Errorf("failed to move vf %d to init netns: %v", conf.VF, err)
+		return fmt.Errorf("failed to move vf %d to init netns: %v", vfIdx, err)
 	}
 
 	return nil
