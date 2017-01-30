@@ -1,16 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"net"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
-	"crypto/rand"
 
 	"github.com/containernetworking/cni/pkg/ipam"
 	"github.com/containernetworking/cni/pkg/ns"
@@ -19,12 +20,24 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
+const defaultCNIDir = "/var/lib/cni/sriov"
+
+type dpdkConf struct {
+	PCIaddr    string `json:"pci_addr"`
+	Ifname     string `json:"ifname"`
+	KDriver    string `json:"kernel_driver"`
+	DPDKDriver string `json:"dpdk_driver"`
+	DPDKtool   string `json:"dpdk_tool"`
+}
+
 type NetConf struct {
 	types.NetConf
-	IF0        string `json:"if0"`
-	IF0NAME    string `json:"if0name"`
-	MAC        bool   `json:"createmac"`
-	Vlan       int    `json:"vlan"`
+	DPDKMode bool
+	DPDKConf dpdkConf `json:"dpdk,omitempty"`
+	CNIDir   string   `json:"cniDir"`
+	IF0      string   `json:"if0"`
+	IF0NAME  string   `json:"if0name"`
+	Vlan     int      `json:"vlan"`
 }
 
 func init() {
@@ -34,23 +47,10 @@ func init() {
 	runtime.LockOSThread()
 }
 
-func createRandomMacAddr() (net.HardwareAddr, error) {
-	//Reserve 6 bytes for the Mac Address
-	addr := make([]byte, 6)
-	if _, err := rand.Read(addr); err != nil {
-		return nil, fmt.Errorf("err in Generating Mac addr: %v", err)
-	}
-	//refer, http://standards.ieee.org/regauth/oui/oui.txt
-	//x2 perfix is used to set local administation and 0xfe for the unicast
-	//address
-	addr[0] = (addr[0] | 2) & 0xfe
-	return net.HardwareAddr(addr), nil
-}
-
 func checkIf0name(ifname string) bool {
-	op  := []string{"eth0", "eth1", "lo", ""}
+	op := []string{"eth0", "eth1", "lo", ""}
 	for _, if0name := range op {
-		if (strings.Compare(if0name,ifname) == 0) {
+		if strings.Compare(if0name, ifname) == 0 {
 			return false
 		}
 	}
@@ -75,13 +75,127 @@ func loadConf(bytes []byte) (*NetConf, error) {
 		return nil, fmt.Errorf(`"if0" field is required. It specifies the host interface name to virtualize`)
 	}
 
+	if n.CNIDir == "" {
+		n.CNIDir = defaultCNIDir
+	}
+
+	if (dpdkConf{}) != n.DPDKConf {
+		n.DPDKMode = true
+	}
+
 	return n, nil
 }
 
-func setupVF(conf *NetConf, ifName string,  podifName string, netns ns.NetNS) error {
+func saveScratchNetConf(containerID, dataDir string, netconf []byte) error {
+	if err := os.MkdirAll(dataDir, 0700); err != nil {
+		return fmt.Errorf("failed to create the multus data directory(%q): %v", dataDir, err)
+	}
+
+	path := filepath.Join(dataDir, containerID)
+
+	err := ioutil.WriteFile(path, netconf, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to write container data in the path(%q): %v", path, err)
+	}
+
+	return err
+}
+
+func consumeScratchNetConf(containerID, dataDir string) ([]byte, error) {
+	path := filepath.Join(dataDir, containerID)
+	defer os.Remove(path)
+
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read container data in the path(%q): %v", path, err)
+	}
+
+	return data, err
+}
+
+func savedpdkConf(cid, dataDir string, conf *NetConf) error {
+	dpdkconfBytes, err := json.Marshal(conf.DPDKConf)
+	if err != nil {
+		return fmt.Errorf("error serializing delegate netconf: %v", err)
+	}
+
+	s := []string{cid, conf.DPDKConf.Ifname}
+	cRef := strings.Join(s, "-")
+
+	// save the rendered netconf for cmdDel
+	if err = saveScratchNetConf(cRef, dataDir, dpdkconfBytes); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (dc *dpdkConf) getdpdkConf(cid, dataDir string, conf *NetConf) error {
+	s := []string{cid, conf.IF0NAME}
+	cRef := strings.Join(s, "-")
+
+	dpdkconfBytes, err := consumeScratchNetConf(cRef, dataDir)
+	if err != nil {
+		return err
+	}
+
+	if err = json.Unmarshal(dpdkconfBytes, dc); err != nil {
+		return fmt.Errorf("failed to parse netconf: %v", err)
+	}
+
+	return nil
+}
+
+func enabledpdkmode(conf *dpdkConf, ifname string, dpdkmode bool) error {
+	stdout := &bytes.Buffer{}
+	var driver string
+	var device string
+
+	if dpdkmode != false {
+		driver = conf.DPDKDriver
+		device = ifname
+	} else {
+		driver = conf.KDriver
+		device = conf.PCIaddr
+	}
+
+	cmd := exec.Command(conf.DPDKtool, "-b", driver, device)
+	cmd.Stdout = stdout
+	err := cmd.Run()
+	if err != nil {
+		return fmt.Errorf("DPDK binding failed with err msg %q:", stdout.String())
+	}
+
+	stdout.Reset()
+	return nil
+}
+
+func getpciaddress(ifName string, vf int) (string, error) {
+	var pciaddr string
+	vfDir := fmt.Sprintf("/sys/class/net/%s/device/virtfn%d", ifName, vf)
+	dirInfo, err := os.Lstat(vfDir)
+	if err != nil {
+		return pciaddr, fmt.Errorf("can't get the symbolic link of virtfn%d dir of the device %q: %v", vf, ifName, err)
+	}
+
+	if (dirInfo.Mode() & os.ModeSymlink) == 0 {
+		return pciaddr, fmt.Errorf("No symbolic link for the virtfn%d dir of the device %q", vf, ifName)
+	}
+
+	pciinfo, err := os.Readlink(vfDir)
+	if err != nil {
+		return pciaddr, fmt.Errorf("can't read the symbolic link of virtfn%d dir of the device %q: %v", vf, ifName, err)
+	}
+
+	pciaddr = pciinfo[len("../"):]
+	return pciaddr, nil
+}
+
+func setupVF(conf *NetConf, ifName string, podifName string, cid string, netns ns.NetNS) error {
 
 	var vfIdx int
 	var infos []os.FileInfo
+	var pciAddr string
 
 	m, err := netlink.LinkByName(ifName)
 	if err != nil {
@@ -112,10 +226,13 @@ func setupVF(conf *NetConf, ifName string,  podifName string, netns ns.NetNS) er
 		return fmt.Errorf("no virtual function in the device %q: %v", ifName)
 	}
 
-	for vf := 0; vf <= (vfTotal-1); vf++ {
+	for vf := 0; vf <= (vfTotal - 1); vf++ {
 		vfDir := fmt.Sprintf("/sys/class/net/%s/device/virtfn%d/net", ifName, vf)
 		if _, err := os.Lstat(vfDir); err != nil {
-			return fmt.Errorf("failed to open the virtfn%d dir of the device %q: %v", vf, ifName, err)
+			if vf == (vfTotal - 1) {
+				return fmt.Errorf("failed to open the virtfn%d dir of the device %q: %v", vf, ifName, err)
+			}
+			continue
 		}
 
 		infos, err = ioutil.ReadDir(vfDir)
@@ -123,16 +240,20 @@ func setupVF(conf *NetConf, ifName string,  podifName string, netns ns.NetNS) er
 			return fmt.Errorf("failed to read the virtfn%d dir of the device %q: %v", vf, ifName, err)
 		}
 
-		if (len(infos) == 0) && (vf == (vfTotal-1)) {
+		if (len(infos) == 0) && (vf == (vfTotal - 1)) {
 			return fmt.Errorf("no Virtual function exist in directory %s, last vf is virtfn%d", vfDir, vf)
 		}
 
-		if (len(infos) == 0) && (vf != (vfTotal-1)) {
+		if (len(infos) == 0) && (vf != (vfTotal - 1)) {
 			continue
 		}
 
 		if len(infos) == 1 {
 			vfIdx = vf
+			pciAddr, err = getpciaddress(ifName, vfIdx)
+			if err != nil {
+				return fmt.Errorf("err in getting pci address - %q", err)
+			}
 			break
 		} else {
 			return fmt.Errorf("mutiple network devices in directory %s", vfDir)
@@ -145,21 +266,18 @@ func setupVF(conf *NetConf, ifName string,  podifName string, netns ns.NetNS) er
 	}
 
 	vfDevName := infos[0].Name()
+	if conf.DPDKMode != false {
+		conf.DPDKConf.PCIaddr = pciAddr
+		conf.DPDKConf.Ifname = podifName
+		if err = savedpdkConf(cid, conf.CNIDir, conf); err != nil {
+			return err
+		}
+		return enabledpdkmode(&conf.DPDKConf, vfDevName, true)
+	}
+
 	vfDev, err := netlink.LinkByName(vfDevName)
 	if err != nil {
 		return fmt.Errorf("failed to lookup vf device %q: %v", vfDevName, err)
-	}
-
-	// set hardware address
-	if conf.MAC != false {
-		macAddr,err := createRandomMacAddr()
-		if err != nil {
-			return fmt.Errorf("err in getting Random Mac addr: %v", err)
-		}
-
-		if err = netlink.LinkSetVfHardwareAddr(m, vfIdx, macAddr); err != nil {
-			return fmt.Errorf("failed to set vf %d macaddress: %v", vfIdx, err)
-		}
 	}
 
 	if conf.Vlan != 0 {
@@ -182,11 +300,20 @@ func setupVF(conf *NetConf, ifName string,  podifName string, netns ns.NetNS) er
 		if err != nil {
 			return fmt.Errorf("failed to rename %d vf of the device %q to %q: %v", vfIdx, vfDevName, podifName, err)
 		}
+
 		return nil
 	})
 }
 
-func releaseVF(conf *NetConf, podifName string, netns ns.NetNS) error {
+func releaseVF(conf *NetConf, podifName string, cid string, netns ns.NetNS) error {
+	if conf.DPDKMode != false {
+		df := &dpdkConf{}
+		if err := df.getdpdkConf(cid, conf.CNIDir, conf); err != nil {
+			return err
+		}
+		return enabledpdkmode(df, df.Ifname, false)
+	}
+
 	initns, err := ns.GetCurrentNS()
 	if err != nil {
 		return fmt.Errorf("failed to get init netns: %v", err)
@@ -237,16 +364,21 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 	defer netns.Close()
 
-	if n.IF0NAME != ""{
+	if n.IF0NAME != "" {
 		args.IfName = n.IF0NAME
 	}
 
-	if err = setupVF(n, n.IF0, args.IfName, netns); err != nil {
+	if err = setupVF(n, n.IF0, args.IfName, args.ContainerID, netns); err != nil {
 		return fmt.Errorf("failed to set up pod interface %q from the device %q: %v", args.IfName, n.IF0, err)
 	}
 
 	// run the IPAM plugin and get back the config to apply
-	result, err := ipam.ExecAdd(n.IPAM.Type, args.StdinData)
+	var result *types.Result
+	if n.DPDKMode != false {
+		return result.Print()
+	}
+
+	result, err = ipam.ExecAdd(n.IPAM.Type, args.StdinData)
 	if err != nil {
 		return fmt.Errorf("failed to set up IPAM plugin type %q from the device %q: %v", n.IPAM.Type, n.IF0, err)
 	}
@@ -281,8 +413,12 @@ func cmdDel(args *skel.CmdArgs) error {
 		args.IfName = n.IF0NAME
 	}
 
-	if err = releaseVF(n, args.IfName, netns); err != nil {
+	if err = releaseVF(n, args.IfName, args.ContainerID, netns); err != nil {
 		return err
+	}
+
+	if n.DPDKMode != false {
+		return nil
 	}
 
 	err = ipam.ExecDel(n.IPAM.Type, args.StdinData)
