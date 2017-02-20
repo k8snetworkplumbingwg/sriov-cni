@@ -23,6 +23,12 @@ import (
 
 const defaultCNIDir = "/var/lib/cni/sriov"
 
+const (
+	NOTSUP = iota - 1
+	FALSE  = iota - 1
+	TRUE   = iota - 1
+)
+
 type dpdkConf struct {
 	PCIaddr    string `json:"pci_addr"`
 	Ifname     string `json:"ifname"`
@@ -221,17 +227,21 @@ func getphyPortID(ifName string) (string, error) {
 
 }
 
-func compareportID(ifName string, portId string) (bool, error) {
+func compareportID(ifName string, portId string) (int, error) {
 	physportId, err := getphyPortID(ifName)
 	if err != nil {
-		return false, err
+		return FALSE, err
 	}
+
+	if len(physportId) == 0 && err == nil {
+		return NOTSUP, nil
+	}
+
 	if strings.Compare(physportId, portId) != 0 {
-		return false, nil
+		return FALSE, nil
 	}
 
-	return true, nil
-
+	return TRUE, nil
 }
 
 func getsriovNumfs(ifName string) (int, error) {
@@ -313,11 +323,11 @@ func setupVF(conf *NetConf, ifName string, podifName string, cid string, netns n
 
 		// if sriov vf has more than one interface
 		if len(infos) <= 2 {
-			var portId bool
 			var err error
 
 			vfIdx = vf
-			for i := 1; i <= len(infos) && portId != true; i++ {
+			portId := FALSE
+			for i := 1; i <= len(infos) && portId == FALSE; i++ {
 				vfDevName = infos[i-1].Name()
 
 				if len(physportId) != 0 {
@@ -331,11 +341,11 @@ func setupVF(conf *NetConf, ifName string, podifName string, cid string, netns n
 			}
 
 			//return error, if no VF is available for the NIC support port ID
-			if !portId && len(physportId) != 0 && (vf == (vfTotal - 1)) {
+			if portId == FALSE && len(physportId) != 0 && (vf == (vfTotal - 1)) {
 				return fmt.Errorf("no Virtual function exist in directory %s, last vf is virtfn%d", vfDir, vf)
 			}
 
-			if !portId && len(physportId) != 0 {
+			if portId == FALSE && len(physportId) != 0 {
 				continue
 			}
 
