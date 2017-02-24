@@ -12,7 +12,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 
 	"github.com/containernetworking/cni/pkg/ipam"
 	"github.com/containernetworking/cni/pkg/ns"
@@ -22,12 +21,7 @@ import (
 )
 
 const defaultCNIDir = "/var/lib/cni/sriov"
-
-const (
-	NOTSUP = iota - 1
-	FALSE  = iota - 1
-	TRUE   = iota - 1
-)
+const maxSharedVf = 2
 
 type dpdkConf struct {
 	PCIaddr    string `json:"pci_addr"`
@@ -40,6 +34,7 @@ type dpdkConf struct {
 type NetConf struct {
 	types.NetConf
 	DPDKMode bool
+	Sharedvf bool
 	DPDKConf dpdkConf `json:"dpdk,omitempty"`
 	CNIDir   string   `json:"cniDir"`
 	IF0      string   `json:"if0"`
@@ -199,51 +194,6 @@ func getpciaddress(ifName string, vf int) (string, error) {
 	return pciaddr, nil
 }
 
-func getphyPortID(ifName string) (string, error) {
-	var physportId string
-
-	physportidFile := fmt.Sprintf("/sys/class/net/%s/phys_port_id", ifName)
-	if _, err := os.Lstat(physportidFile); err != nil {
-		return physportId, fmt.Errorf("failed to open the phys_port_id file of device %q: %v", ifName, err)
-	}
-
-	data, err := ioutil.ReadFile(physportidFile)
-	if err != nil {
-		// skip nics that don't support phy port id
-		if e, ok := err.(*os.PathError); ok && e.Err == syscall.ENOTSUP {
-			return physportId, nil
-		}
-
-		return physportId, fmt.Errorf("failed to read the phys_port_id file of device %q: %v", ifName, err)
-	}
-
-	if len(data) == 0 {
-		return physportId, fmt.Errorf("no data in the file: %q", physportidFile)
-	}
-
-	physportId = strings.TrimSpace(string(data))
-
-	return physportId, nil
-
-}
-
-func compareportID(ifName string, portId string) (int, error) {
-	physportId, err := getphyPortID(ifName)
-	if err != nil {
-		return FALSE, err
-	}
-
-	if len(physportId) == 0 && err == nil {
-		return NOTSUP, nil
-	}
-
-	if strings.Compare(physportId, portId) != 0 {
-		return FALSE, nil
-	}
-
-	return TRUE, nil
-}
-
 func getsriovNumfs(ifName string) (int, error) {
 	var vfTotal int
 
@@ -275,17 +225,10 @@ func setupVF(conf *NetConf, ifName string, podifName string, cid string, netns n
 	var vfIdx int
 	var infos []os.FileInfo
 	var pciAddr string
-	var vfDevName string
 
 	m, err := netlink.LinkByName(ifName)
 	if err != nil {
 		return fmt.Errorf("failed to lookup master %q: %v", conf.IF0, err)
-	}
-
-	// get the ifname phy port id, if exist
-	physportId, err := getphyPortID(ifName)
-	if err != nil {
-		return fmt.Errorf("failed to get phy port id of %q: %v", ifName, err)
 	}
 
 	// get the ifname sriov vf num
@@ -299,7 +242,6 @@ func setupVF(conf *NetConf, ifName string, podifName string, cid string, netns n
 	}
 
 	for vf := 0; vf <= (vfTotal - 1); vf++ {
-		// get network interface of virtual function
 		vfDir := fmt.Sprintf("/sys/class/net/%s/device/virtfn%d/net", ifName, vf)
 		if _, err := os.Lstat(vfDir); err != nil {
 			if vf == (vfTotal - 1) {
@@ -321,35 +263,12 @@ func setupVF(conf *NetConf, ifName string, podifName string, cid string, netns n
 			continue
 		}
 
-		// if sriov vf has more than one interface
-		if len(infos) <= 2 {
-			var err error
+		if len(infos) == maxSharedVf {
+			conf.Sharedvf = true
+		}
 
+		if len(infos) <= maxSharedVf {
 			vfIdx = vf
-			portId := FALSE
-			for i := 1; i <= len(infos) && portId == FALSE; i++ {
-				vfDevName = infos[i-1].Name()
-
-				if len(physportId) != 0 {
-					// compare the phy port id of sriov vf net interface and pf
-					portId, err = compareportID(infos[i-1].Name(), physportId)
-					if err != nil {
-						return err
-					}
-
-				}
-			}
-
-			//return error, if no VF is available for the NIC support port ID
-			if portId == FALSE && len(physportId) != 0 && (vf == (vfTotal - 1)) {
-				return fmt.Errorf("no Virtual function exist in directory %s, last vf is virtfn%d", vfDir, vf)
-			}
-
-			if portId == FALSE && len(physportId) != 0 {
-				continue
-			}
-
-			// get the sriov vf net interface pci
 			pciAddr, err = getpciaddress(ifName, vfIdx)
 			if err != nil {
 				return fmt.Errorf("err in getting pci address - %q", err)
@@ -360,51 +279,67 @@ func setupVF(conf *NetConf, ifName string, podifName string, cid string, netns n
 		}
 	}
 
+	// VF NIC name
+	if len(infos) != 1 && len(infos) != maxSharedVf {
+		return fmt.Errorf("no virutal network resources avaiable for the %q", conf.IF0)
+	}
+
+	if conf.Sharedvf != false && conf.L2Mode != true {
+		return fmt.Errorf("l2enable mode must be true to use shared net interface %q", conf.IF0)
+	}
+
 	if conf.DPDKMode != false {
 		conf.DPDKConf.PCIaddr = pciAddr
 		conf.DPDKConf.Ifname = podifName
-		// save the DPDK net conf in cniDir
 		if err = savedpdkConf(cid, conf.CNIDir, conf); err != nil {
 			return err
 		}
-		// bind the sriov vf to the DPDK driver
-		return enabledpdkmode(&conf.DPDKConf, vfDevName, true)
+		return enabledpdkmode(&conf.DPDKConf, infos[0].Name(), true)
 	}
 
-	vfDev, err := netlink.LinkByName(vfDevName)
-	if err != nil {
-		return fmt.Errorf("failed to lookup vf device %q: %v", vfDevName, err)
-	}
-
-	if conf.Vlan != 0 {
-		if err = netlink.LinkSetVfVlan(m, vfIdx, conf.Vlan); err != nil {
-			return fmt.Errorf("failed to set vf %d vlan: %v", vfIdx, err)
-		}
-	}
-
-	if err = netlink.LinkSetUp(vfDev); err != nil {
-		return fmt.Errorf("failed to setup vf %d device: %v", vfIdx, err)
-	}
-
-	// move VF device to ns
-	if err = netlink.LinkSetNsFd(vfDev, int(netns.Fd())); err != nil {
-		return fmt.Errorf("failed to move vf %d to netns: %v", vfIdx, err)
-	}
-
-	return netns.Do(func(_ ns.NetNS) error {
-		err := renameLink(vfDevName, podifName)
+	for i := 1; i <= len(infos); i++ {
+		vfDev, err := netlink.LinkByName(infos[i-1].Name())
 		if err != nil {
-			return fmt.Errorf("failed to rename %d vf of the device %q to %q: %v", vfIdx, vfDevName, podifName, err)
+			return fmt.Errorf("failed to lookup vf device %q: %v", infos[i-1].Name(), err)
 		}
 
-		// for L2 mode enable the pod net interface
-		if conf.L2Mode != false {
-			err = setUpLink(podifName)
-			if err != nil {
-				return fmt.Errorf("failed to set up the pod interface name %q: %v", podifName, err)
+		if conf.Vlan != 0 {
+			if err = netlink.LinkSetVfVlan(m, vfIdx, conf.Vlan); err != nil {
+				return fmt.Errorf("failed to set vf %d vlan: %v", vfIdx, err)
 			}
 		}
 
+		if err = netlink.LinkSetUp(vfDev); err != nil {
+			return fmt.Errorf("failed to setup vf %d device: %v", vfIdx, err)
+		}
+
+		// move VF device to ns
+		if err = netlink.LinkSetNsFd(vfDev, int(netns.Fd())); err != nil {
+			return fmt.Errorf("failed to move vf %d to netns: %v", vfIdx, err)
+		}
+	}
+
+	return netns.Do(func(_ ns.NetNS) error {
+
+		ifName := podifName
+		for i := 1; i <= len(infos); i++ {
+			if len(infos) == maxSharedVf && i == len(infos) {
+				ifName = podifName + fmt.Sprintf("d%d", i-1)
+			}
+
+			err := renameLink(infos[i-1].Name(), ifName)
+			if err != nil {
+				return fmt.Errorf("failed to rename %d vf of the device %q to %q: %v", vfIdx, infos[i-1].Name(), ifName, err)
+			}
+
+			// for L2 mode enable the pod net interface
+			if conf.L2Mode != false {
+				err = setUpLink(ifName)
+				if err != nil {
+					return fmt.Errorf("failed to set up the pod interface name %q: %v", ifName, err)
+				}
+			}
+		}
 		return nil
 	})
 }
@@ -430,30 +365,50 @@ func releaseVF(conf *NetConf, podifName string, cid string, netns ns.NetNS) erro
 		return fmt.Errorf("failed to enter netns %q: %v", netns, err)
 	}
 
-	// get VF device
-	vfDev, err := netlink.LinkByName(podifName)
-	if err != nil {
-		return fmt.Errorf("failed to lookup vf device %q: %v", podifName, err)
+	if conf.L2Mode != false {
+		//check for the shared vf net interface
+		ifName := podifName + "d1"
+		_, err := netlink.LinkByName(ifName)
+		if err == nil {
+			conf.Sharedvf = true
+		}
+
 	}
 
-	// device name in init netns
-	index := vfDev.Attrs().Index
-	devName := fmt.Sprintf("dev%d", index)
+	for i := 1; i <= maxSharedVf; i++ {
+		ifName := podifName
+		if i == maxSharedVf {
+			ifName = podifName + fmt.Sprintf("d%d", i-1)
+		}
+		// get VF device
+		vfDev, err := netlink.LinkByName(ifName)
+		if err != nil {
+			return fmt.Errorf("failed to lookup vf device %q: %v", ifName, err)
+		}
 
-	// shutdown VF device
-	if err = netlink.LinkSetDown(vfDev); err != nil {
-		return fmt.Errorf("failed to down vf device %q: %v", podifName, err)
-	}
+		// device name in init netns
+		index := vfDev.Attrs().Index
+		devName := fmt.Sprintf("dev%d", index)
 
-	// rename VF device
-	err = renameLink(podifName, devName)
-	if err != nil {
-		return fmt.Errorf("failed to rename vf device %q to %q: %v", podifName, devName, err)
-	}
+		// shutdown VF device
+		if err = netlink.LinkSetDown(vfDev); err != nil {
+			return fmt.Errorf("failed to down vf device %q: %v", ifName, err)
+		}
 
-	// move VF device to init netns
-	if err = netlink.LinkSetNsFd(vfDev, int(initns.Fd())); err != nil {
-		return fmt.Errorf("failed to move vf device to init netns: %v", podifName, err)
+		// rename VF device
+		err = renameLink(ifName, devName)
+		if err != nil {
+			return fmt.Errorf("failed to rename vf device %q to %q: %v", ifName, devName, err)
+		}
+
+		// move VF device to init netns
+		if err = netlink.LinkSetNsFd(vfDev, int(initns.Fd())); err != nil {
+			return fmt.Errorf("failed to move vf device to init netns: %v", ifName, err)
+		}
+		//break the loop, if the namespace has no shared vf net interface
+		if conf.Sharedvf != true {
+			break
+		}
 	}
 
 	return nil
