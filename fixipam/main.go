@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
+	"net"
+
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
-	"net"
 )
 
 func main() {

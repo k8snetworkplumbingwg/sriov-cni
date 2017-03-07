@@ -5,7 +5,10 @@ if [[ ${DEBUG} -gt 0 ]]; then set -x; fi
 # Run a command in a private network namespace
 # set up by CNI plugins
 contid=$(printf '%x%x%x%x' $RANDOM $RANDOM $RANDOM $RANDOM)
+echo "contid=$contid"
+
 netnspath=/var/run/netns/$contid
+echo "netnspath=$netnspath"
 
 ip netns add $contid
 ./exec-plugins.sh add $contid $netnspath
