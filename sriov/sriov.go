@@ -12,17 +12,10 @@ import (
 	"github.com/containernetworking/cni/pkg/ipam"
 	"github.com/containernetworking/cni/pkg/ns"
 	"github.com/containernetworking/cni/pkg/skel"
-	"github.com/containernetworking/cni/pkg/types"
 	"github.com/vishvananda/netlink"
-)
 
-type NetConf struct {
-	types.NetConf
-	Master string `json:"master"`
-	MAC    string `json:"mac"`
-	VF     *int   `json:"vf"`
-	Vlan   int    `json:"vlan"`
-}
+	. "github.com/hustcat/sriov-cni/config"
+)
 
 func init() {
 	// this ensures that main runs only on main thread (thread group leader).
@@ -31,28 +24,43 @@ func init() {
 	runtime.LockOSThread()
 }
 
-func loadConf(bytes []byte) (*NetConf, error) {
+func loadConf(bytes []byte, args string) (*SriovConf, error) {
 	n := &NetConf{}
+	a := &NetArgs{}
+
 	if err := json.Unmarshal(bytes, n); err != nil {
 		return nil, fmt.Errorf("failed to load netconf: %v", err)
 	}
 	if n.Master == "" {
 		return nil, fmt.Errorf(`"master" field is required. It specifies the host interface name to virtualize`)
 	}
-	return n, nil
+
+	if args != "" {
+		err := LoadSriovArgs(args, a)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse args: %v", err)
+		}
+	}
+
+	return &SriovConf{
+		Net:  n,
+		Args: a,
+	}, nil
 }
 
-func setupVF(conf *NetConf, ifName string, netns ns.NetNS) error {
+func setupVF(conf *SriovConf, ifName string, netns ns.NetNS) error {
 	vfIdx := 0
-	masterName := conf.Master
-	if conf.VF != nil {
-		vfIdx = *conf.VF
+	masterName := conf.Net.Master
+	args := conf.Args
+
+	if args.VF != 0 {
+		vfIdx = args.VF
 	}
 	// TODO: if conf.VF == nil, alloc vf randomly
 
 	m, err := netlink.LinkByName(masterName)
 	if err != nil {
-		return fmt.Errorf("failed to lookup master %q: %v", conf.Master, err)
+		return fmt.Errorf("failed to lookup master %q: %v", masterName, err)
 	}
 
 	vfDir := fmt.Sprintf("/sys/class/net/%s/device/virtfn%d/net", masterName, vfIdx)
@@ -77,8 +85,8 @@ func setupVF(conf *NetConf, ifName string, netns ns.NetNS) error {
 	}
 
 	// set hardware address
-	if conf.MAC != "" {
-		macAddr, err := net.ParseMAC(conf.MAC)
+	if args.MAC != "" {
+		macAddr, err := net.ParseMAC(args.MAC)
 		if err != nil {
 			return err
 		}
@@ -87,8 +95,8 @@ func setupVF(conf *NetConf, ifName string, netns ns.NetNS) error {
 		}
 	}
 
-	if conf.Vlan != 0 {
-		if err = netlink.LinkSetVfVlan(m, vfIdx, conf.Vlan); err != nil {
+	if args.VLAN != 0 {
+		if err = netlink.LinkSetVfVlan(m, vfIdx, args.VLAN); err != nil {
 			return fmt.Errorf("failed to set vf %d vlan: %v", vfIdx, err)
 		}
 	}
@@ -111,10 +119,11 @@ func setupVF(conf *NetConf, ifName string, netns ns.NetNS) error {
 	})
 }
 
-func releaseVF(conf *NetConf, ifName string, netns ns.NetNS) error {
+func releaseVF(conf *SriovConf, ifName string, netns ns.NetNS) error {
 	vfIdx := 0
-	if conf.VF != nil {
-		vfIdx = *conf.VF
+	args := conf.Args
+	if args.VF != 0 {
+		vfIdx = args.VF
 	}
 
 	initns, err := ns.GetCurrentNS()
@@ -156,7 +165,7 @@ func releaseVF(conf *NetConf, ifName string, netns ns.NetNS) error {
 }
 
 func cmdAdd(args *skel.CmdArgs) error {
-	n, err := loadConf(args.StdinData)
+	n, err := loadConf(args.StdinData, args.Args)
 	if err != nil {
 		return err
 	}
@@ -171,8 +180,12 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return err
 	}
 
+	if err:= resetCniArgsForIPAM(n.Args); err != nil {
+		return err
+	}
+
 	// run the IPAM plugin and get back the config to apply
-	result, err := ipam.ExecAdd(n.IPAM.Type, args.StdinData)
+	result, err := ipam.ExecAdd(n.Net.IPAM.Type, args.StdinData)
 	if err != nil {
 		return err
 	}
@@ -187,12 +200,12 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return err
 	}
 
-	result.DNS = n.DNS
+	result.DNS = n.Net.DNS
 	return result.Print()
 }
 
 func cmdDel(args *skel.CmdArgs) error {
-	n, err := loadConf(args.StdinData)
+	n, err := loadConf(args.StdinData, args.Args)
 	if err != nil {
 		return err
 	}
@@ -207,7 +220,11 @@ func cmdDel(args *skel.CmdArgs) error {
 		return err
 	}
 
-	err = ipam.ExecDel(n.IPAM.Type, args.StdinData)
+	if err:= resetCniArgsForIPAM(n.Args); err != nil {
+		return err
+	}
+
+	err = ipam.ExecDel(n.Net.IPAM.Type, args.StdinData)
 	if err != nil {
 		return err
 	}
@@ -222,6 +239,19 @@ func renameLink(curName, newName string) error {
 	}
 
 	return netlink.LinkSetName(link, newName)
+}
+
+func resetCniArgsForIPAM(args *NetArgs) error {
+	argVal := ""
+
+	if args.IP != nil {
+		argVal = fmt.Sprintf("IP=%s", args.IP.String())
+	}
+	if err := os.Setenv("CNI_ARGS", argVal); err != nil {
+		return fmt.Errorf("reset cni args for ipam failed: %v", err)
+	}
+
+	return nil
 }
 
 func main() {

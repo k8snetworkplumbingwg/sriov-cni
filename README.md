@@ -30,10 +30,13 @@ options ixgbe max_vfs=8,8
 * `name` (string, required): the name of the network
 * `type` (string, required): "sriov"
 * `master` (string, required): name of the PF
+* `ipam` (dictionary, required): IPAM configuration to be used for this network.
+
+## Extra arguments
+
 * `vf` (int, optional): VF index, default value is 0
 * `vlan` (int, optional): VLAN ID for VF device
 * `mac` (string, optional): mac address for VF device
-* `ipam` (dictionary, required): IPAM configuration to be used for this network.
 
 ## Usage
 
@@ -45,10 +48,8 @@ Given the following network configuration:
     "name": "mynet",
     "type": "sriov",
     "master": "eth1",
-    "vf": 1,
-    "mac": "66:d8:02:77:aa:aa",
     "ipam": {
-        "type": "host-local",
+        "type": "fixipam",
         "subnet": "10.55.206.0/26",
         "routes": [
             { "dst": "0.0.0.0/0" }
@@ -59,16 +60,22 @@ Given the following network configuration:
 EOF
 ```
 
-```
-# CNI_PATH=$CNI_PATH CNI_ARGS="IP=10.55.206.46" ./priv-net-run.sh ifconfig
+Add container to network:
+
+```sh
+# CNI_PATH=`pwd`/bin
+# cd scripts
+# CNI_PATH=$CNI_PATH CNI_ARGS="IP=10.55.206.46;VF=1;MAC=66:d8:02:77:aa:aa" ./priv-net-run.sh ifconfig
+contid=148e21a85bcc7aaf
+netnspath=/var/run/netns/148e21a85bcc7aaf
 eth0      Link encap:Ethernet  HWaddr 66:D8:02:77:AA:AA  
           inet addr:10.55.206.46  Bcast:0.0.0.0  Mask:255.255.255.192
           inet6 addr: fe80::64d8:2ff:fe77:aaaa/64 Scope:Link
           UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
-          RX packets:7 errors:0 dropped:0 overruns:0 frame:0
-          TX packets:14 errors:0 dropped:0 overruns:0 carrier:0
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:7 errors:0 dropped:0 overruns:0 carrier:0
           collisions:0 txqueuelen:1000 
-          RX bytes:530 (530.0 b)  TX bytes:988 (988.0 b)
+          RX bytes:0 (0.0 b)  TX bytes:558 (558.0 b)
 
 lo        Link encap:Local Loopback  
           inet addr:127.0.0.1  Mask:255.0.0.0
@@ -78,6 +85,18 @@ lo        Link encap:Local Loopback
           TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
           collisions:0 txqueuelen:0 
           RX bytes:0 (0.0 b)  TX bytes:0 (0.0 b)
+```
+
+Remove container from network:
+
+```sh
+# CNI_PATH=$CNI_PATH ./exec-plugins.sh del $contid /var/run/netns/$contid
+```
+
+For example:
+
+```sh
+# CNI_PATH=$CNI_PATH ./exec-plugins.sh del 148e21a85bcc7aaf /var/run/netns/148e21a85bcc7aaf
 ```
 
 [More info](https://github.com/containernetworking/cni/pull/259).
