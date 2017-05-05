@@ -3,7 +3,6 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"net"
 	"strconv"
 
 	"github.com/containernetworking/cni/pkg/types"
@@ -32,7 +31,6 @@ type NetArgs struct {
 	VF   UnmarshallableInt          `json:"vf,omitempty"`
 	VLAN UnmarshallableInt          `json:"vlan,omitempty"`
 	MAC  types.UnmarshallableString `json:"mac,omitempty"`
-	IP   net.IP                     `json:"ip,omitempty"`
 }
 
 type SriovConf struct {
