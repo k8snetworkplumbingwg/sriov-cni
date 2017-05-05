@@ -65,7 +65,7 @@ Add container to network:
 ```sh
 # CNI_PATH=`pwd`/bin
 # cd scripts
-# CNI_PATH=$CNI_PATH CNI_ARGS="IP=10.55.206.46;VF=1;MAC=66:d8:02:77:aa:aa" ./priv-net-run.sh ifconfig
+# CNI_PATH=$CNI_PATH CNI_ARGS="IgnoreUnknown=1;IP=10.55.206.46;VF=1;MAC=66:d8:02:77:aa:aa" ./priv-net-run.sh ifconfig
 contid=148e21a85bcc7aaf
 netnspath=/var/run/netns/148e21a85bcc7aaf
 eth0      Link encap:Ethernet  HWaddr 66:D8:02:77:AA:AA  
