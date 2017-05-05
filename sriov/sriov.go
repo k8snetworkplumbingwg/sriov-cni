@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -24,37 +23,13 @@ func init() {
 	runtime.LockOSThread()
 }
 
-func loadConf(bytes []byte, args string) (*SriovConf, error) {
-	n := &NetConf{}
-	a := &NetArgs{}
-
-	if err := json.Unmarshal(bytes, n); err != nil {
-		return nil, fmt.Errorf("failed to load netconf: %v", err)
-	}
-	if n.Master == "" {
-		return nil, fmt.Errorf(`"master" field is required. It specifies the host interface name to virtualize`)
-	}
-
-	if args != "" {
-		err := LoadSriovArgs(args, a)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse args: %v", err)
-		}
-	}
-
-	return &SriovConf{
-		Net:  n,
-		Args: a,
-	}, nil
-}
-
 func setupVF(conf *SriovConf, ifName string, netns ns.NetNS) error {
 	vfIdx := 0
 	masterName := conf.Net.Master
 	args := conf.Args
 
 	if args.VF != 0 {
-		vfIdx = args.VF
+		vfIdx = int(args.VF)
 	}
 	// TODO: if conf.VF == nil, alloc vf randomly
 
@@ -86,7 +61,7 @@ func setupVF(conf *SriovConf, ifName string, netns ns.NetNS) error {
 
 	// set hardware address
 	if args.MAC != "" {
-		macAddr, err := net.ParseMAC(args.MAC)
+		macAddr, err := net.ParseMAC(string(args.MAC))
 		if err != nil {
 			return err
 		}
@@ -96,7 +71,7 @@ func setupVF(conf *SriovConf, ifName string, netns ns.NetNS) error {
 	}
 
 	if args.VLAN != 0 {
-		if err = netlink.LinkSetVfVlan(m, vfIdx, args.VLAN); err != nil {
+		if err = netlink.LinkSetVfVlan(m, vfIdx, int(args.VLAN)); err != nil {
 			return fmt.Errorf("failed to set vf %d vlan: %v", vfIdx, err)
 		}
 	}
@@ -120,52 +95,46 @@ func setupVF(conf *SriovConf, ifName string, netns ns.NetNS) error {
 }
 
 func releaseVF(conf *SriovConf, ifName string, netns ns.NetNS) error {
-	vfIdx := 0
-	args := conf.Args
-	if args.VF != 0 {
-		vfIdx = args.VF
-	}
-
 	initns, err := ns.GetCurrentNS()
 	if err != nil {
 		return fmt.Errorf("failed to get init netns: %v", err)
 	}
 
-	if err = netns.Set(); err != nil {
-		return fmt.Errorf("failed to enter netns %q: %v", netns, err)
-	}
+	// for IPAM in cmdDel
+	return netns.Do(func(_ ns.NetNS) error {
 
-	// get VF device
-	vfDev, err := netlink.LinkByName(ifName)
-	if err != nil {
-		return fmt.Errorf("failed to lookup vf %d device %q: %v", vfIdx, ifName, err)
-	}
+		// get VF device
+		vfDev, err := netlink.LinkByName(ifName)
+		if err != nil {
+			return fmt.Errorf("failed to lookup device %s: %v", ifName, err)
+		}
 
-	// device name in init netns
-	index := vfDev.Attrs().Index
-	devName := fmt.Sprintf("dev%d", index)
+		// device name in init netns
+		index := vfDev.Attrs().Index
+		devName := fmt.Sprintf("dev%d", index)
 
-	// shutdown VF device
-	if err = netlink.LinkSetDown(vfDev); err != nil {
-		return fmt.Errorf("failed to down vf %d device: %v", vfIdx, err)
-	}
+		// shutdown VF device
+		if err = netlink.LinkSetDown(vfDev); err != nil {
+			return fmt.Errorf("failed to down device: %v", err)
+		}
 
-	// rename VF device
-	err = renameLink(ifName, devName)
-	if err != nil {
-		return fmt.Errorf("failed to rename vf %d evice %q to %q: %v", vfIdx, ifName, devName, err)
-	}
+		// rename VF device
+		err = renameLink(ifName, devName)
+		if err != nil {
+			return fmt.Errorf("failed to rename device %s to %s: %v", ifName, devName, err)
+		}
 
-	// move VF device to init netns
-	if err = netlink.LinkSetNsFd(vfDev, int(initns.Fd())); err != nil {
-		return fmt.Errorf("failed to move vf %d to init netns: %v", vfIdx, err)
-	}
+		// move VF device to init netns
+		if err = netlink.LinkSetNsFd(vfDev, int(initns.Fd())); err != nil {
+			return fmt.Errorf("failed to move device %s to init netns: %v", ifName, err)
+		}
 
-	return nil
+		return nil
+	})
 }
 
 func cmdAdd(args *skel.CmdArgs) error {
-	n, err := loadConf(args.StdinData, args.Args)
+	n, err := LoadConf(args.StdinData, args.Args)
 	if err != nil {
 		return err
 	}
@@ -177,10 +146,6 @@ func cmdAdd(args *skel.CmdArgs) error {
 	defer netns.Close()
 
 	if err = setupVF(n, args.IfName, netns); err != nil {
-		return err
-	}
-
-	if err:= resetCniArgsForIPAM(n.Args); err != nil {
 		return err
 	}
 
@@ -205,7 +170,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 }
 
 func cmdDel(args *skel.CmdArgs) error {
-	n, err := loadConf(args.StdinData, args.Args)
+	n, err := LoadConf(args.StdinData, args.Args)
 	if err != nil {
 		return err
 	}
@@ -217,10 +182,6 @@ func cmdDel(args *skel.CmdArgs) error {
 	defer netns.Close()
 
 	if err = releaseVF(n, args.IfName, netns); err != nil {
-		return err
-	}
-
-	if err:= resetCniArgsForIPAM(n.Args); err != nil {
 		return err
 	}
 
@@ -239,19 +200,6 @@ func renameLink(curName, newName string) error {
 	}
 
 	return netlink.LinkSetName(link, newName)
-}
-
-func resetCniArgsForIPAM(args *NetArgs) error {
-	argVal := ""
-
-	if args.IP != nil {
-		argVal = fmt.Sprintf("IP=%s", args.IP.String())
-	}
-	if err := os.Setenv("CNI_ARGS", argVal); err != nil {
-		return fmt.Errorf("reset cni args for ipam failed: %v", err)
-	}
-
-	return nil
 }
 
 func main() {
