@@ -34,7 +34,7 @@ options ixgbe max_vfs=8,8
 
 ## Extra arguments
 
-* `vf` (int, optional): VF index, default value is 0
+* `vf` (int, optional): VF index. This plugin will allocate a free VF if not assigned
 * `vlan` (int, optional): VLAN ID for VF device
 * `mac` (string, optional): mac address for VF device
 
