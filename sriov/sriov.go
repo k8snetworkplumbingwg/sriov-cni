@@ -220,6 +220,46 @@ func getsriovNumfs(ifName string) (int, error) {
 	return vfTotal, nil
 }
 
+func setSharedVfVlan(ifName string, vfIdx int, vlan int) error {
+	var err error
+	var sharedifName string
+
+	vfDir := fmt.Sprintf("/sys/class/net/%s/device/net", ifName)
+	if _, err := os.Lstat(vfDir); err != nil {
+		return fmt.Errorf("failed to open the net dir of the device %q: %v", ifName, err)
+	}
+
+	infos, err := ioutil.ReadDir(vfDir)
+	if err != nil {
+		return fmt.Errorf("failed to read the net dir of the device %q: %v", ifName, err)
+	}
+
+	if len(infos) != maxSharedVf {
+		return fmt.Errorf("Given PF - %q is not having shared VF", ifName)
+	}
+
+	for _, dir := range infos {
+		if strings.Compare(ifName, dir.Name()) != 0 {
+			sharedifName = dir.Name()
+		}
+	}
+
+	if sharedifName == "" {
+		return fmt.Errorf("Shared ifname can't be empty")
+	}
+
+	iflink, err := netlink.LinkByName(sharedifName)
+	if err != nil {
+		return fmt.Errorf("failed to lookup the shared ifname %q: %v", sharedifName, err)
+	}
+
+	if err := netlink.LinkSetVfVlan(iflink, vfIdx, vlan); err != nil {
+		return fmt.Errorf("failed to set vf %d vlan: %v for shared ifname %q", vfIdx, err, sharedifName)
+	}
+
+	return nil
+}
+
 func setupVF(conf *NetConf, ifName string, podifName string, cid string, netns ns.NetNS) error {
 
 	var vfIdx int
@@ -306,6 +346,12 @@ func setupVF(conf *NetConf, ifName string, podifName string, cid string, netns n
 		if conf.Vlan != 0 {
 			if err = netlink.LinkSetVfVlan(m, vfIdx, conf.Vlan); err != nil {
 				return fmt.Errorf("failed to set vf %d vlan: %v", vfIdx, err)
+			}
+		}
+
+		if conf.Vlan != 0 && conf.Sharedvf != false && conf.L2Mode != false {
+			if err = setSharedVfVlan(ifName, vfIdx, conf.Vlan); err != nil {
+				return fmt.Errorf("failed to set shared vf %d vlan: %v", vfIdx, err)
 			}
 		}
 
