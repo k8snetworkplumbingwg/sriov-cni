@@ -372,6 +372,18 @@ func setupVF(conf *NetConf, ifName string, podifName string, cid string, netns n
 		return fmt.Errorf("l2enable mode must be true to use shared net interface %q", conf.IF0)
 	}
 
+	if conf.Vlan != 0 {
+		if err = netlink.LinkSetVfVlan(m, vfIdx, conf.Vlan); err != nil {
+			return fmt.Errorf("failed to set vf %d vlan: %v", vfIdx, err)
+		}
+
+		if conf.Sharedvf {
+			if err = setSharedVfVlan(ifName, vfIdx, conf.Vlan); err != nil {
+				return fmt.Errorf("failed to set shared vf %d vlan: %v", vfIdx, err)
+			}
+		}
+	}
+
 	if conf.DPDKMode != false {
 		conf.DPDKConf.PCIaddr = pciAddr
 		conf.DPDKConf.Ifname = podifName
@@ -392,18 +404,6 @@ func setupVF(conf *NetConf, ifName string, podifName string, cid string, netns n
 		vfDev, err := netlink.LinkByName(infos[i-1].Name())
 		if err != nil {
 			return fmt.Errorf("failed to lookup vf device %q: %v", infos[i-1].Name(), err)
-		}
-
-		if conf.Vlan != 0 {
-			if err = netlink.LinkSetVfVlan(m, vfIdx, conf.Vlan); err != nil {
-				return fmt.Errorf("failed to set vf %d vlan: %v", vfIdx, err)
-			}
-		}
-
-		if conf.Vlan != 0 && conf.Sharedvf != false && conf.L2Mode != false {
-			if err = setSharedVfVlan(ifName, vfIdx, conf.Vlan); err != nil {
-				return fmt.Errorf("failed to set shared vf %d vlan: %v", vfIdx, err)
-			}
 		}
 
 		if err = netlink.LinkSetUp(vfDev); err != nil {
