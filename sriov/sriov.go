@@ -29,6 +29,7 @@ type dpdkConf struct {
 	KDriver    string `json:"kernel_driver"`
 	DPDKDriver string `json:"dpdk_driver"`
 	DPDKtool   string `json:"dpdk_tool"`
+	VFID       int    `json: "vfid"`
 }
 
 type NetConf struct {
@@ -194,6 +195,32 @@ func getpciaddress(ifName string, vf int) (string, error) {
 	return pciaddr, nil
 }
 
+func getSharedPF(ifName string) (string, error) {
+	pfName := ""
+	pfDir := fmt.Sprintf("/sys/class/net/%s", ifName)
+	dirInfo, err := os.Lstat(pfDir)
+	if err != nil {
+		return pfName, fmt.Errorf("can't get the symbolic link of the device %q: %v", ifName, err)
+	}
+
+	if (dirInfo.Mode() & os.ModeSymlink) == 0 {
+		return pfName, fmt.Errorf("No symbolic link for dir of the device %q", ifName)
+	}
+
+	fullpath, err := filepath.EvalSymlinks(pfDir)
+	parentDir := fullpath[:len(fullpath)-len(ifName)]
+	dirList, err := ioutil.ReadDir(parentDir)
+
+	for _, file := range dirList {
+		if file.Name() != ifName {
+			pfName = file.Name()
+			return pfName, nil
+		}
+	}
+
+	return pfName, fmt.Errorf("Shared PF not found")
+}
+
 func getsriovNumfs(ifName string) (int, error) {
 	var vfTotal int
 
@@ -331,6 +358,7 @@ func setupVF(conf *NetConf, ifName string, podifName string, cid string, netns n
 	if conf.DPDKMode != false {
 		conf.DPDKConf.PCIaddr = pciAddr
 		conf.DPDKConf.Ifname = podifName
+		conf.DPDKConf.VFID = vfIdx
 		if err = savedpdkConf(cid, conf.CNIDir, conf); err != nil {
 			return err
 		}
@@ -398,8 +426,23 @@ func releaseVF(conf *NetConf, podifName string, cid string, netns ns.NetNS) erro
 		if err := df.getdpdkConf(cid, conf.CNIDir, conf); err != nil {
 			return err
 		}
+
 		// bind the sriov vf to the kernel driver
-		return enabledpdkmode(df, df.Ifname, false)
+		if err := enabledpdkmode(df, df.Ifname, false); err != nil {
+			return fmt.Errorf("DPDK: failed to bind %s to kernel space: %s", df.Ifname, err)
+		}
+
+		// reset vlan for DPDK code here
+		pfLink, err := netlink.LinkByName(conf.IF0)
+		if err != nil {
+			return fmt.Errorf("DPDK: master device %s not found: %v", conf.IF0, err)
+		}
+
+		if err = netlink.LinkSetVfVlan(pfLink, df.VFID, 0); err != nil {
+			return fmt.Errorf("DPDK: failed to reset vlan tag for vf %d: %v", df.VFID, err)
+		}
+
+		return nil
 	}
 
 	initns, err := ns.GetCurrentNS()
@@ -421,11 +464,21 @@ func releaseVF(conf *NetConf, podifName string, cid string, netns ns.NetNS) erro
 
 	}
 
+	if err != nil {
+		fmt.Errorf("Enable to get shared PF device: %v", err)
+	}
+
 	for i := 1; i <= maxSharedVf; i++ {
 		ifName := podifName
+		pfName := conf.IF0
 		if i == maxSharedVf {
 			ifName = podifName + fmt.Sprintf("d%d", i-1)
+			pfName, err = getSharedPF(conf.IF0)
+			if err != nil {
+				return fmt.Errorf("Failed to look up shared PF device: %v:", err)
+			}
 		}
+
 		// get VF device
 		vfDev, err := netlink.LinkByName(ifName)
 		if err != nil {
@@ -451,12 +504,61 @@ func releaseVF(conf *NetConf, podifName string, cid string, netns ns.NetNS) erro
 		if err = netlink.LinkSetNsFd(vfDev, int(initns.Fd())); err != nil {
 			return fmt.Errorf("failed to move vf device to init netns: %v", ifName, err)
 		}
+
+		// reset vlan
+		if conf.Vlan != 0 {
+			err = initns.Do(func(_ ns.NetNS) error {
+				return resetVfVlan(pfName, devName)
+			})
+			if err != nil {
+				return fmt.Errorf("failed to reset vlan: %v", err)
+			}
+		}
+
 		//break the loop, if the namespace has no shared vf net interface
 		if conf.Sharedvf != true {
 			break
 		}
 	}
 
+	return nil
+}
+
+func resetVfVlan(pfName, vfName string) error {
+
+	// get the ifname sriov vf num
+	vfTotal, err := getsriovNumfs(pfName)
+	if err != nil {
+		return err
+	}
+
+	if vfTotal <= 0 {
+		return fmt.Errorf("no virtual function in the device %q: %v", pfName)
+	}
+
+	// Get VF id
+	var vf int
+	idFound := false
+	for vf = 0; vf < vfTotal; vf++ {
+		vfDir := fmt.Sprintf("/sys/class/net/%s/device/virtfn%d/net/%s", pfName, vf, vfName)
+		if _, err := os.Stat(vfDir); !os.IsNotExist(err) {
+			idFound = true
+			break
+		}
+	}
+
+	if !idFound {
+		return fmt.Errorf("failed to get VF id for %s", vfName)
+	}
+
+	pfLink, err := netlink.LinkByName(pfName)
+	if err != nil {
+		return fmt.Errorf("Master device %s not found\n", pfName)
+	}
+
+	if err = netlink.LinkSetVfVlan(pfLink, vf, 0); err != nil {
+		return fmt.Errorf("failed to reset vlan tag for vf %d: %v", vf, err)
+	}
 	return nil
 }
 
