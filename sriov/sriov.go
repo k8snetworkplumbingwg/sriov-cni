@@ -614,6 +614,18 @@ func cmdDel(args *skel.CmdArgs) error {
 		return err
 	}
 
+	// skip the IPAM release for the DPDK and L2 mode
+	if n.IPAM.Type != "" {
+		err = ipam.ExecDel(n.IPAM.Type, args.StdinData)
+		if err != nil {
+			return err
+		}
+	}
+
+	if args.Netns == "" {
+		return nil
+	}
+
 	netns, err := ns.GetNS(args.Netns)
 	if err != nil {
 		return fmt.Errorf("failed to open netns %q: %v", netns, err)
@@ -625,16 +637,6 @@ func cmdDel(args *skel.CmdArgs) error {
 	}
 
 	if err = releaseVF(n, args.IfName, args.ContainerID, netns); err != nil {
-		return err
-	}
-
-	// skip the IPAM release for the DPDK and L2 mode
-	if n.DPDKMode != false || n.L2Mode != false {
-		return nil
-	}
-
-	err = ipam.ExecDel(n.IPAM.Type, args.StdinData)
-	if err != nil {
 		return err
 	}
 
