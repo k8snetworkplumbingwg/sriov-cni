@@ -628,6 +628,16 @@ func cmdDel(args *skel.CmdArgs) error {
 
 	netns, err := ns.GetNS(args.Netns)
 	if err != nil {
+		// according to:
+		// https://github.com/kubernetes/kubernetes/issues/43014#issuecomment-287164444
+		// if provided path does not exist (e.x. when node was restarted)
+		// plugin should silently return with success after releasing
+		// IPAM resources
+		_, ok := err.(ns.NSPathNotExistErr)
+		if ok {
+			return nil
+		}
+
 		return fmt.Errorf("failed to open netns %q: %v", netns, err)
 	}
 	defer netns.Close()
