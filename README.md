@@ -29,7 +29,7 @@ options ixgbe max_vfs=8,8
 
 * `name` (string, required): the name of the network
 * `type` (string, required): "sriov"
-* `master` (string, required): name of the PF
+* `if0` (string, required): name of the PF
 * `vf` (int, optional): VF index, default value is 0
 * `vlan` (int, optional): VLAN ID for VF device
 * `mac` (string, optional): mac address for VF device
@@ -44,7 +44,7 @@ Given the following network configuration:
 {
     "name": "mynet",
     "type": "sriov",
-    "master": "eth1",
+    "if0": "eth1",
     "vf": 1,
     "mac": "66:d8:02:77:aa:aa",
     "ipam": {
