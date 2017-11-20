@@ -51,7 +51,7 @@ var _ = Describe("sriov Operations", func() {
 		conf := fmt.Sprintf(`{
     "name": "mynet",
     "type": "sriov",
-    "master": "%s",
+    "if0": "%s",
     "mac":"66:77:88:99:aa:bb",
     "vf": 1,
     "ipam": {
