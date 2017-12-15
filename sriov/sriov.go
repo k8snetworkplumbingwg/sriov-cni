@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -42,6 +43,22 @@ type NetConf struct {
 	IF0NAME  string   `json:"if0name"`
 	L2Mode   bool     `json:"l2enable"`
 	Vlan     int      `json:"vlan"`
+}
+
+// Link names given as os.FileInfo need to be sorted by their Index
+
+type LinksByIndex []os.FileInfo
+
+// LinksByIndex implements sort.Inteface
+func (l LinksByIndex) Len() int { return len(l) }
+
+func (l LinksByIndex) Swap(i, j int) { l[i], l[j] = l[j], l[i] }
+
+func (l LinksByIndex) Less(i, j int) bool {
+	link_a, _ := netlink.LinkByName(l[i].Name())
+	link_b, _ := netlink.LinkByName(l[j].Name())
+
+	return link_a.Attrs().Index < link_b.Attrs().Index
 }
 
 func init() {
@@ -363,6 +380,12 @@ func setupVF(conf *NetConf, ifName string, podifName string, cid string, netns n
 			return err
 		}
 		return enabledpdkmode(&conf.DPDKConf, infos[0].Name(), true)
+	}
+
+	// Sort links name if there are 2 or more PF links found for a VF;
+	if len(infos) > 1 {
+		// sort Links FileInfo by their Link indices
+		sort.Sort(LinksByIndex(infos))
 	}
 
 	for i := 1; i <= len(infos); i++ {
