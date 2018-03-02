@@ -151,8 +151,8 @@ func savedpdkConf(cid, dataDir string, conf *NetConf) error {
 	return nil
 }
 
-func (dc *dpdkConf) getdpdkConf(cid, dataDir string, conf *NetConf) error {
-	s := []string{cid, conf.IF0NAME}
+func (dc *dpdkConf) getdpdkConf(cid, podIfName, dataDir string, conf *NetConf) error {
+	s := []string{cid, podIfName}
 	cRef := strings.Join(s, "-")
 
 	dpdkconfBytes, err := consumeScratchNetConf(cRef, dataDir)
@@ -446,7 +446,7 @@ func releaseVF(conf *NetConf, podifName string, cid string, netns ns.NetNS) erro
 	if conf.DPDKMode != false {
 		df := &dpdkConf{}
 		// get the DPDK net conf in cniDir
-		if err := df.getdpdkConf(cid, conf.CNIDir, conf); err != nil {
+		if err := df.getdpdkConf(cid, podifName, conf.CNIDir, conf); err != nil {
 			return err
 		}
 
