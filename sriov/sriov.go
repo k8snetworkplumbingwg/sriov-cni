@@ -184,7 +184,11 @@ func enabledpdkmode(conf *dpdkConf, ifname string, dpdkmode bool) error {
 	cmd.Stdout = stdout
 	err := cmd.Run()
 	if err != nil {
-		return fmt.Errorf("DPDK binding failed with err msg %q:", stdout.String())
+		msg := stdout.String()
+		if msg == "" {
+			msg = err.Error()
+		}
+		return fmt.Errorf("DPDK binding failed with err msg: %q", msg)
 	}
 
 	stdout.Reset()
