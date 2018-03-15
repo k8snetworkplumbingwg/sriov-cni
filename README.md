@@ -15,7 +15,7 @@
       * [Contacts](#contacts)
 
 # SR-IOV CNI plugin
-This repository contains the sriov CNI plugin that allows DPDK driver binding as well as the orginal featuers of [sriov-cni](https://github.com/hustcat/sriov-cni). To learn about CNI please visit [containernetworking/cni](https://github.com/containernetworking/cni).
+This repository contains the sriov CNI plugin that allows DPDK driver binding as well as the orginal features of [sriov-cni](https://github.com/hustcat/sriov-cni). To learn about CNI please visit [containernetworking/cni](https://github.com/containernetworking/cni).
 
 NIC with [SR-IOV](http://blog.scottlowe.org/2009/12/02/what-is-sr-iov/) capabilities work by introducing the idea of physical functions (PFs) and virtual functions (VFs). 
 
@@ -142,7 +142,7 @@ echo 8 > /sys/class/net/enp2s0f0/device/sriov_numvfs
 * `dpdk` (dictionary, optional): DPDK configuration
 
 ### Using DPDK drivers:
-If this plugin is used to bind a VF to dpdk driver inside the container, then the IPAM configtuations will be ignored.
+If this plugin is used to bind a VF to dpdk driver inside the container, then the IPAM configuration will be ignored.
 
 ### DPDK parameters
 If given, The DPDK configuration expected to have the following parameters
