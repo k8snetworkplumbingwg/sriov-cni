@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-ORG_PATH="github.com/hustcat"
+ORG_PATH="github.com/Intel-Corp"
 REPO_PATH="${ORG_PATH}/sriov-cni"
 
 if [ ! -h gopath/src/${REPO_PATH} ]; then
