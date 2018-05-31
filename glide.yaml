@@ -1,0 +1,61 @@
+package: github.com/Intel-Corp/sriov-cni
+import:
+- package: github.com/containernetworking/cni
+  version: v0.3.0
+  subpackages:
+  - pkg/invoke
+  - pkg/ip
+  - pkg/ipam
+  - pkg/ns
+  - pkg/skel
+  - pkg/testutils
+  - pkg/types
+- package: github.com/coreos/go-iptables
+  version: 90456be57fcb8185b264b77ce42a9539df42df25
+  subpackages:
+  - iptables
+- package: github.com/onsi/ginkgo
+  version: 7f8ab55aaf3b86885aa55b762e803744d1674700
+  subpackages:
+  - config
+  - internal/codelocation
+  - internal/containernode
+  - internal/failer
+  - internal/leafnodes
+  - internal/remote
+  - internal/spec
+  - internal/specrunner
+  - internal/suite
+  - internal/testingtproxy
+  - internal/writer
+  - reporters
+  - reporters/stenographer
+  - types
+- package: github.com/onsi/gomega
+  version: 2152b45fa28a361beba9aab0885972323a444e28
+  subpackages:
+  - format
+  - internal/assertion
+  - internal/asyncassertion
+  - internal/oraclematcher
+  - internal/testingtsupport
+  - matchers
+  - matchers/support/goraph/bipartitegraph
+  - matchers/support/goraph/edge
+  - matchers/support/goraph/node
+  - matchers/support/goraph/util
+  - types
+- package: github.com/vishvananda/netlink
+  version: 77483a0e697ebcc2584461e9624b611767e7d203
+  subpackages:
+  - nl
+- package: github.com/vishvananda/netns
+  version: 8ba1072b58e0c2a240eb5f6120165c7776c3e7b8
+- package: golang.org/x/sys
+  version: e11762ca30adc5b39fdbfd8c4250dabeb8e456d3
+  subpackages:
+  - unix
+- package: github.com/intel/sriov-network-device-plugin
+  version: 70678aa74dbd6e9f85fd69bd540f0c41fca3c60e
+  subpackages:
+  - api

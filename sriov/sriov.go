@@ -18,6 +18,7 @@ import (
 	"github.com/containernetworking/cni/pkg/ns"
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
+	deviceApi "github.com/intel/sriov-network-device-plugin/api"
 	"github.com/vishvananda/netlink"
 )
 
@@ -35,16 +36,15 @@ type dpdkConf struct {
 
 type NetConf struct {
 	types.NetConf
-	DPDKMode bool
-	Sharedvf bool
-	DPDKConf dpdkConf `json:"dpdk,omitempty"`
-	CNIDir   string   `json:"cniDir"`
-	IF0      string   `json:"if0"`
-	IF0NAME  string   `json:"if0name"`
-	L2Mode   bool     `json:"l2enable"`
-	Vlan     int      `json:"vlan"`
-	DeviceId string   `json:"deviceid"` // Device ID holds an VF's PCI address
-	VfId     int      `json: "vfid"`
+	DPDKMode   bool
+	Sharedvf   bool
+	DPDKConf   dpdkConf                `json:"dpdk,omitempty"`
+	CNIDir     string                  `json:"cniDir"`
+	IF0        string                  `json:"if0"`
+	IF0NAME    string                  `json:"if0name"`
+	L2Mode     bool                    `json:"l2enable"`
+	Vlan       int                     `json:"vlan"`
+	DeviceInfo deviceApi.VfInformation `json:"deviceinfo"`
 }
 
 // Link names given as os.FileInfo need to be sorted by their Index
@@ -94,8 +94,10 @@ func loadConf(bytes []byte) (*NetConf, error) {
 		}
 	}
 
-	if n.IF0 == "" && n.DeviceId == "" {
+	if n.IF0 == "" && n.DeviceInfo.GetPfname() == "" {
 		return nil, fmt.Errorf(`either "if0" OR "deviceid" field is required. It specifies the host interface name to virtualize`)
+	} else if n.IF0 == "" {
+		n.IF0 = n.DeviceInfo.GetPfname()
 	}
 
 	if n.CNIDir == "" {
@@ -348,30 +350,34 @@ func getDeviceNameFromPci(pciaddr string) (string, error) {
 func setupWithVfInfo(conf *NetConf, netns ns.NetNS, cid, podifName string) error {
 	var err error
 
+	vfPciAddr := conf.DeviceInfo.GetPciaddr()
+	pfName := conf.DeviceInfo.GetPfname()
+	vfId := int(conf.DeviceInfo.GetVfid())
+
 	// Get PF link with given name
-	m, err := netlink.LinkByName(conf.IF0)
+	m, err := netlink.LinkByName(pfName)
 	if err != nil {
-		return fmt.Errorf("failed to lookup master %q: %v", conf.IF0, err)
+		return fmt.Errorf("failed to lookup master %q: %v", pfName, err)
 	}
 
 	// Get VF link name
-	vfLinkName, err := getDeviceNameFromPci(conf.DeviceId)
+	vfLinkName, err := getDeviceNameFromPci(vfPciAddr)
 	if err != nil {
 		return err
 	}
 
 	// Set Vlan
 	if conf.Vlan != 0 {
-		if err = netlink.LinkSetVfVlan(m, conf.VfId, conf.Vlan); err != nil {
-			return fmt.Errorf("failed to set vf %d vlan: %v", conf.VfId, err)
+		if err = netlink.LinkSetVfVlan(m, vfId, conf.Vlan); err != nil {
+			return fmt.Errorf("failed to set vf %d vlan: %v", vfId, err)
 		}
 	}
 
 	// if dpdk mode then skip rest
 	if conf.DPDKMode != false {
-		conf.DPDKConf.PCIaddr = conf.DeviceId
+		conf.DPDKConf.PCIaddr = vfPciAddr
 		conf.DPDKConf.Ifname = podifName
-		conf.DPDKConf.VFID = conf.VfId
+		conf.DPDKConf.VFID = vfId
 		if err = savedpdkConf(cid, conf.CNIDir, conf); err != nil {
 			return err
 		}
@@ -565,14 +571,11 @@ func releaseVF(conf *NetConf, podifName string, cid string, netns ns.NetNS) erro
 		//check for the shared vf net interface
 		ifName := podifName + "d1"
 		_, err := netlink.LinkByName(ifName)
-		if err == nil {
-			conf.Sharedvf = true
+
+		if err != nil {
+			return fmt.Errorf("unable to get shared PF device: %v", err)
 		}
-
-	}
-
-	if err != nil {
-		fmt.Errorf("Enable to get shared PF device: %v", err)
+		conf.Sharedvf = true
 	}
 
 	for i := 1; i <= maxSharedVf; i++ {
@@ -613,13 +616,16 @@ func releaseVF(conf *NetConf, podifName string, cid string, netns ns.NetNS) erro
 		}
 
 		// reset vlan
-		if conf.Vlan != 0 {
-			err = initns.Do(func(_ ns.NetNS) error {
-				return resetVfVlan(pfName, devName)
-			})
+		err = initns.Do(func(_ ns.NetNS) error {
+			//return resetVfVlan(pfName, devName)
+			pfLink, err := netlink.LinkByName(pfName)
 			if err != nil {
-				return fmt.Errorf("failed to reset vlan: %v", err)
+				return fmt.Errorf("sriov master device %s not found: %v", pfName, err)
 			}
+			return netlink.LinkSetVfVlan(pfLink, int(conf.DeviceInfo.GetVfid()), 0)
+		})
+		if err != nil {
+			return fmt.Errorf("failed to reset vlan: %v", err)
 		}
 
 		//break the loop, if the namespace has no shared vf net interface
@@ -685,7 +691,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 		args.IfName = n.IF0NAME
 	}
 
-	if n.DeviceId != "" && n.VfId >= 0 {
+	if n.DeviceInfo.GetPciaddr() != "" && n.DeviceInfo.GetVfid() >= 0 && n.DeviceInfo.GetPfname() != "" {
 		if err = setupWithVfInfo(n, netns, args.ContainerID, args.IfName); err != nil {
 			return err
 		}
