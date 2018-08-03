@@ -22,10 +22,11 @@ import (
 )
 
 const (
-	defaultCNIDir = "/var/lib/cni/sriov"
-	maxSharedVf = 2
+	defaultCNIDir   = "/var/lib/cni/sriov"
+	maxSharedVf     = 2
 	netDirectory    = "/sys/class/net/"
 	sriovConfigured = "/sriov_numvfs"
+	sysBusPci       = "/sys/bus/pci/devices"
 )
 
 type dpdkConf struct {
@@ -38,22 +39,23 @@ type dpdkConf struct {
 }
 
 type VfInformation struct {
-	PCIaddr	string	`json:"pci_addr"`
-	Pfname	string	`json:"pfname"`
-	Vfid	int	`json:"vfid"`
+	PCIaddr string `json:"pci_addr"`
+	Pfname  string `json:"pfname"`
+	Vfid    int    `json:"vfid"`
 }
 
 type NetConf struct {
 	types.NetConf
 	DPDKMode   bool
 	Sharedvf   bool
-	DPDKConf   dpdkConf                `json:"dpdk,omitempty"`
-	CNIDir     string                  `json:"cniDir"`
-	IF0        string                  `json:"if0"`
-	IF0NAME    string                  `json:"if0name"`
-	L2Mode     bool                    `json:"l2enable"`
-	Vlan       int                     `json:"vlan"`
-	DeviceInfo VfInformation           `json:"deviceinfo"`
+	DPDKConf   dpdkConf       `json:"dpdk,omitempty"`
+	CNIDir     string         `json:"cniDir"`
+	IF0        string         `json:"if0"`
+	IF0NAME    string         `json:"if0name"`
+	L2Mode     bool           `json:"l2enable"`
+	Vlan       int            `json:"vlan"`
+	DeviceID   string         `json:"deviceID"`
+	DeviceInfo *VfInformation `json:"deviceinfo,omitempty"`
 }
 
 // Link names given as os.FileInfo need to be sorted by their Index
@@ -96,9 +98,22 @@ func loadConf(bytes []byte) (*NetConf, error) {
 		return nil, fmt.Errorf("failed to load netconf: %v", err)
 	}
 
+	// DeviceID takes precedence; if we are given a VF pciaddr then work from there
+	if n.DeviceID != "" {
+		// Get rest of the VF information
+		vfInfo, err := getVfInfo(n.DeviceID)
+		if err != nil {
+			return n, err
+		}
+		n.DeviceInfo = vfInfo
+		n.IF0 = vfInfo.Pfname
+	} else if n.IF0 == "" {
+		return nil, fmt.Errorf("error: SRIOV-CNI loadConf: VF pci addr OR IF0 name is required")
+	}
+
 	if n.IF0NAME != "" {
-		err := checkIf0name(n.IF0NAME)
-		if err != true {
+		valid := checkIf0name(n.IF0NAME)
+		if !valid {
 			return nil, fmt.Errorf(`"if0name" field should not be  equal to (eth0 | eth1 | lo | ""). It specifies the virtualized interface name in the pod`)
 		}
 	}
@@ -112,6 +127,23 @@ func loadConf(bytes []byte) (*NetConf, error) {
 	}
 
 	return n, nil
+}
+
+func getVfInfo(vfPci string) (*VfInformation, error) {
+	pf, err := getPfName(vfPci)
+	if err != nil {
+		return nil, err
+	}
+	vfID, err := getVfid(vfPci, pf)
+	if err != nil {
+		return nil, err
+	}
+
+	return &VfInformation{
+		PCIaddr: vfPci,
+		Pfname:  pf,
+		Vfid:    vfID,
+	}, nil
 }
 
 func saveScratchNetConf(containerID, dataDir string, netconf []byte) error {
@@ -707,54 +739,25 @@ func getSriovPfList() ([]string, error) {
 	return sriovNetDevices, nil
 }
 
-func getPfName(pciAddr string) (string, error) {
-	var name string
-	// Get a list of SRIOV capable NICs in the host
-	pfList, err := getSriovPfList()
+// Returns PF net device name of a given VF pci address
+func getPfName(vf string) (string, error) {
+	sysBusPci := "/sys/bus/pci/devices"
+	pfSymLink := filepath.Join(sysBusPci, vf, "physfn", "net")
+	_, err := os.Lstat(pfSymLink)
 	if err != nil {
-		return name, err
+		return "", err
 	}
 
-	if len(pfList) < 1 {
-		fmt.Errorf("Error. No SRIOV network device found")
-		return name, fmt.Errorf("Error. No SRIOV network device found")
+	files, err := ioutil.ReadDir(pfSymLink)
+	if err != nil {
+		return "", err
 	}
-	for _, dev := range pfList {
-		sriovconfiguredpath := netDirectory + dev + "/device" + sriovConfigured
-		vfs, err := ioutil.ReadFile(sriovconfiguredpath)
-		if err != nil {
-			fmt.Errorf("Error. Could not read sriov_numvfs file of dev: %s. SRIOV error. %v", dev, err)
-			continue
-		}
-		configuredVFs := bytes.TrimSpace(vfs)
-		numconfiguredvfs, err := strconv.Atoi(string(configuredVFs))
-		if err != nil {
-			fmt.Errorf("Error. Could not parse sriov_numvfs files. Skipping device: %s. Err: %v", dev, err)
-			continue
-		}
-		for vf := 0; vf < numconfiguredvfs; vf++ {
-			vfDir := fmt.Sprintf("/sys/class/net/%s/device/virtfn%d", dev, vf)
-			dirInfo, err := os.Lstat(vfDir)
-			if err != nil {
-				fmt.Errorf("Error. Could not get directory information for device: %s, VF: %v. Err: %v", dev, vf, err)
-				continue
-			}
-			if (dirInfo.Mode() & os.ModeSymlink) == 0 {
-				fmt.Errorf("Error. No symbolic link between virtual function and PCI - Device: %s, VF: %v", dev, vf)
-				continue
-			}
-			pciInfo, err := os.Readlink(vfDir)
-			if err != nil {
-				fmt.Errorf("Error. Cannot read symbolic link between virtual function and PCI - Device: %s, VF: %v. Err: %v", dev, vf, err)
-				continue
-			}
-			addr := pciInfo[len("../"):]
-			if addr == pciAddr {
-				return dev, nil
-			}
-		}
+
+	if len(files) < 1 {
+		return "", fmt.Errorf("PF network device not found")
 	}
-	return name, nil
+
+	return strings.TrimSpace(files[0].Name()), nil
 }
 
 func getVfid(addr string, pfName string) (int, error) {
@@ -786,7 +789,7 @@ func getVfid(addr string, pfName string) (int, error) {
 func cmdAdd(args *skel.CmdArgs) error {
 	n, err := loadConf(args.StdinData)
 	if err != nil {
-		return fmt.Errorf("failed to load netconf: %v", err)
+		return fmt.Errorf("SRIOV-CNI failed to load netconf: %v", err)
 	}
 
 	netns, err := ns.GetNS(args.Netns)
@@ -797,22 +800,6 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 	if n.IF0NAME != "" {
 		args.IfName = n.IF0NAME
-	}
-
-	// derive Vfid and Pfname if VF pci address is set
-	if n.DeviceInfo.PCIaddr != "" {
-		n.DeviceInfo.Pfname, err = getPfName(n.DeviceInfo.PCIaddr)
-		if err != nil {
-			return fmt.Errorf("Error in getting PF name from VF pci address")
-		}
-		n.DeviceInfo.Vfid, err = getVfid(n.DeviceInfo.PCIaddr, n.DeviceInfo.Pfname)
-		if err != nil {
-			return fmt.Errorf("Error in getting VF id")
-		}
-	}
-
-	if n.DeviceInfo.PCIaddr == "" && n.IF0 == "" {
-		return fmt.Errorf("Error. either 'if0' OR 'deviceid' field is required. It specifies the host interface name to virtualize")
 	}
 
 	if n.DeviceInfo.PCIaddr != "" && n.DeviceInfo.Vfid >= 0 && n.DeviceInfo.Pfname != "" {
