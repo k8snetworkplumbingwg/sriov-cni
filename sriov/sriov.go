@@ -802,7 +802,8 @@ func cmdAdd(args *skel.CmdArgs) error {
 		args.IfName = n.IF0NAME
 	}
 
-	if n.DeviceInfo.PCIaddr != "" && n.DeviceInfo.Vfid >= 0 && n.DeviceInfo.Pfname != "" {
+
+	if n.DeviceInfo != nil && n.DeviceInfo.PCIaddr != "" && n.DeviceInfo.Vfid >= 0 && n.DeviceInfo.Pfname != "" {
 		if err = setupWithVfInfo(n, netns, args.ContainerID, args.IfName); err != nil {
 			return err
 		}
