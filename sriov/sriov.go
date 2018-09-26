@@ -1,306 +1,39 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
-	"path/filepath"
-	"runtime"
 	"sort"
-	"strconv"
 	"strings"
 
-	"github.com/containernetworking/cni/pkg/ipam"
 	"github.com/containernetworking/cni/pkg/ns"
-	"github.com/containernetworking/cni/pkg/skel"
-	"github.com/containernetworking/cni/pkg/types"
+	"github.com/intel/sriov-cni/pkg/config"
+	"github.com/intel/sriov-cni/pkg/dpdk"
+	sriovtypes "github.com/intel/sriov-cni/pkg/types"
+	"github.com/intel/sriov-cni/pkg/utils"
 	"github.com/vishvananda/netlink"
 )
 
-const (
-	defaultCNIDir   = "/var/lib/cni/sriov"
-	maxSharedVf     = 2
-	netDirectory    = "/sys/class/net/"
-	sriovConfigured = "/sriov_numvfs"
-	sysBusPci       = "/sys/bus/pci/devices"
-)
+/*
+ Link names given as os.FileInfo need to be sorted by their Index
+*/
 
-type dpdkConf struct {
-	PCIaddr    string `json:"pci_addr"`
-	Ifname     string `json:"ifname"`
-	KDriver    string `json:"kernel_driver"`
-	DPDKDriver string `json:"dpdk_driver"`
-	DPDKtool   string `json:"dpdk_tool"`
-	VFID       int    `json: "vfid"`
-}
-
-type VfInformation struct {
-	PCIaddr string `json:"pci_addr"`
-	Pfname  string `json:"pfname"`
-	Vfid    int    `json:"vfid"`
-}
-
-type NetConf struct {
-	types.NetConf
-	DPDKMode   bool
-	Sharedvf   bool
-	DPDKConf   dpdkConf       `json:"dpdk,omitempty"`
-	CNIDir     string         `json:"cniDir"`
-	IF0        string         `json:"if0"`
-	IF0NAME    string         `json:"if0name"`
-	L2Mode     bool           `json:"l2enable"`
-	Vlan       int            `json:"vlan"`
-	DeviceID   string         `json:"deviceID"`
-	DeviceInfo *VfInformation `json:"deviceinfo,omitempty"`
-}
-
-// Link names given as os.FileInfo need to be sorted by their Index
-
-type LinksByIndex []os.FileInfo
+// LinksByIndex holds network interfaces name
+type LinksByIndex []string
 
 // LinksByIndex implements sort.Inteface
 func (l LinksByIndex) Len() int { return len(l) }
 
+// Swap implements Swap() method of sort interface
 func (l LinksByIndex) Swap(i, j int) { l[i], l[j] = l[j], l[i] }
 
+// Less implements Less() method of sort interface
 func (l LinksByIndex) Less(i, j int) bool {
-	link_a, _ := netlink.LinkByName(l[i].Name())
-	link_b, _ := netlink.LinkByName(l[j].Name())
+	linkA, _ := netlink.LinkByName(l[i])
+	linkB, _ := netlink.LinkByName(l[j])
 
-	return link_a.Attrs().Index < link_b.Attrs().Index
-}
-
-func init() {
-	// this ensures that main runs only on main thread (thread group leader).
-	// since namespace ops (unshare, setns) are done for a single thread, we
-	// must ensure that the goroutine does not jump from OS thread to thread
-	runtime.LockOSThread()
-}
-
-func checkIf0name(ifname string) bool {
-	op := []string{"eth0", "eth1", "lo", ""}
-	for _, if0name := range op {
-		if strings.Compare(if0name, ifname) == 0 {
-			return false
-		}
-	}
-
-	return true
-}
-
-func loadConf(bytes []byte) (*NetConf, error) {
-	n := &NetConf{}
-	if err := json.Unmarshal(bytes, n); err != nil {
-		return nil, fmt.Errorf("failed to load netconf: %v", err)
-	}
-
-	// DeviceID takes precedence; if we are given a VF pciaddr then work from there
-	if n.DeviceID != "" {
-		// Get rest of the VF information
-		vfInfo, err := getVfInfo(n.DeviceID)
-		if err != nil {
-			return n, err
-		}
-		n.DeviceInfo = vfInfo
-		n.IF0 = vfInfo.Pfname
-	} else if n.IF0 == "" {
-		return nil, fmt.Errorf("error: SRIOV-CNI loadConf: VF pci addr OR IF0 name is required")
-	}
-
-	if n.IF0NAME != "" {
-		valid := checkIf0name(n.IF0NAME)
-		if !valid {
-			return nil, fmt.Errorf(`"if0name" field should not be  equal to (eth0 | eth1 | lo | ""). It specifies the virtualized interface name in the pod`)
-		}
-	}
-
-	if n.CNIDir == "" {
-		n.CNIDir = defaultCNIDir
-	}
-
-	if (dpdkConf{}) != n.DPDKConf {
-		n.DPDKMode = true
-	}
-
-	return n, nil
-}
-
-func getVfInfo(vfPci string) (*VfInformation, error) {
-	pf, err := getPfName(vfPci)
-	if err != nil {
-		return nil, err
-	}
-	vfID, err := getVfid(vfPci, pf)
-	if err != nil {
-		return nil, err
-	}
-
-	return &VfInformation{
-		PCIaddr: vfPci,
-		Pfname:  pf,
-		Vfid:    vfID,
-	}, nil
-}
-
-func saveScratchNetConf(containerID, dataDir string, netconf []byte) error {
-	if err := os.MkdirAll(dataDir, 0700); err != nil {
-		return fmt.Errorf("failed to create the sriov data directory(%q): %v", dataDir, err)
-	}
-
-	path := filepath.Join(dataDir, containerID)
-
-	err := ioutil.WriteFile(path, netconf, 0600)
-	if err != nil {
-		return fmt.Errorf("failed to write container data in the path(%q): %v", path, err)
-	}
-
-	return err
-}
-
-func consumeScratchNetConf(containerID, dataDir string) ([]byte, error) {
-	path := filepath.Join(dataDir, containerID)
-	defer os.Remove(path)
-
-	data, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read container data in the path(%q): %v", path, err)
-	}
-
-	return data, err
-}
-
-func savedpdkConf(cid, dataDir string, conf *NetConf) error {
-	dpdkconfBytes, err := json.Marshal(conf.DPDKConf)
-	if err != nil {
-		return fmt.Errorf("error serializing delegate netconf: %v", err)
-	}
-
-	s := []string{cid, conf.DPDKConf.Ifname}
-	cRef := strings.Join(s, "-")
-
-	// save the rendered netconf for cmdDel
-	if err = saveScratchNetConf(cRef, dataDir, dpdkconfBytes); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (dc *dpdkConf) getdpdkConf(cid, podIfName, dataDir string, conf *NetConf) error {
-	s := []string{cid, podIfName}
-	cRef := strings.Join(s, "-")
-
-	dpdkconfBytes, err := consumeScratchNetConf(cRef, dataDir)
-	if err != nil {
-		return err
-	}
-
-	if err = json.Unmarshal(dpdkconfBytes, dc); err != nil {
-		return fmt.Errorf("failed to parse netconf: %v", err)
-	}
-
-	return nil
-}
-
-func enabledpdkmode(conf *dpdkConf, ifname string, dpdkmode bool) error {
-	stdout := &bytes.Buffer{}
-	var driver string
-	var device string
-
-	if dpdkmode != false {
-		driver = conf.DPDKDriver
-		device = ifname
-	} else {
-		driver = conf.KDriver
-		device = conf.PCIaddr
-	}
-
-	cmd := exec.Command(conf.DPDKtool, "-b", driver, device)
-	cmd.Stdout = stdout
-	err := cmd.Run()
-	if err != nil {
-		return fmt.Errorf("DPDK binding failed with err msg %q:", stdout.String())
-	}
-
-	stdout.Reset()
-	return nil
-}
-
-func getpciaddress(ifName string, vf int) (string, error) {
-	var pciaddr string
-	vfDir := fmt.Sprintf("/sys/class/net/%s/device/virtfn%d", ifName, vf)
-	dirInfo, err := os.Lstat(vfDir)
-	if err != nil {
-		return pciaddr, fmt.Errorf("can't get the symbolic link of virtfn%d dir of the device %q: %v", vf, ifName, err)
-	}
-
-	if (dirInfo.Mode() & os.ModeSymlink) == 0 {
-		return pciaddr, fmt.Errorf("No symbolic link for the virtfn%d dir of the device %q", vf, ifName)
-	}
-
-	pciinfo, err := os.Readlink(vfDir)
-	if err != nil {
-		return pciaddr, fmt.Errorf("can't read the symbolic link of virtfn%d dir of the device %q: %v", vf, ifName, err)
-	}
-
-	pciaddr = pciinfo[len("../"):]
-	return pciaddr, nil
-}
-
-func getSharedPF(ifName string) (string, error) {
-	pfName := ""
-	pfDir := fmt.Sprintf("/sys/class/net/%s", ifName)
-	dirInfo, err := os.Lstat(pfDir)
-	if err != nil {
-		return pfName, fmt.Errorf("can't get the symbolic link of the device %q: %v", ifName, err)
-	}
-
-	if (dirInfo.Mode() & os.ModeSymlink) == 0 {
-		return pfName, fmt.Errorf("No symbolic link for dir of the device %q", ifName)
-	}
-
-	fullpath, err := filepath.EvalSymlinks(pfDir)
-	parentDir := fullpath[:len(fullpath)-len(ifName)]
-	dirList, err := ioutil.ReadDir(parentDir)
-
-	for _, file := range dirList {
-		if file.Name() != ifName {
-			pfName = file.Name()
-			return pfName, nil
-		}
-	}
-
-	return pfName, fmt.Errorf("Shared PF not found")
-}
-
-func getsriovNumfs(ifName string) (int, error) {
-	var vfTotal int
-
-	sriovFile := fmt.Sprintf("/sys/class/net/%s/device/sriov_numvfs", ifName)
-	if _, err := os.Lstat(sriovFile); err != nil {
-		return vfTotal, fmt.Errorf("failed to open the sriov_numfs of device %q: %v", ifName, err)
-	}
-
-	data, err := ioutil.ReadFile(sriovFile)
-	if err != nil {
-		return vfTotal, fmt.Errorf("failed to read the sriov_numfs of device %q: %v", ifName, err)
-	}
-
-	if len(data) == 0 {
-		return vfTotal, fmt.Errorf("no data in the file %q", sriovFile)
-	}
-
-	sriovNumfs := strings.TrimSpace(string(data))
-	vfTotal, err = strconv.Atoi(sriovNumfs)
-	if err != nil {
-		return vfTotal, fmt.Errorf("failed to convert sriov_numfs(byte value) to int of device %q: %v", ifName, err)
-	}
-
-	return vfTotal, nil
+	return linkA.Attrs().Index < linkB.Attrs().Index
 }
 
 func setSharedVfVlan(ifName string, vfIdx int, vlan int) error {
@@ -317,7 +50,7 @@ func setSharedVfVlan(ifName string, vfIdx int, vlan int) error {
 		return fmt.Errorf("failed to read the net dir of the device %q: %v", ifName, err)
 	}
 
-	if len(infos) != maxSharedVf {
+	if len(infos) != config.MaxSharedVf {
 		return fmt.Errorf("Given PF - %q is not having shared VF", ifName)
 	}
 
@@ -361,180 +94,45 @@ func moveIfToNetns(ifname string, netns ns.NetNS) error {
 	return nil
 }
 
-func getDeviceNameFromPci(pciaddr string) (string, error) {
-	var devName string
-	vfDir := fmt.Sprintf("/sys/bus/pci/devices/%s/net/", pciaddr)
-	_, err := os.Lstat(vfDir)
-	if err != nil {
-		return devName, fmt.Errorf("cannot get a network device with pci address %v %q", pciaddr, err)
-	}
-	dirContents, _ := ioutil.ReadDir(vfDir)
+func setupVF(conf *sriovtypes.NetConf, pfName string, podifName string, cid string, netns ns.NetNS) error {
 
-	if err != nil || len(dirContents) < 1 {
-		return devName, fmt.Errorf("failed to get network device name in %v %v", vfDir, err)
-	}
-
-	if len(dirContents) < 1 {
-		return devName, fmt.Errorf("no network device found in %v", vfDir)
-	}
-
-	devName = dirContents[0].Name() // assuming one net device in this directory
-	return strings.TrimSpace(devName), nil
-}
-
-func setupWithVfInfo(conf *NetConf, netns ns.NetNS, cid, podifName string) error {
-	var err error
-
-	vfPciAddr := conf.DeviceInfo.PCIaddr
-	pfName := conf.DeviceInfo.Pfname
-	vfId := int(conf.DeviceInfo.Vfid)
-
-	// Get PF link with given name
 	m, err := netlink.LinkByName(pfName)
 	if err != nil {
-		return fmt.Errorf("failed to lookup master %q: %v", pfName, err)
+		return fmt.Errorf("failed to lookup master %q: %v", conf.Master, err)
 	}
 
-	// Get VF link name
-	vfLinkName, err := getDeviceNameFromPci(vfPciAddr)
+	vfLinks, err := utils.GetVFLinkNames(pfName, conf.DeviceInfo.Vfid)
 	if err != nil {
 		return err
-	}
-
-	// Set Vlan
-	if conf.Vlan != 0 {
-		if err = netlink.LinkSetVfVlan(m, vfId, conf.Vlan); err != nil {
-			return fmt.Errorf("failed to set vf %d vlan: %v", vfId, err)
-		}
-	}
-
-	// if dpdk mode then skip rest
-	if conf.DPDKMode != false {
-		conf.DPDKConf.PCIaddr = vfPciAddr
-		conf.DPDKConf.Ifname = podifName
-		conf.DPDKConf.VFID = vfId
-		if err = savedpdkConf(cid, conf.CNIDir, conf); err != nil {
-			return err
-		}
-		return enabledpdkmode(&conf.DPDKConf, vfLinkName, true)
-	}
-
-	// move VF to pod netns
-	if err = moveIfToNetns(vfLinkName, netns); err != nil {
-		return err
-	}
-
-	// Rename VF in Pod
-	return netns.Do(func(_ ns.NetNS) error {
-		err := renameLink(vfLinkName, podifName)
-		if err != nil {
-			return fmt.Errorf("failed to rename  interface %v to %v in Pod netns %q", vfLinkName, podifName, err)
-		}
-		return nil
-	})
-}
-
-func setupVF(conf *NetConf, ifName string, podifName string, cid string, netns ns.NetNS) error {
-
-	var vfIdx int
-	var infos []os.FileInfo
-	var pciAddr string
-
-	// try to get VF using PF information
-	m, err := netlink.LinkByName(ifName)
-	if err != nil {
-		return fmt.Errorf("failed to lookup master %q: %v", conf.IF0, err)
-	}
-
-	// get the ifname sriov vf num
-	vfTotal, err := getsriovNumfs(ifName)
-	if err != nil {
-		return err
-	}
-
-	if vfTotal <= 0 {
-		return fmt.Errorf("no virtual function in the device %q: %v", ifName)
-	}
-
-	// Select a free VF
-	for vf := 0; vf <= (vfTotal - 1); vf++ {
-		vfDir := fmt.Sprintf("/sys/class/net/%s/device/virtfn%d/net", ifName, vf)
-		if _, err := os.Lstat(vfDir); err != nil {
-			if vf == (vfTotal - 1) {
-				return fmt.Errorf("failed to open the virtfn%d dir of the device %q: %v", vf, ifName, err)
-			}
-			continue
-		}
-
-		infos, err = ioutil.ReadDir(vfDir)
-		if err != nil {
-			return fmt.Errorf("failed to read the virtfn%d dir of the device %q: %v", vf, ifName, err)
-		}
-
-		if (len(infos) == 0) && (vf == (vfTotal - 1)) {
-			return fmt.Errorf("no Virtual function exist in directory %s, last vf is virtfn%d", vfDir, vf)
-		}
-
-		if (len(infos) == 0) && (vf != (vfTotal - 1)) {
-			continue
-		}
-
-		if len(infos) == maxSharedVf {
-			conf.Sharedvf = true
-		}
-
-		if len(infos) <= maxSharedVf {
-			vfIdx = vf
-			pciAddr, err = getpciaddress(ifName, vfIdx)
-			if err != nil {
-				return fmt.Errorf("err in getting pci address - %q", err)
-			}
-			break
-		} else {
-			return fmt.Errorf("mutiple network devices in directory %s", vfDir)
-		}
-	}
-
-	// VF NIC name
-	if len(infos) != 1 && len(infos) != maxSharedVf {
-		return fmt.Errorf("no virutal network resources avaiable for the %q", conf.IF0)
-	}
-
-	if conf.Sharedvf != false && conf.L2Mode != true {
-		return fmt.Errorf("l2enable mode must be true to use shared net interface %q", conf.IF0)
 	}
 
 	if conf.Vlan != 0 {
-		if err = netlink.LinkSetVfVlan(m, vfIdx, conf.Vlan); err != nil {
-			return fmt.Errorf("failed to set vf %d vlan: %v", vfIdx, err)
+		if err = netlink.LinkSetVfVlan(m, conf.DeviceInfo.Vfid, conf.Vlan); err != nil {
+			return fmt.Errorf("failed to set vf %d vlan: %v", conf.DeviceInfo.Vfid, err)
 		}
 
 		if conf.Sharedvf {
-			if err = setSharedVfVlan(ifName, vfIdx, conf.Vlan); err != nil {
-				return fmt.Errorf("failed to set shared vf %d vlan: %v", vfIdx, err)
+			if err = setSharedVfVlan(pfName, conf.DeviceInfo.Vfid, conf.Vlan); err != nil {
+				return fmt.Errorf("failed to set shared vf %d vlan: %v", conf.DeviceInfo.Vfid, err)
 			}
 		}
 	}
 
-	if conf.DPDKMode != false {
-		conf.DPDKConf.PCIaddr = pciAddr
-		conf.DPDKConf.Ifname = podifName
-		conf.DPDKConf.VFID = vfIdx
-		if err = savedpdkConf(cid, conf.CNIDir, conf); err != nil {
+	if conf.DPDKMode {
+		if err = dpdk.SaveDpdkConf(cid, conf.CNIDir, conf.DPDKConf); err != nil {
 			return err
 		}
-		return enabledpdkmode(&conf.DPDKConf, infos[0].Name(), true)
+		return dpdk.Enabledpdkmode(conf.DPDKConf, vfLinks[0], true)
 	}
 
 	// Sort links name if there are 2 or more PF links found for a VF;
-	if len(infos) > 1 {
+	if len(vfLinks) > 1 {
 		// sort Links FileInfo by their Link indices
-		sort.Sort(LinksByIndex(infos))
+		sort.Sort(LinksByIndex(vfLinks))
 	}
 
-	for i := 1; i <= len(infos); i++ {
-		// vfDev, err := netlink.LinkByName(infos[i-1].Name())
-		linkName := infos[i-1].Name()
+	for i := 0; i < len(vfLinks); i++ {
+		linkName := vfLinks[i]
 
 		if err = moveIfToNetns(linkName, netns); err != nil {
 			return err
@@ -544,14 +142,14 @@ func setupVF(conf *NetConf, ifName string, podifName string, cid string, netns n
 	return netns.Do(func(_ ns.NetNS) error {
 
 		ifName := podifName
-		for i := 1; i <= len(infos); i++ {
-			if len(infos) == maxSharedVf && i == len(infos) {
-				ifName = podifName + fmt.Sprintf("d%d", i-1)
+		for i := 0; i < len(vfLinks); i++ {
+			if len(vfLinks) == config.MaxSharedVf && i == (len(vfLinks)-1) {
+				ifName = podifName + fmt.Sprintf("d%d", i)
 			}
 
-			err := renameLink(infos[i-1].Name(), ifName)
+			err := renameLink(vfLinks[i], ifName)
 			if err != nil {
-				return fmt.Errorf("failed to rename %d vf of the device %q to %q: %v", vfIdx, infos[i-1].Name(), ifName, err)
+				return fmt.Errorf("failed to rename vf %d of the device %q to %q: %v", conf.DeviceInfo.Vfid, vfLinks[i], ifName, err)
 			}
 
 			// for L2 mode enable the pod net interface
@@ -566,24 +164,24 @@ func setupVF(conf *NetConf, ifName string, podifName string, cid string, netns n
 	})
 }
 
-func releaseVF(conf *NetConf, podifName string, cid string, netns ns.NetNS) error {
+func releaseVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.NetNS) error {
 	// check for the DPDK mode and release the allocated DPDK resources
 	if conf.DPDKMode != false {
-		df := &dpdkConf{}
 		// get the DPDK net conf in cniDir
-		if err := df.getdpdkConf(cid, podifName, conf.CNIDir, conf); err != nil {
+		df, err := dpdk.GetConf(cid, podifName, conf.CNIDir)
+		if err != nil {
 			return err
 		}
 
 		// bind the sriov vf to the kernel driver
-		if err := enabledpdkmode(df, df.Ifname, false); err != nil {
+		if err := dpdk.Enabledpdkmode(df, df.Ifname, false); err != nil {
 			return fmt.Errorf("DPDK: failed to bind %s to kernel space: %s", df.Ifname, err)
 		}
 
 		// reset vlan for DPDK code here
-		pfLink, err := netlink.LinkByName(conf.IF0)
+		pfLink, err := netlink.LinkByName(conf.Master)
 		if err != nil {
-			return fmt.Errorf("DPDK: master device %s not found: %v", conf.IF0, err)
+			return fmt.Errorf("DPDK: master device %s not found: %v", conf.Master, err)
 		}
 
 		if err = netlink.LinkSetVfVlan(pfLink, df.VFID, 0); err != nil {
@@ -606,21 +204,20 @@ func releaseVF(conf *NetConf, podifName string, cid string, netns ns.NetNS) erro
 		//check for the shared vf net interface
 		ifName := podifName + "d1"
 		_, err := netlink.LinkByName(ifName)
-
 		if err != nil {
 			return fmt.Errorf("unable to get shared PF device: %v", err)
 		}
 		conf.Sharedvf = true
 	}
 
-	for i := 1; i <= maxSharedVf; i++ {
+	for i := 1; i <= config.MaxSharedVf; i++ {
 		ifName := podifName
-		pfName := conf.IF0
-		if i == maxSharedVf {
+		pfName := conf.Master
+		if i == config.MaxSharedVf {
 			ifName = podifName + fmt.Sprintf("d%d", i-1)
-			pfName, err = getSharedPF(conf.IF0)
+			pfName, err = utils.GetSharedPF(conf.Master)
 			if err != nil {
-				return fmt.Errorf("Failed to look up shared PF device: %v:", err)
+				return fmt.Errorf("failed to look up shared PF device: %v", err)
 			}
 		}
 
@@ -651,16 +248,13 @@ func releaseVF(conf *NetConf, podifName string, cid string, netns ns.NetNS) erro
 		}
 
 		// reset vlan
-		err = initns.Do(func(_ ns.NetNS) error {
-			//return resetVfVlan(pfName, devName)
-			pfLink, err := netlink.LinkByName(pfName)
+		if conf.Vlan != 0 {
+			err = initns.Do(func(_ ns.NetNS) error {
+				return resetVfVlan(pfName, devName)
+			})
 			if err != nil {
-				return fmt.Errorf("sriov master device %s not found: %v", pfName, err)
+				return fmt.Errorf("failed to reset vlan: %v", err)
 			}
-			return netlink.LinkSetVfVlan(pfLink, int(conf.DeviceInfo.Vfid), 0)
-		})
-		if err != nil {
-			return fmt.Errorf("failed to reset vlan: %v", err)
 		}
 
 		//break the loop, if the namespace has no shared vf net interface
@@ -675,13 +269,13 @@ func releaseVF(conf *NetConf, podifName string, cid string, netns ns.NetNS) erro
 func resetVfVlan(pfName, vfName string) error {
 
 	// get the ifname sriov vf num
-	vfTotal, err := getsriovNumfs(pfName)
+	vfTotal, err := utils.GetsriovNumfs(pfName)
 	if err != nil {
 		return err
 	}
 
 	if vfTotal <= 0 {
-		return fmt.Errorf("no virtual function in the device %q: %v", pfName)
+		return fmt.Errorf("no virtual function in the device: %v", pfName)
 	}
 
 	// Get VF id
@@ -701,177 +295,12 @@ func resetVfVlan(pfName, vfName string) error {
 
 	pfLink, err := netlink.LinkByName(pfName)
 	if err != nil {
-		return fmt.Errorf("Master device %s not found\n", pfName)
+		return fmt.Errorf("master device %s not found", pfName)
 	}
 
 	if err = netlink.LinkSetVfVlan(pfLink, vf, 0); err != nil {
 		return fmt.Errorf("failed to reset vlan tag for vf %d: %v", vf, err)
 	}
-	return nil
-}
-
-// Returns a list of SRIOV capable PF names as string
-func getSriovPfList() ([]string, error) {
-
-	sriovNetDevices := []string{}
-
-	netDevices, err := ioutil.ReadDir(netDirectory)
-	if err != nil {
-		fmt.Errorf("Error. Cannot read %s for network device names. Err: %v", netDirectory, err)
-		return sriovNetDevices, err
-	}
-
-	if len(netDevices) < 1 {
-		fmt.Errorf("Error. No network device found in %s directory", netDirectory)
-		return sriovNetDevices, err
-	}
-
-	for _, dev := range netDevices {
-		sriovFilePath := filepath.Join(netDirectory, dev.Name(), "device", "sriov_numvfs")
-
-		if f, err := os.Lstat(sriovFilePath); !os.IsNotExist(err) {
-			if f.Mode().IsRegular() { // and its a regular file
-				sriovNetDevices = append(sriovNetDevices, dev.Name())
-			}
-		}
-	}
-
-	return sriovNetDevices, nil
-}
-
-// Returns PF net device name of a given VF pci address
-func getPfName(vf string) (string, error) {
-	sysBusPci := "/sys/bus/pci/devices"
-	pfSymLink := filepath.Join(sysBusPci, vf, "physfn", "net")
-	_, err := os.Lstat(pfSymLink)
-	if err != nil {
-		return "", err
-	}
-
-	files, err := ioutil.ReadDir(pfSymLink)
-	if err != nil {
-		return "", err
-	}
-
-	if len(files) < 1 {
-		return "", fmt.Errorf("PF network device not found")
-	}
-
-	return strings.TrimSpace(files[0].Name()), nil
-}
-
-func getVfid(addr string, pfName string) (int, error) {
-	var id int
-	vfTotal, err := getsriovNumfs(pfName)
-	if err != nil {
-		return id, err
-	}
-	for vf := 0; vf <= vfTotal; vf++ {
-		vfDir := fmt.Sprintf("/sys/class/net/%s/device/virtfn%d", pfName, vf)
-		_, err := os.Lstat(vfDir)
-		if err != nil {
-			fmt.Errorf("can't get the symbolic link of virtfn%d dir of the device %q: %v", vf, pfName, err)
-			continue
-		}
-		pciinfo, err := os.Readlink(vfDir)
-		if err != nil {
-			fmt.Errorf("can't read the symbolic link of virtfn%d dir of the device %q: %v", vf, pfName, err)
-			continue
-		}
-		pciaddr := pciinfo[len("../"):]
-		if pciaddr == addr {
-			return vf, nil
-		}
-	}
-	return id, nil
-}
-
-func cmdAdd(args *skel.CmdArgs) error {
-	n, err := loadConf(args.StdinData)
-	if err != nil {
-		return fmt.Errorf("SRIOV-CNI failed to load netconf: %v", err)
-	}
-
-	netns, err := ns.GetNS(args.Netns)
-	if err != nil {
-		return fmt.Errorf("failed to open netns %q: %v", netns, err)
-	}
-	defer netns.Close()
-
-	if n.IF0NAME != "" {
-		args.IfName = n.IF0NAME
-	}
-
-
-	if n.DeviceInfo != nil && n.DeviceInfo.PCIaddr != "" && n.DeviceInfo.Vfid >= 0 && n.DeviceInfo.Pfname != "" {
-		if err = setupWithVfInfo(n, netns, args.ContainerID, args.IfName); err != nil {
-			return err
-		}
-	} else {
-		if err = setupVF(n, n.IF0, args.IfName, args.ContainerID, netns); err != nil {
-			return fmt.Errorf("failed to set up pod interface %q from the device %q: %v", args.IfName, n.IF0, err)
-		}
-	}
-
-	// skip the IPAM allocation for the DPDK and L2 mode
-	var result *types.Result
-	if n.DPDKMode != false || n.L2Mode != false {
-		return result.Print()
-	}
-
-	// run the IPAM plugin and get back the config to apply
-	result, err = ipam.ExecAdd(n.IPAM.Type, args.StdinData)
-	if err != nil {
-		return fmt.Errorf("failed to set up IPAM plugin type %q from the device %q: %v", n.IPAM.Type, n.IF0, err)
-	}
-
-	if result.IP4 == nil {
-		return errors.New("IPAM plugin returned missing IPv4 config")
-	}
-
-	err = netns.Do(func(_ ns.NetNS) error {
-		return ipam.ConfigureIface(args.IfName, result)
-	})
-	if err != nil {
-		return err
-	}
-
-	result.DNS = n.DNS
-	return result.Print()
-}
-
-func cmdDel(args *skel.CmdArgs) error {
-	n, err := loadConf(args.StdinData)
-	if err != nil {
-		return err
-	}
-
-	// skip the IPAM release for the DPDK and L2 mode
-	if n.IPAM.Type != "" {
-		err = ipam.ExecDel(n.IPAM.Type, args.StdinData)
-		if err != nil {
-			return err
-		}
-	}
-
-	if args.Netns == "" {
-		return nil
-	}
-
-	netns, err := ns.GetNS(args.Netns)
-	if err != nil {
-		return fmt.Errorf("failed to open netns %q: %v", netns, err)
-	}
-	defer netns.Close()
-
-	if n.IF0NAME != "" {
-		args.IfName = n.IF0NAME
-	}
-
-	if err = releaseVF(n, args.IfName, args.ContainerID, netns); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -891,8 +320,4 @@ func setUpLink(ifName string) error {
 	}
 
 	return netlink.LinkSetUp(link)
-}
-
-func main() {
-	skel.PluginMain(cmdAdd, cmdDel)
 }
