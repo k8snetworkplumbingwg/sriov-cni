@@ -20,7 +20,6 @@ import (
 	"os"
 	"path"
 	"runtime"
-	"strings"
 	"sync"
 	"syscall"
 
@@ -63,6 +62,9 @@ type netNS struct {
 	closed  bool
 }
 
+// netNS implements the NetNS interface
+var _ NetNS = &netNS{}
+
 func getCurrentThreadNetNSPath() string {
 	// /proc/self/ns/net returns the namespace of the main thread, not
 	// of whatever thread this goroutine is running on.  Make sure we
@@ -101,19 +103,7 @@ func IsNSorErr(nspath string) error {
 	}
 
 	switch stat.Type {
-	case PROCFS_MAGIC:
-		// Kernel < 3.19
-
-		validPathContent := "ns/"
-		validName := strings.Contains(nspath, validPathContent)
-		if !validName {
-			return NSPathNotNSErr{msg: fmt.Sprintf("path %q doesn't contain %q", nspath, validPathContent)}
-		}
-
-		return nil
-	case NSFS_MAGIC:
-		// Kernel >= 3.19
-
+	case PROCFS_MAGIC, NSFS_MAGIC:
 		return nil
 	default:
 		return NSPathNotNSErr{msg: fmt.Sprintf("unknown FS magic on %q: %x", nspath, stat.Type)}
