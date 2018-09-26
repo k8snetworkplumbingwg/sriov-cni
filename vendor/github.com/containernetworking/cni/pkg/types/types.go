@@ -57,6 +57,8 @@ func (n *IPNet) UnmarshalJSON(data []byte) error {
 
 // NetConf describes a network.
 type NetConf struct {
+	CNIVersion string `json:"cniVersion,omitempty"`
+
 	Name string `json:"name,omitempty"`
 	Type string `json:"type,omitempty"`
 	IPAM struct {
@@ -109,6 +111,14 @@ type Route struct {
 	Dst net.IPNet
 	GW  net.IP
 }
+
+// Well known error codes
+// see https://github.com/containernetworking/cni/blob/master/SPEC.md#well-known-error-codes
+const (
+	ErrUnknown                uint = iota // 0
+	ErrIncompatibleCNIVersion             // 1
+	ErrUnsupportedField                   // 2
+)
 
 type Error struct {
 	Code    uint   `json:"code"`

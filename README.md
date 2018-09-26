@@ -24,10 +24,10 @@ This plugin requires Go 1.5+ to build.
 Go 1.5 users will need to set `GO15VENDOREXPERIMENT=1` to get vendored dependencies. This flag is set by default in 1.6.
 
 ```
-#./build
+# make
 ```
 
-Upon successful build the plugin binary will be available in `bin/sriov`. 
+Upon successful build the plugin binary will be available in `build/sriov`. 
 
 ## Enable SR-IOV
 
@@ -42,7 +42,7 @@ options ixgbe max_vfs=8,8
 ### Main parameters
 * `name` (string, required): the name of the network
 * `type` (string, required): "sriov"
-* `if0` (string, required): name of the PF
+* `master` (string, required): name of the PF
 * `if0name` (string, optional): interface name in the Container
 * `l2enable` (boolean, optional): if `true` then add VF as L2 mode only, IPAM will not be executed
 * `vlan` (int, optional): VLAN ID to assign for the VF
@@ -69,7 +69,7 @@ If given, The DPDK configuration expected to have the following parameters
 {
     "name": "mynet",
     "type": "sriov",
-    "if0": "enp1s0f1",
+    "master": "enp1s0f1",
     "ipam": {
         "type": "host-local",
         "subnet": "10.55.206.0/26",
@@ -109,7 +109,7 @@ lo        Link encap:Local Loopback
 {
     "name": "mynet",
     "type": "sriov",
-    "if0": "enp1s0f1",
+    "master": "enp1s0f1",
     "if0name": "net0",
     "dpdk": {
         "kernel_driver":"ixgbevf",
