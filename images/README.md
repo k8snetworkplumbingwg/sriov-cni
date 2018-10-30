@@ -5,7 +5,7 @@ This is used for distribution of SR-IOV CNI binary in a Docker image.
 Typically you'd build this from the root of your SR-IOV CNI clone, and you'd set the `-f` flag to specify the Dockerfile during build time. This allows the addition of the entirety of the SR-IOV CNI git clone as part of the Docker context. Use the `-f` flag with the root of the clone as the context (e.g. your current work directory would be root of git clone), such as:
 
 ```
-$ docker build -t sriov-cni -f ./images/Dockerfile .
+$ docker build -t sriov-cni -f ./Dockerfile .
 ```
 
 A `build_docker.sh` script is available for building the SR-IOV CNI docker image from the `./images` directory.
