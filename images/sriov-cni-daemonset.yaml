@@ -24,6 +24,8 @@ spec:
       containers:
       - name: kube-sriov-cni
         image: nfvpe/sriov-cni:latest
+        securityContext:
+          privileged: true
         resources:
           requests:
             cpu: "100m"
