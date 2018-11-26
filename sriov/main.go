@@ -56,7 +56,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	if n.DeviceInfo != nil && n.DeviceInfo.PCIaddr != "" && n.DeviceInfo.Vfid >= 0 && n.DeviceInfo.Pfname != "" {
-		if err = setupVF(n, n.Master, args.IfName, args.ContainerID, netns); err != nil {
+		if err = setupVF(n, args.IfName, args.ContainerID, netns); err != nil {
 			return fmt.Errorf("failed to set up pod interface %q from the device %q: %v", args.IfName, n.Master, err)
 		}
 	} else {
