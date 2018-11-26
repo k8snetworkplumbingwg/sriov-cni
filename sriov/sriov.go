@@ -94,14 +94,13 @@ func moveIfToNetns(ifname string, netns ns.NetNS) error {
 	return nil
 }
 
-func setupVF(conf *sriovtypes.NetConf, pfName string, podifName string, cid string, netns ns.NetNS) error {
-
-	m, err := netlink.LinkByName(pfName)
+func setupVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.NetNS) error {
+	m, err := netlink.LinkByName(conf.Master)
 	if err != nil {
 		return fmt.Errorf("failed to lookup master %q: %v", conf.Master, err)
 	}
 
-	vfLinks, err := utils.GetVFLinkNames(pfName, conf.DeviceInfo.Vfid)
+	vfLinks, err := utils.GetVFLinkNames(conf.Master, conf.DeviceInfo.Vfid)
 	if err != nil {
 		return err
 	}
@@ -112,7 +111,7 @@ func setupVF(conf *sriovtypes.NetConf, pfName string, podifName string, cid stri
 		}
 
 		if conf.Sharedvf {
-			if err = setSharedVfVlan(pfName, conf.DeviceInfo.Vfid, conf.Vlan); err != nil {
+			if err = setSharedVfVlan(conf.Master, conf.DeviceInfo.Vfid, conf.Vlan); err != nil {
 				return fmt.Errorf("failed to set shared vf %d vlan: %v", conf.DeviceInfo.Vfid, err)
 			}
 		}
@@ -269,7 +268,7 @@ func releaseVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.
 func resetVfVlan(pfName, vfName string) error {
 
 	// get the ifname sriov vf num
-	vfTotal, err := utils.GetsriovNumfs(pfName)
+	vfTotal, err := utils.GetSriovNumVfs(pfName)
 	if err != nil {
 		return err
 	}
