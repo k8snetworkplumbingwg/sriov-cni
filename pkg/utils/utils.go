@@ -15,8 +15,8 @@ const (
 	sysBusPci       = "/sys/bus/pci/devices"
 )
 
-// GetsriovNumfs takes in a PF name(ifName) as string and returns number of VF configured as int
-func GetsriovNumfs(ifName string) (int, error) {
+// GetSriovNumVfs takes in a PF name(ifName) as string and returns number of VF configured as int
+func GetSriovNumVfs(ifName string) (int, error) {
 	var vfTotal int
 
 	sriovFile := filepath.Join(netDirectory, ifName, "device", sriovConfigured)
@@ -45,7 +45,7 @@ func GetsriovNumfs(ifName string) (int, error) {
 // GetVfid takes in VF's PCI address(addr) and pfName as string and returns VF's ID as int
 func GetVfid(addr string, pfName string) (int, error) {
 	var id int
-	vfTotal, err := GetsriovNumfs(pfName)
+	vfTotal, err := GetSriovNumVfs(pfName)
 	if err != nil {
 		return id, err
 	}
@@ -65,33 +65,6 @@ func GetVfid(addr string, pfName string) (int, error) {
 		}
 	}
 	return id, fmt.Errorf("unable to get VF ID with PF: %s and VF pci address %v", pfName, addr)
-}
-
-// getSriovPfList returns a list of SRIOV capable PF names as string
-func getSriovPfList() ([]string, error) {
-
-	sriovNetDevices := []string{}
-
-	netDevices, err := ioutil.ReadDir(netDirectory)
-	if err != nil {
-		return sriovNetDevices, fmt.Errorf("Error. Cannot read %s for network device names. Err: %v", netDirectory, err)
-	}
-
-	if len(netDevices) < 1 {
-		return sriovNetDevices, fmt.Errorf("Error. No network device found in %s directory", netDirectory)
-	}
-
-	for _, dev := range netDevices {
-		sriovFilePath := filepath.Join(netDirectory, dev.Name(), "device", "sriov_numvfs")
-
-		if f, err := os.Lstat(sriovFilePath); !os.IsNotExist(err) {
-			if f.Mode().IsRegular() { // and its a regular file
-				sriovNetDevices = append(sriovNetDevices, dev.Name())
-			}
-		}
-	}
-
-	return sriovNetDevices, nil
 }
 
 // GetPfName returns PF net device name of a given VF pci address
@@ -114,7 +87,7 @@ func GetPfName(vf string) (string, error) {
 	return strings.TrimSpace(files[0].Name()), nil
 }
 
-// GetPciAddress takes in a interface(ifName) and VF id and returns its network interface name as string
+// GetPciAddress takes in a interface(ifName) and VF id and returns returns its pci addr as string
 func GetPciAddress(ifName string, vf int) (string, error) {
 	var pciaddr string
 	vfDir := filepath.Join(netDirectory, ifName, "device", fmt.Sprintf("virtfn%d", vf))
@@ -161,28 +134,6 @@ func GetSharedPF(ifName string) (string, error) {
 	}
 
 	return pfName, fmt.Errorf("Shared PF not found")
-}
-
-// GetDeviceNameFromPci takes in a device's pci adddress as string and returns it's network interface name as string
-func GetDeviceNameFromPci(pciaddr string) (string, error) {
-	var devName string
-	vfDir := filepath.Join(sysBusPci, pciaddr, "net")
-	_, err := os.Lstat(vfDir)
-	if err != nil {
-		return devName, fmt.Errorf("cannot get a network device with pci address %v %q", pciaddr, err)
-	}
-	dirContents, _ := ioutil.ReadDir(vfDir)
-
-	if err != nil || len(dirContents) < 1 {
-		return devName, fmt.Errorf("failed to get network device name in %v %v", vfDir, err)
-	}
-
-	if len(dirContents) < 1 {
-		return devName, fmt.Errorf("no network device found in %v", vfDir)
-	}
-
-	devName = dirContents[0].Name() // assuming one net device in this directory
-	return strings.TrimSpace(devName), nil
 }
 
 // NetDeviceNotFoundErr is a custom error type

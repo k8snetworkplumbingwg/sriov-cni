@@ -96,7 +96,7 @@ func AssignFreeVF(conf *sriovtypes.NetConf) error {
 	}
 
 	// get the ifname sriov vf num
-	vfTotal, err := utils.GetsriovNumfs(pfName)
+	vfTotal, err := utils.GetSriovNumVfs(pfName)
 	if err != nil {
 		return err
 	}
@@ -110,9 +110,7 @@ func AssignFreeVF(conf *sriovtypes.NetConf) error {
 		infos, err = utils.GetVFLinkNames(pfName, vf)
 		if err != nil {
 			if _, ok := err.(*utils.NetDeviceNotFoundErr); ok {
-				if vf < vfTotal {
-					continue
-				}
+				continue
 			}
 			return fmt.Errorf("failed to read the virtfn%d dir of the device %q: %v", vf, pfName, err)
 		}
