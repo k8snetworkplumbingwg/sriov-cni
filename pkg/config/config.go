@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
 	sriovtypes "github.com/intel/sriov-cni/pkg/types"
@@ -109,37 +110,32 @@ func AssignFreeVF(conf *sriovtypes.NetConf) error {
 	for vf := 0; vf < vfTotal; vf++ {
 		infos, err = utils.GetVFLinkNames(pfName, vf)
 		if err != nil {
-			if _, ok := err.(*utils.NetDeviceNotFoundErr); ok {
+			if _, ok := err.(*os.PathError); ok {
 				continue
+			} else {
+				return fmt.Errorf("failed to read the virtfn%d dir of the device %q: %v", vf, pfName, err)
 			}
-			return fmt.Errorf("failed to read the virtfn%d dir of the device %q: %v", vf, pfName, err)
-		}
 
-		if (len(infos) == 0) && (vf == (vfTotal - 1)) {
-			return fmt.Errorf("no free Virtual function exist for PF %s, last vf is virtfn%d", pfName, vf)
-		}
+		} else if len(infos) > 0 {
 
-		if (len(infos) == 0) && (vf != (vfTotal - 1)) {
-			continue
-		}
-
-		if len(infos) == MaxSharedVf {
-			conf.Sharedvf = true
-		}
-
-		if len(infos) <= MaxSharedVf {
-			vfIdx = vf
-			pciAddr, err = utils.GetPciAddress(pfName, vfIdx)
-			if err != nil {
-				return fmt.Errorf("err in getting pci address - %q", err)
+			if len(infos) == MaxSharedVf {
+				conf.Sharedvf = true
 			}
-			break
-		} else {
-			return fmt.Errorf("multiple network devices found with VF id: %d under PF %s: %+v", vf, pfName, infos)
+
+			if len(infos) <= MaxSharedVf {
+				vfIdx = vf
+				pciAddr, err = utils.GetPciAddress(pfName, vfIdx)
+				if err != nil {
+					return fmt.Errorf("err in getting pci address for VF %d of PF %s: %q", vf, pfName, err)
+				}
+				break
+			} else {
+				return fmt.Errorf("multiple network devices found with VF id: %d under PF %s: %+v", vf, pfName, infos)
+			}
 		}
 	}
 
-	if len(infos) != 1 && len(infos) != MaxSharedVf {
+	if len(infos) == 0 {
 		return fmt.Errorf("no virtual network resources available for the %q", conf.Master)
 	}
 
