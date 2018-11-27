@@ -136,36 +136,17 @@ func GetSharedPF(ifName string) (string, error) {
 	return pfName, fmt.Errorf("Shared PF not found")
 }
 
-// NetDeviceNotFoundErr is a custom error type
-type NetDeviceNotFoundErr struct {
-	errMsg string
-}
-
-func (e *NetDeviceNotFoundErr) Error() string {
-	return e.errMsg
-}
-
-func newNetDeviceNotFoundErr(msg string) *NetDeviceNotFoundErr {
-	return &NetDeviceNotFoundErr{
-		errMsg: fmt.Sprintf("net device not found: %s", msg),
-	}
-}
-
 // GetVFLinkNames returns VF's network interface name given it's PF name as string and VF id as int
 func GetVFLinkNames(pfName string, vfID int) ([]string, error) {
 	var names []string
 	vfDir := filepath.Join(netDirectory, pfName, "device", fmt.Sprintf("virtfn%d", vfID), "net")
 	if _, err := os.Lstat(vfDir); err != nil {
-		return nil, newNetDeviceNotFoundErr(fmt.Sprintf("failed to open the virtfn%d dir of the device %q: %v", vfID, pfName, err))
+		return nil, err
 	}
 
 	fInfos, err := ioutil.ReadDir(vfDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read the virtfn%d dir of the device %q: %v", vfID, pfName, err)
-	}
-
-	if len(fInfos) < 1 {
-		return nil, fmt.Errorf("no netdevice found in dir: %s", vfDir)
 	}
 
 	names = make([]string, 0)
