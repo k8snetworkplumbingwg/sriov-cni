@@ -11,7 +11,26 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-const (
+// mocked netlink interface
+// required for unit tests
+var nLink NetlinkManager
+
+// NetlinkManager is an interface to get link by name
+type NetlinkManager interface {
+	LinkByName(string) (netlink.Link, error)
+}
+
+// MyNetlink NetlinkManager
+type MyNetlink struct {
+	lm NetlinkManager
+}
+
+// LinkByName implements NetlinkManager
+func (n *MyNetlink) LinkByName(name string) (netlink.Link, error) {
+	return netlink.LinkByName(name)
+}
+
+var (
 	defaultCNIDir = "/var/lib/cni/sriov"
 	// MaxSharedVf defines maximum number of PFs a VF is being shared
 	MaxSharedVf = 2
@@ -91,7 +110,7 @@ func AssignFreeVF(conf *sriovtypes.NetConf) error {
 	var pciAddr string
 	pfName := conf.Master
 
-	_, err := netlink.LinkByName(pfName)
+	_, err := nLink.LinkByName(pfName)
 	if err != nil {
 		return fmt.Errorf("failed to lookup master %q: %v", conf.Master, err)
 	}

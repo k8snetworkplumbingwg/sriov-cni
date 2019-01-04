@@ -88,6 +88,9 @@ func consumeScratchNetConf(containerID, dataDir string) ([]byte, error) {
 	return data, err
 }
 
+//https://npf.io/2015/06/testing-exec-command
+var execCommand = exec.Command
+
 // Enabledpdkmode binds an interface given as ifname string to the dpdk driver in Conf
 func Enabledpdkmode(dc *Conf, ifname string, dpdkmode bool) error {
 	stdout := &bytes.Buffer{}
@@ -102,7 +105,7 @@ func Enabledpdkmode(dc *Conf, ifname string, dpdkmode bool) error {
 		device = dc.PCIaddr
 	}
 
-	cmd := exec.Command(dc.DPDKtool, "-b", driver, device)
+	cmd := execCommand(dc.DPDKtool, "-b", driver, device)
 	cmd.Stdout = stdout
 	err := cmd.Run()
 	if err != nil {
