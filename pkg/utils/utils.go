@@ -9,17 +9,19 @@ import (
 	"strings"
 )
 
-const (
-	netDirectory    = "/sys/class/net"
-	sriovConfigured = "sriov_numvfs"
-	sysBusPci       = "/sys/bus/pci/devices"
+var (
+	sriovConfigured = "/sriov_numvfs"
+	// NetDirectory sysfs net directory
+	NetDirectory = "/sys/class/net"
+	// SysBusPci is sysfs pci device directory
+	SysBusPci = "/sys/bus/pci/devices"
 )
 
 // GetSriovNumVfs takes in a PF name(ifName) as string and returns number of VF configured as int
 func GetSriovNumVfs(ifName string) (int, error) {
 	var vfTotal int
 
-	sriovFile := filepath.Join(netDirectory, ifName, "device", sriovConfigured)
+	sriovFile := filepath.Join(NetDirectory, ifName, "device", sriovConfigured)
 	if _, err := os.Lstat(sriovFile); err != nil {
 		return vfTotal, fmt.Errorf("failed to open the sriov_numfs of device %q: %v", ifName, err)
 	}
@@ -50,7 +52,7 @@ func GetVfid(addr string, pfName string) (int, error) {
 		return id, err
 	}
 	for vf := 0; vf <= vfTotal; vf++ {
-		vfDir := filepath.Join(netDirectory, pfName, "device", fmt.Sprintf("virtfn%d", vf))
+		vfDir := filepath.Join(NetDirectory, pfName, "device", fmt.Sprintf("virtfn%d", vf))
 		_, err := os.Lstat(vfDir)
 		if err != nil {
 			continue
@@ -59,7 +61,7 @@ func GetVfid(addr string, pfName string) (int, error) {
 		if err != nil {
 			continue
 		}
-		pciaddr := pciinfo[len("../"):]
+		pciaddr := filepath.Base(pciinfo)
 		if pciaddr == addr {
 			return vf, nil
 		}
@@ -69,7 +71,7 @@ func GetVfid(addr string, pfName string) (int, error) {
 
 // GetPfName returns PF net device name of a given VF pci address
 func GetPfName(vf string) (string, error) {
-	pfSymLink := filepath.Join(sysBusPci, vf, "physfn", "net")
+	pfSymLink := filepath.Join(SysBusPci, vf, "physfn", "net")
 	_, err := os.Lstat(pfSymLink)
 	if err != nil {
 		return "", err
@@ -90,7 +92,7 @@ func GetPfName(vf string) (string, error) {
 // GetPciAddress takes in a interface(ifName) and VF id and returns returns its pci addr as string
 func GetPciAddress(ifName string, vf int) (string, error) {
 	var pciaddr string
-	vfDir := filepath.Join(netDirectory, ifName, "device", fmt.Sprintf("virtfn%d", vf))
+	vfDir := filepath.Join(NetDirectory, ifName, "device", fmt.Sprintf("virtfn%d", vf))
 	dirInfo, err := os.Lstat(vfDir)
 	if err != nil {
 		return pciaddr, fmt.Errorf("can't get the symbolic link of virtfn%d dir of the device %q: %v", vf, ifName, err)
@@ -105,14 +107,14 @@ func GetPciAddress(ifName string, vf int) (string, error) {
 		return pciaddr, fmt.Errorf("can't read the symbolic link of virtfn%d dir of the device %q: %v", vf, ifName, err)
 	}
 
-	pciaddr = pciinfo[len("../"):]
+	pciaddr = filepath.Base(pciinfo)
 	return pciaddr, nil
 }
 
 // GetSharedPF takes in VF name(ifName) as string and returns the other VF name that shares same PCI address as string
 func GetSharedPF(ifName string) (string, error) {
 	pfName := ""
-	pfDir := filepath.Join(netDirectory, ifName)
+	pfDir := filepath.Join(NetDirectory, ifName)
 	dirInfo, err := os.Lstat(pfDir)
 	if err != nil {
 		return pfName, fmt.Errorf("can't get the symbolic link of the device %q: %v", ifName, err)
@@ -139,7 +141,7 @@ func GetSharedPF(ifName string) (string, error) {
 // GetVFLinkNames returns VF's network interface name given it's PF name as string and VF id as int
 func GetVFLinkNames(pfName string, vfID int) ([]string, error) {
 	var names []string
-	vfDir := filepath.Join(netDirectory, pfName, "device", fmt.Sprintf("virtfn%d", vfID), "net")
+	vfDir := filepath.Join(NetDirectory, pfName, "device", fmt.Sprintf("virtfn%d", vfID), "net")
 	if _, err := os.Lstat(vfDir); err != nil {
 		return nil, err
 	}
