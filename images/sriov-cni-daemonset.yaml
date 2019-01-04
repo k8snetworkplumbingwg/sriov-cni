@@ -23,7 +23,7 @@ spec:
         effect: NoSchedule
       containers:
       - name: kube-sriov-cni
-        image: nfvpe/sriov-cni:latest
+        image: nfvpe/sriov-cni:release-v1
         securityContext:
           privileged: true
         resources:
