@@ -1,0 +1,10 @@
+language: go
+
+go:
+  - "1.10"
+
+before_install:
+  - go get -v golang.org/x/lint/golint
+
+script:
+  - make
