@@ -203,10 +203,9 @@ func releaseVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.
 		//check for the shared vf net interface
 		ifName := podifName + "d1"
 		_, err := netlink.LinkByName(ifName)
-		if err != nil {
-			return fmt.Errorf("unable to get shared PF device: %v", err)
+		if err == nil {
+			conf.Sharedvf = true
 		}
-		conf.Sharedvf = true
 	}
 
 	for i := 1; i <= config.MaxSharedVf; i++ {
