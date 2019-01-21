@@ -169,3 +169,7 @@ func AssignFreeVF(conf *sriovtypes.NetConf) error {
 	}
 	return nil
 }
+
+func init() {
+	nLink = &MyNetlink{}
+}
