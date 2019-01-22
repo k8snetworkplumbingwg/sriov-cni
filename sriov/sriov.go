@@ -82,6 +82,11 @@ func moveIfToNetns(ifname string, netns ns.NetNS) error {
 		return fmt.Errorf("failed to lookup vf device %v: %q", ifname, err)
 	}
 
+	netlink.LinkSetDown(vfDev)
+	index := vfDev.Attrs().Index
+	vfName := fmt.Sprintf("dev%d", index)
+	renameLink(ifname, vfName)
+
 	if err = netlink.LinkSetUp(vfDev); err != nil {
 		return fmt.Errorf("failed to setup netlink device %v %q", ifname, err)
 	}
