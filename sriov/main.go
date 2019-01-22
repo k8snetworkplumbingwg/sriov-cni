@@ -12,6 +12,7 @@ import (
 	"github.com/containernetworking/cni/pkg/types"
 	"github.com/containernetworking/cni/pkg/version"
 	"github.com/intel/sriov-cni/pkg/config"
+	"github.com/vishvananda/netlink"
 )
 
 func init() {
