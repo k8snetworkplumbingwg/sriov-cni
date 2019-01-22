@@ -89,6 +89,12 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return errors.New("IPAM plugin returned missing IPv4 config")
 	}
 
+	defer func() {
+		if err != nil {
+			ipam.ExecDel(n.IPAM.Type, args.StdinData)
+		}
+	}()
+
 	err = netns.Do(func(_ ns.NetNS) error {
 		return ipam.ConfigureIface(args.IfName, result)
 	})
