@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"os"
 
 	"github.com/containernetworking/cni/pkg/ipam"
 	"github.com/containernetworking/cni/pkg/ns"
@@ -32,8 +33,11 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 	defer netns.Close()
 
+	old_ifname := os.Getenv("CNI_IFNAME")
+	defer os.Setenv("CNI_IFNAME", old_ifname)
 	if n.IF0NAME != "" {
 		args.IfName = n.IF0NAME
+		os.Setenv("CNI_IFNAME", args.IfName)
 	}
 
 	// Try assigning a VF from PF
@@ -112,8 +116,11 @@ func cmdDel(args *skel.CmdArgs) error {
 		return err
 	}
 
+	old_ifname := os.Getenv("CNI_IFNAME")
+	defer os.Setenv("CNI_IFNAME", old_ifname)
 	if n.IF0NAME != "" {
 		args.IfName = n.IF0NAME
+		os.Setenv("CNI_IFNAME", args.IfName)
 	}
 
 	// skip the IPAM release for the DPDK and L2 mode
