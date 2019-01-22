@@ -56,9 +56,19 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	if n.DeviceInfo != nil && n.DeviceInfo.PCIaddr != "" && n.DeviceInfo.Vfid >= 0 && n.DeviceInfo.Pfname != "" {
-		if err = setupVF(n, args.IfName, args.ContainerID, netns); err != nil {
-			return fmt.Errorf("failed to set up pod interface %q from the device %q: %v", args.IfName, n.Master, err)
-		}
+		err = setupVF(n, args.IfName, args.ContainerID, netns)
+		defer func() {
+			if err != nil {
+				err = netns.Do(func(_ ns.NetNS) error {
+					_, err := netlink.LinkByName(args.IfName)
+					return err
+				})
+				if err == nil {
+					releaseVF(n, args.IfName, args.ContainerID, netns)
+				}
+			}
+		}()
+		
 	} else {
 		return fmt.Errorf("VF information are not available to invoke setupVF()")
 	}
