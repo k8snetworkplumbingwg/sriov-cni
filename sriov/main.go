@@ -33,8 +33,8 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 	defer netns.Close()
 
-	old_ifname := os.Getenv("CNI_IFNAME")
-	defer os.Setenv("CNI_IFNAME", old_ifname)
+	oldIfname := os.Getenv("CNI_IFNAME")
+	defer os.Setenv("CNI_IFNAME", oldIfname)
 	if n.IF0NAME != "" {
 		args.IfName = n.IF0NAME
 		os.Setenv("CNI_IFNAME", args.IfName)
@@ -116,8 +116,8 @@ func cmdDel(args *skel.CmdArgs) error {
 		return err
 	}
 
-	old_ifname := os.Getenv("CNI_IFNAME")
-	defer os.Setenv("CNI_IFNAME", old_ifname)
+	oldIfname := os.Getenv("CNI_IFNAME")
+	defer os.Setenv("CNI_IFNAME", oldIfname)
 	if n.IF0NAME != "" {
 		args.IfName = n.IF0NAME
 		os.Setenv("CNI_IFNAME", args.IfName)
