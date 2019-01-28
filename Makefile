@@ -8,8 +8,8 @@ PACKAGE=sriov-cni
 ORG_PATH=github.com/intel
 REPO_PATH=$(ORG_PATH)/$(PACKAGE)
 GOPATH=$(CURDIR)/.gopath
-GOBIN=$(CURDIR)/bin
-BUILDDIR=$(CURDIR)/build
+GOBIN=$(CURDIR)/gobin
+BUILDDIR=$(CURDIR)/bin
 BASE=$(GOPATH)/src/$(REPO_PATH)
 PKGS     = $(or $(PKG),$(shell cd $(BASE) && env GOPATH=$(GOPATH) $(GO) list ./... | grep -v "^$(PACKAGE)/vendor/"))
 TESTPKGS = $(shell env GOPATH=$(GOPATH) $(GO) list -f '{{ if or .TestGoFiles .XTestGoFiles }}{{ .ImportPath }}{{ end }}' $(PKGS))
