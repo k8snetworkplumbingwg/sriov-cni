@@ -76,31 +76,31 @@ func setSharedVfVlan(ifName string, vfIdx int, vlan int) error {
 	return nil
 }
 
-func moveIfToNetns(ifname string, netns ns.NetNS) error {
+func moveIfToNetns(ifname string, netns ns.NetNS) (string, error) {
 	vfDev, err := netlink.LinkByName(ifname)
 	if err != nil {
-		return fmt.Errorf("failed to lookup vf device %v: %q", ifname, err)
+		return ifname, fmt.Errorf("failed to lookup vf device %v: %q", ifname, err)
 	}
 
 	if err = netlink.LinkSetDown(vfDev); err != nil {
-		return fmt.Errorf("failed to down vf device %q: %v", ifname, err)
+		return ifname, fmt.Errorf("failed to down vf device %q: %v", ifname, err)
 	}
 	index := vfDev.Attrs().Index
 	vfName := fmt.Sprintf("dev%d", index)
 	if renameLink(ifname, vfName); err != nil {
-		return fmt.Errorf("failed to rename vf device %q to %q: %v", ifname, vfName, err)
+		return ifname, fmt.Errorf("failed to rename vf device %q to %q: %v", ifname, vfName, err)
 	}
 
 	if err = netlink.LinkSetUp(vfDev); err != nil {
-		return fmt.Errorf("failed to setup netlink device %v %q", ifname, err)
+		return vfName, fmt.Errorf("failed to setup netlink device %v %q", ifname, err)
 	}
 
 	// move VF device to ns
 	if err = netlink.LinkSetNsFd(vfDev, int(netns.Fd())); err != nil {
-		return fmt.Errorf("failed to move device %+v to netns: %q", ifname, err)
+		return vfName, fmt.Errorf("failed to move device %+v to netns: %q", ifname, err)
 	}
 
-	return nil
+	return vfName, nil
 }
 
 func setupVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.NetNS) error {
@@ -142,9 +142,11 @@ func setupVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.Ne
 	for i := 0; i < len(vfLinks); i++ {
 		linkName := vfLinks[i]
 
-		if err = moveIfToNetns(linkName, netns); err != nil {
+		newLinkName, err := moveIfToNetns(linkName, netns)
+		if err != nil {
 			return err
 		}
+		vfLinks[i] = newLinkName
 	}
 
 	return netns.Do(func(_ ns.NetNS) error {
