@@ -11,7 +11,7 @@ GOPATH=$(CURDIR)/.gopath
 GOBIN=$(CURDIR)/bin
 BUILDDIR=$(CURDIR)/build
 BASE=$(GOPATH)/src/$(REPO_PATH)
-GOFILES = $(shell cd $(BASE) && find . -name *.go | grep -vE "(vendor)|(_test.go)")
+GOFILES = $(shell find . -name *.go | grep -vE "(\/vendor\/)|(_test.go)")
 PKGS     = $(or $(PKG),$(shell cd $(BASE) && env GOPATH=$(GOPATH) $(GO) list ./... | grep -v "^$(PACKAGE)/vendor/"))
 TESTPKGS = $(shell env GOPATH=$(GOPATH) $(GO) list -f '{{ if or .TestGoFiles .XTestGoFiles }}{{ .ImportPath }}{{ end }}' $(PKGS))
 
