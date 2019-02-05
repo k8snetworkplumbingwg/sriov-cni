@@ -1,4 +1,4 @@
-package main
+package sriov
 
 import (
 	"fmt"
@@ -15,6 +15,59 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
+// mocked netlink interface
+// required for unit tests
+var nLink NetlinkManager
+
+// NetlinkManager is an interface to mock nelink library
+type NetlinkManager interface {
+	LinkByName(string) (netlink.Link, error)
+	LinkSetVfVlan(netlink.Link, int, int) error
+	LinkSetUp(netlink.Link) error
+	LinkSetDown(netlink.Link) error
+	LinkSetNsFd(netlink.Link, int) error
+	LinkSetName(netlink.Link, string) error
+}
+
+// MyNetlink NetlinkManager
+type MyNetlink struct {
+	lm NetlinkManager
+}
+
+// LinkByName implements NetlinkManager
+func (n *MyNetlink) LinkByName(name string) (netlink.Link, error) {
+	return netlink.LinkByName(name)
+}
+
+// LinkSetVfVlan using NetlinkManager
+func (n *MyNetlink) LinkSetVfVlan(link netlink.Link, vf, vlan int) error {
+	return netlink.LinkSetVfVlan(link, vf, vlan)
+}
+
+// LinkSetUp using NetlinkManager
+func (n *MyNetlink) LinkSetUp(link netlink.Link) error {
+	return netlink.LinkSetUp(link)
+}
+
+// LinkSetDown using NetlinkManager
+func (n *MyNetlink) LinkSetDown(link netlink.Link) error {
+	return netlink.LinkSetDown(link)
+}
+
+// LinkSetNsFd using NetlinkManager
+func (n *MyNetlink) LinkSetNsFd(link netlink.Link, fd int) error {
+	return netlink.LinkSetNsFd(link, fd)
+}
+
+// LinkSetName using NetlinkManager
+func (n *MyNetlink) LinkSetName(link netlink.Link, name string) error {
+	return netlink.LinkSetName(link, name)
+}
+
+func init() {
+	nLink = &MyNetlink{}
+}
+
 /*
  Link names given as os.FileInfo need to be sorted by their Index
 */
@@ -30,8 +83,8 @@ func (l LinksByIndex) Swap(i, j int) { l[i], l[j] = l[j], l[i] }
 
 // Less implements Less() method of sort interface
 func (l LinksByIndex) Less(i, j int) bool {
-	linkA, _ := netlink.LinkByName(l[i])
-	linkB, _ := netlink.LinkByName(l[j])
+	linkA, _ := nLink.LinkByName(l[i])
+	linkB, _ := nLink.LinkByName(l[j])
 
 	return linkA.Attrs().Index < linkB.Attrs().Index
 }
@@ -64,12 +117,12 @@ func setSharedVfVlan(ifName string, vfIdx int, vlan int) error {
 		return fmt.Errorf("Shared ifname can't be empty")
 	}
 
-	iflink, err := netlink.LinkByName(sharedifName)
+	iflink, err := nLink.LinkByName(sharedifName)
 	if err != nil {
 		return fmt.Errorf("failed to lookup the shared ifname %q: %v", sharedifName, err)
 	}
 
-	if err := netlink.LinkSetVfVlan(iflink, vfIdx, vlan); err != nil {
+	if err := nLink.LinkSetVfVlan(iflink, vfIdx, vlan); err != nil {
 		return fmt.Errorf("failed to set vf %d vlan: %v for shared ifname %q", vfIdx, err, sharedifName)
 	}
 
@@ -77,12 +130,12 @@ func setSharedVfVlan(ifName string, vfIdx int, vlan int) error {
 }
 
 func moveIfToNetns(ifname string, netns ns.NetNS) (string, error) {
-	vfDev, err := netlink.LinkByName(ifname)
+	vfDev, err := nLink.LinkByName(ifname)
 	if err != nil {
 		return ifname, fmt.Errorf("failed to lookup vf device %v: %q", ifname, err)
 	}
 
-	if err = netlink.LinkSetDown(vfDev); err != nil {
+	if err = nLink.LinkSetDown(vfDev); err != nil {
 		return ifname, fmt.Errorf("failed to down vf device %q: %v", ifname, err)
 	}
 	index := vfDev.Attrs().Index
@@ -91,12 +144,12 @@ func moveIfToNetns(ifname string, netns ns.NetNS) (string, error) {
 		return ifname, fmt.Errorf("failed to rename vf device %q to %q: %v", ifname, vfName, err)
 	}
 
-	if err = netlink.LinkSetUp(vfDev); err != nil {
+	if err = nLink.LinkSetUp(vfDev); err != nil {
 		return vfName, fmt.Errorf("failed to setup netlink device %v %q", ifname, err)
 	}
 
 	// move VF device to ns
-	if err = netlink.LinkSetNsFd(vfDev, int(netns.Fd())); err != nil {
+	if err = nLink.LinkSetNsFd(vfDev, int(netns.Fd())); err != nil {
 		return vfName, fmt.Errorf("failed to move device %+v to netns: %q", ifname, err)
 	}
 
@@ -104,7 +157,7 @@ func moveIfToNetns(ifname string, netns ns.NetNS) (string, error) {
 }
 
 func setupVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.NetNS) error {
-	m, err := netlink.LinkByName(conf.Master)
+	m, err := nLink.LinkByName(conf.Master)
 	if err != nil {
 		return fmt.Errorf("failed to lookup master %q: %v", conf.Master, err)
 	}
@@ -115,7 +168,7 @@ func setupVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.Ne
 	}
 
 	if conf.Vlan != 0 {
-		if err = netlink.LinkSetVfVlan(m, conf.DeviceInfo.Vfid, conf.Vlan); err != nil {
+		if err = nLink.LinkSetVfVlan(m, conf.DeviceInfo.Vfid, conf.Vlan); err != nil {
 			return fmt.Errorf("failed to set vf %d vlan: %v", conf.DeviceInfo.Vfid, err)
 		}
 
@@ -189,12 +242,12 @@ func releaseVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.
 		}
 
 		// reset vlan for DPDK code here
-		pfLink, err := netlink.LinkByName(conf.Master)
+		pfLink, err := nLink.LinkByName(conf.Master)
 		if err != nil {
 			return fmt.Errorf("DPDK: master device %s not found: %v", conf.Master, err)
 		}
 
-		if err = netlink.LinkSetVfVlan(pfLink, df.VFID, 0); err != nil {
+		if err = nLink.LinkSetVfVlan(pfLink, df.VFID, 0); err != nil {
 			return fmt.Errorf("DPDK: failed to reset vlan tag for vf %d: %v", df.VFID, err)
 		}
 
@@ -213,7 +266,7 @@ func releaseVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.
 	if conf.L2Mode != false {
 		//check for the shared vf net interface
 		ifName := podifName + "d1"
-		_, err := netlink.LinkByName(ifName)
+		_, err := nLink.LinkByName(ifName)
 		if err == nil {
 			conf.Sharedvf = true
 		}
@@ -231,7 +284,7 @@ func releaseVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.
 		}
 
 		// get VF device
-		vfDev, err := netlink.LinkByName(ifName)
+		vfDev, err := nLink.LinkByName(ifName)
 		if err != nil {
 			return fmt.Errorf("failed to lookup vf device %q: %v", ifName, err)
 		}
@@ -241,7 +294,7 @@ func releaseVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.
 		devName := fmt.Sprintf("dev%d", index)
 
 		// shutdown VF device
-		if err = netlink.LinkSetDown(vfDev); err != nil {
+		if err = nLink.LinkSetDown(vfDev); err != nil {
 			return fmt.Errorf("failed to down vf device %q: %v", ifName, err)
 		}
 
@@ -252,7 +305,7 @@ func releaseVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.
 		}
 
 		// move VF device to init netns
-		if err = netlink.LinkSetNsFd(vfDev, int(initns.Fd())); err != nil {
+		if err = nLink.LinkSetNsFd(vfDev, int(initns.Fd())); err != nil {
 			return fmt.Errorf("failed to move vf device %q to init netns: %v", ifName, err)
 		}
 
@@ -302,31 +355,98 @@ func resetVfVlan(pfName, vfName string) error {
 		return fmt.Errorf("failed to get VF id for %s", vfName)
 	}
 
-	pfLink, err := netlink.LinkByName(pfName)
+	pfLink, err := nLink.LinkByName(pfName)
 	if err != nil {
 		return fmt.Errorf("master device %s not found", pfName)
 	}
 
-	if err = netlink.LinkSetVfVlan(pfLink, vf, 0); err != nil {
+	if err = nLink.LinkSetVfVlan(pfLink, vf, 0); err != nil {
 		return fmt.Errorf("failed to reset vlan tag for vf %d: %v", vf, err)
 	}
 	return nil
 }
 
 func renameLink(curName, newName string) error {
-	link, err := netlink.LinkByName(curName)
+	link, err := nLink.LinkByName(curName)
 	if err != nil {
 		return fmt.Errorf("failed to lookup device %q: %v", curName, err)
 	}
 
-	return netlink.LinkSetName(link, newName)
+	return nLink.LinkSetName(link, newName)
 }
 
 func setUpLink(ifName string) error {
-	link, err := netlink.LinkByName(ifName)
+	link, err := nLink.LinkByName(ifName)
 	if err != nil {
 		return fmt.Errorf("failed to set up device %q: %v", ifName, err)
 	}
 
-	return netlink.LinkSetUp(link)
+	return nLink.LinkSetUp(link)
+}
+
+// AssignFreeVF takes in a NetConf object and updates it with an self allocated VF information
+func AssignFreeVF(conf *sriovtypes.NetConf) error {
+	var vfIdx int
+	var infos []string
+	var pciAddr string
+	pfName := conf.Master
+
+	_, err := nLink.LinkByName(pfName)
+	if err != nil {
+		return fmt.Errorf("failed to lookup master %q: %v", conf.Master, err)
+	}
+
+	// get the ifname sriov vf num
+	vfTotal, err := utils.GetSriovNumVfs(pfName)
+	if err != nil {
+		return err
+	}
+
+	if vfTotal <= 0 {
+		return fmt.Errorf("no virtual function in the device %s", pfName)
+	}
+
+	// Select a free VF
+	for vf := 0; vf < vfTotal; vf++ {
+		infos, err = utils.GetVFLinkNames(pfName, vf)
+		if err != nil {
+			if _, ok := err.(*os.PathError); ok {
+				continue
+			} else {
+				return fmt.Errorf("failed to read the virtfn%d dir of the device %q: %v", vf, pfName, err)
+			}
+
+		} else if len(infos) > 0 {
+
+			if len(infos) == config.MaxSharedVf {
+				conf.Sharedvf = true
+			}
+
+			if len(infos) <= config.MaxSharedVf {
+				vfIdx = vf
+				pciAddr, err = utils.GetPciAddress(pfName, vfIdx)
+				if err != nil {
+					return fmt.Errorf("err in getting pci address for VF %d of PF %s: %q", vf, pfName, err)
+				}
+				break
+			} else {
+				return fmt.Errorf("multiple network devices found with VF id: %d under PF %s: %+v", vf, pfName, infos)
+			}
+		}
+	}
+
+	if len(infos) == 0 {
+		return fmt.Errorf("no virtual network resources available for the %q", conf.Master)
+	}
+
+	// instantiate DeviceInfo
+	if pciAddr != "" {
+		vfInfo := &sriovtypes.VfInformation{
+			PCIaddr: pciAddr,
+			Pfname:  pfName,
+			Vfid:    vfIdx,
+		}
+		conf.DeviceInfo = vfInfo
+	}
+	return nil
 }

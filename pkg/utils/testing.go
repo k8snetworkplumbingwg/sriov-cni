@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"syscall"
 )
 
 func check(e error) {
@@ -19,12 +20,13 @@ func check(e error) {
 }
 
 type tmpSysFs struct {
-	dirRoot     string
-	dirList     []string
-	fileList    map[string][]byte
-	netSymlinks map[string]string
-	devSymlinks map[string]string
-	vfSymlinks  map[string]string
+	dirRoot      string
+	dirList      []string
+	fileList     map[string][]byte
+	netSymlinks  map[string]string
+	devSymlinks  map[string]string
+	vfSymlinks   map[string]string
+	originalRoot *os.File
 }
 
 var ts = tmpSysFs{
@@ -34,23 +36,31 @@ var ts = tmpSysFs{
 		"sys/devices/pci0000:ae/0000:ae:00.0/0000:af:00.1/net/enp175s0f1",
 		"sys/devices/pci0000:ae/0000:ae:00.0/0000:af:06.0/net/enp175s6",
 		"sys/devices/pci0000:ae/0000:ae:00.0/0000:af:06.1/net/enp175s7",
+		"sys/devices/pci0000:00/0000:00:02.0/0000:05:00.0/net/ens1",
+		"sys/devices/pci0000:00/0000:00:02.0/0000:05:00.0/net/ens1d1",
 	},
 	fileList: map[string][]byte{
 		"sys/devices/pci0000:ae/0000:ae:00.0/0000:af:00.1/sriov_numvfs": []byte("2"),
+		"sys/devices/pci0000:00/0000:00:02.0/0000:05:00.0/sriov_numvfs": []byte("0"),
 	},
 	netSymlinks: map[string]string{
 		"sys/class/net/enp175s0f1": "sys/devices/pci0000:ae/0000:ae:00.0/0000:af:00.1/net/enp175s0f1",
 		"sys/class/net/enp175s6":   "sys/devices/pci0000:ae/0000:ae:00.0/0000:af:06.0/net/enp175s6",
 		"sys/class/net/enp175s7":   "sys/devices/pci0000:ae/0000:ae:00.0/0000:af:06.1/net/enp175s7",
+		"sys/class/net/ens1":       "sys/devices/pci0000:00/0000:00:02.0/0000:05:00.0/net/ens1",
+		"sys/class/net/ens1d1":     "sys/devices/pci0000:00/0000:00:02.0/0000:05:00.0/net/ens1d1",
 	},
 	devSymlinks: map[string]string{
 		"sys/class/net/enp175s0f1/device": "sys/devices/pci0000:ae/0000:ae:00.0/0000:af:00.1",
 		"sys/class/net/enp175s6/device":   "sys/devices/pci0000:ae/0000:ae:00.0/0000:af:06.0",
 		"sys/class/net/enp175s7/device":   "sys/devices/pci0000:ae/0000:ae:00.0/0000:af:06.1",
+		"sys/class/net/ens1/device":       "sys/devices/pci0000:00/0000:00:02.0/0000:05:00.0",
+		"sys/class/net/ens1d1/device":     "sys/devices/pci0000:00/0000:00:02.0/0000:05:00.0",
 
 		"sys/bus/pci/devices/0000:af:00.1": "sys/devices/pci0000:ae/0000:ae:00.0/0000:af:00.1",
 		"sys/bus/pci/devices/0000:af:06.0": "sys/devices/pci0000:ae/0000:ae:00.0/0000:af:06.0",
 		"sys/bus/pci/devices/0000:af:06.1": "sys/devices/pci0000:ae/0000:ae:00.0/0000:af:06.1",
+		"sys/bus/pci/devices/0000:05:00.0": "sys/devices/pci0000:00/0000:00:02.0/0000:05:00.0",
 	},
 	vfSymlinks: map[string]string{
 		"sys/devices/pci0000:ae/0000:ae:00.0/0000:af:00.1/virtfn0": "sys/devices/pci0000:ae/0000:ae:00.0/0000:af:06.0",
@@ -63,46 +73,46 @@ var ts = tmpSysFs{
 
 // CreateTmpSysFs create mock sysfs for testing
 func CreateTmpSysFs() error {
+	originalRoot, err := os.Open("/")
+	ts.originalRoot = originalRoot
+
 	tmpdir, err := ioutil.TempDir("/tmp", "sriovplugin-testfiles-")
 	if err != nil {
 		return err
 	}
 
 	ts.dirRoot = tmpdir
+	syscall.Chroot(ts.dirRoot)
 
 	for _, dir := range ts.dirList {
-		if err := os.MkdirAll(filepath.Join(ts.dirRoot, dir), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Join("/", dir), 0755); err != nil {
 			return err
 		}
 	}
 	for filename, body := range ts.fileList {
 
-		if err := ioutil.WriteFile(filepath.Join(ts.dirRoot, filename), body, 0644); err != nil {
+		if err := ioutil.WriteFile(filepath.Join("/", filename), body, 0644); err != nil {
 			return err
 		}
 	}
 
 	for link, target := range ts.netSymlinks {
-		if err := createSymlinks(filepath.Join(ts.dirRoot, link), filepath.Join(ts.dirRoot, target)); err != nil {
+		if err := createSymlinks(filepath.Join("/", link), filepath.Join("/", target)); err != nil {
 			return err
 		}
 	}
 
 	for link, target := range ts.devSymlinks {
-		if err := createSymlinks(filepath.Join(ts.dirRoot, link), filepath.Join(ts.dirRoot, target)); err != nil {
+		if err := createSymlinks(filepath.Join("/", link), filepath.Join("/", target)); err != nil {
 			return err
 		}
 	}
 
 	for link, target := range ts.vfSymlinks {
-		if err := createSymlinks(filepath.Join(ts.dirRoot, link), filepath.Join(ts.dirRoot, target)); err != nil {
+		if err := createSymlinks(filepath.Join("/", link), filepath.Join("/", target)); err != nil {
 			return err
 		}
 	}
-
-	// switch to test sys tree
-	NetDirectory = filepath.Join(tmpdir, NetDirectory)
-	SysBusPci = filepath.Join(tmpdir, SysBusPci)
 	return nil
 }
 
@@ -118,7 +128,17 @@ func createSymlinks(link, target string) error {
 
 // RemoveTmpSysFs removes mocked sysfs
 func RemoveTmpSysFs() error {
-	if err := os.RemoveAll(ts.dirRoot); err != nil {
+	err := ts.originalRoot.Chdir()
+	if err != nil {
+		return err
+	}
+	if err = syscall.Chroot("."); err != nil {
+		return err
+	}
+	if err = ts.originalRoot.Close(); err != nil {
+		return err
+	}
+	if err = os.RemoveAll(ts.dirRoot); err != nil {
 		return err
 	}
 	return nil
