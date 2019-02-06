@@ -3,6 +3,7 @@ package sriov
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/containernetworking/cni/pkg/ns"
 	sriovtypes "github.com/intel/sriov-cni/pkg/types"
 	. "github.com/onsi/ginkgo"
@@ -176,7 +177,7 @@ var _ = Describe("Sriov", func() {
 			Expect(err).To(HaveOccurred())
 		})
 	})
-	PContext("Checking setupVF function", func() {
+	PContext("Checking SetupVF function", func() {
 		It("Assuming existing interface", func() {
 			conf := []byte(`{
         "name": "mynet",
@@ -204,7 +205,7 @@ var _ = Describe("Sriov", func() {
 				On("LinkByName", mock.AnythingOfType("string")).Return(fakeLink, nil).
 				On("LinkSetVfVlan", mock.AnythingOfType("FakeLink"), mock.AnythingOfType("int"), mock.AnythingOfType("int")).Return(nil)
 			nLink = mocked
-			err = setupVF(&netconf, "enp175s0f1", "dummycid", targetNetNS)
+			err = SetupVF(&netconf, "enp175s0f1", "dummycid", targetNetNS)
 			Expect(err).NotTo(HaveOccurred())
 		})
 		It("Assuming existing interface in dpdk mode", func() {
@@ -231,7 +232,7 @@ var _ = Describe("Sriov", func() {
 				On("LinkByName", mock.AnythingOfType("string")).Return(fakeLink, nil).
 				On("LinkSetVfVlan", mock.AnythingOfType("FakeLink"), mock.AnythingOfType("int"), mock.AnythingOfType("int")).Return(nil)
 			nLink = mocked
-			err = setupVF(&netconf, "enp175s0f1", "dummycid", targetNetNS)
+			err = SetupVF(&netconf, "enp175s0f1", "dummycid", targetNetNS)
 			Expect(err).NotTo(HaveOccurred())
 		})
 		It("Assuming existing interface with vlan", func() {
@@ -262,7 +263,7 @@ var _ = Describe("Sriov", func() {
 				On("LinkByName", mock.AnythingOfType("string")).Return(fakeLink, nil).
 				On("LinkSetVfVlan", mock.AnythingOfType("FakeLink"), mock.AnythingOfType("int"), mock.AnythingOfType("int")).Return(nil)
 			nLink = mocked
-			err = setupVF(&netconf, "enp175s0f1", "dummycid", targetNetNS)
+			err = SetupVF(&netconf, "enp175s0f1", "dummycid", targetNetNS)
 			Expect(err).NotTo(HaveOccurred())
 		})
 		It("Assuming existing shared interface with vlan", func() {
@@ -293,7 +294,7 @@ var _ = Describe("Sriov", func() {
 				On("LinkByName", mock.AnythingOfType("string")).Return(fakeLink, nil).
 				On("LinkSetVfVlan", mock.AnythingOfType("FakeLink"), mock.AnythingOfType("int"), mock.AnythingOfType("int")).Return(nil)
 			nLink = mocked
-			err = setupVF(&netconf, "ens1", "dummycid", targetNetNS)
+			err = SetupVF(&netconf, "ens1", "dummycid", targetNetNS)
 			Expect(err).NotTo(HaveOccurred())
 		})
 		It("Assuming not existing interface", func() {
@@ -322,11 +323,11 @@ var _ = Describe("Sriov", func() {
 				On("LinkByName", mock.AnythingOfType("string")).Return(nil, fmt.Errorf("No such interface")).
 				On("LinkSetVfVlan", mock.AnythingOfType("FakeLink"), mock.AnythingOfType("int"), mock.AnythingOfType("int")).Return(fmt.Errorf("LinkSetVfVlan failed"))
 			nLink = mocked
-			err = setupVF(&netconf, "enp175s0f2", "dummycid", targetNetNS)
+			err = SetupVF(&netconf, "enp175s0f2", "dummycid", targetNetNS)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
-	PContext("Checking releaseVF function", func() {
+	PContext("Checking ReleaseVF function", func() {
 		It("Assuming existing interface", func() {
 			conf := []byte(`{
         "name": "mynet",
@@ -356,7 +357,7 @@ var _ = Describe("Sriov", func() {
 				On("LinkSetNsFd", mock.AnythingOfType("FakeLink"), mock.AnythingOfType("int")).Return(nil).
 				On("LinkSetVfVlan", mock.AnythingOfType("FakeLink"), mock.AnythingOfType("int"), mock.AnythingOfType("int")).Return(nil)
 			nLink = mocked
-			err = releaseVF(&netconf, "enp175s0f1", "dummycid", targetNetNS)
+			err = ReleaseVF(&netconf, "enp175s0f1", "dummycid", targetNetNS)
 			Expect(err).NotTo(HaveOccurred())
 		})
 		It("Assuming existing interface with vlan", func() {
@@ -390,7 +391,7 @@ var _ = Describe("Sriov", func() {
 				On("LinkSetNsFd", mock.AnythingOfType("FakeLink"), mock.AnythingOfType("int")).Return(nil).
 				On("LinkSetVfVlan", mock.AnythingOfType("FakeLink"), mock.AnythingOfType("int"), mock.AnythingOfType("int")).Return(nil)
 			nLink = mocked
-			err = releaseVF(&netconf, "enp175s0f1", "dummycid", targetNetNS)
+			err = ReleaseVF(&netconf, "enp175s0f1", "dummycid", targetNetNS)
 			Expect(err).NotTo(HaveOccurred())
 		})
 		It("Assuming existing interface in dpdk mode", func() {
@@ -419,7 +420,7 @@ var _ = Describe("Sriov", func() {
 				On("LinkSetNsFd", mock.AnythingOfType("FakeLink"), mock.AnythingOfType("int")).Return(nil).
 				On("LinkSetVfVlan", mock.AnythingOfType("FakeLink"), mock.AnythingOfType("int"), mock.AnythingOfType("int")).Return(nil)
 			nLink = mocked
-			err = releaseVF(&netconf, "enp175s0f1", "dummycid", targetNetNS)
+			err = ReleaseVF(&netconf, "enp175s0f1", "dummycid", targetNetNS)
 			Expect(err).NotTo(HaveOccurred())
 		})
 		It("Assuming existing interface in layer2 mode", func() {
@@ -452,7 +453,7 @@ var _ = Describe("Sriov", func() {
 				On("LinkSetNsFd", mock.AnythingOfType("FakeLink"), mock.AnythingOfType("int")).Return(nil).
 				On("LinkSetVfVlan", mock.AnythingOfType("FakeLink"), mock.AnythingOfType("int"), mock.AnythingOfType("int")).Return(nil)
 			nLink = mocked
-			err = releaseVF(&netconf, "enp175s0f1", "dummycid", targetNetNS)
+			err = ReleaseVF(&netconf, "enp175s0f1", "dummycid", targetNetNS)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})

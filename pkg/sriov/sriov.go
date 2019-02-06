@@ -156,7 +156,8 @@ func moveIfToNetns(ifname string, netns ns.NetNS) (string, error) {
 	return vfName, nil
 }
 
-func setupVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.NetNS) error {
+// SetupVF sets up a VF in Pod netns
+func SetupVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.NetNS) error {
 	m, err := nLink.LinkByName(conf.Master)
 	if err != nil {
 		return fmt.Errorf("failed to lookup master %q: %v", conf.Master, err)
@@ -227,7 +228,8 @@ func setupVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.Ne
 	})
 }
 
-func releaseVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.NetNS) error {
+// ReleaseVF reset a VF from Pod netns and return it to init netns
+func ReleaseVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.NetNS) error {
 	// check for the DPDK mode and release the allocated DPDK resources
 	if conf.DPDKMode != false {
 		// get the DPDK net conf in cniDir

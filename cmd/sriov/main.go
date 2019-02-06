@@ -11,6 +11,7 @@ import (
 	"github.com/containernetworking/cni/pkg/types"
 	"github.com/containernetworking/cni/pkg/version"
 	"github.com/intel/sriov-cni/pkg/config"
+	"github.com/intel/sriov-cni/pkg/sriov"
 	"github.com/vishvananda/netlink"
 )
 
@@ -40,7 +41,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 	// Try assigning a VF from PF
 	if n.DeviceInfo == nil && n.Master != "" {
 		// Populate device info from PF
-		if err := config.AssignFreeVF(n); err != nil {
+		if err := sriov.AssignFreeVF(n); err != nil {
 			return fmt.Errorf("unable to get VF information %+v", err)
 		}
 	}
@@ -57,7 +58,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	if n.DeviceInfo != nil && n.DeviceInfo.PCIaddr != "" && n.DeviceInfo.Vfid >= 0 && n.DeviceInfo.Pfname != "" {
-		err = setupVF(n, args.IfName, args.ContainerID, netns)
+		err = sriov.SetupVF(n, args.IfName, args.ContainerID, netns)
 		defer func() {
 			if err != nil {
 				if !n.DPDKMode {
@@ -67,7 +68,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 					})
 				}
 				if n.DPDKMode || err == nil {
-					releaseVF(n, args.IfName, args.ContainerID, netns)
+					sriov.ReleaseVF(n, args.IfName, args.ContainerID, netns)
 				}
 			}
 		}()
@@ -149,7 +150,7 @@ func cmdDel(args *skel.CmdArgs) error {
 	}
 	defer netns.Close()
 
-	if err = releaseVF(n, args.IfName, args.ContainerID, netns); err != nil {
+	if err = sriov.ReleaseVF(n, args.IfName, args.ContainerID, netns); err != nil {
 		return err
 	}
 

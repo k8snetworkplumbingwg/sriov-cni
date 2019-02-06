@@ -57,7 +57,7 @@ build: vendor $(BUILDDIR)/$(BINARY_NAME) ; $(info Building $(BINARY_NAME)...)
 	$(info Done!)
 
 $(BUILDDIR)/$(BINARY_NAME): $(GOFILES) | $(BUILDDIR)
-	@cd $(BASE)/$(BINARY_NAME) && $(GO) build -o $(BUILDDIR)/$(BINARY_NAME) -v
+	@cd $(BASE)/cmd/$(BINARY_NAME) && $(GO) build -o $(BUILDDIR)/$(BINARY_NAME) -v
 
 
 # Tools
