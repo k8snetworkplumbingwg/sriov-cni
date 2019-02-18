@@ -109,6 +109,14 @@ func setupVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.Ne
 		return fmt.Errorf("failed to lookup master %q: %v", conf.Master, err)
 	}
 
+	netlinkExpected, err := utils.ShouldHaveNetlink(conf.Master, conf.DeviceInfo.Vfid)
+	if err != nil {
+		return fmt.Errorf("failed to determine if interface should have netlink device: %v", err)
+	}
+	if !netlinkExpected {
+		return nil
+	}
+
 	vfLinks, err := utils.GetVFLinkNames(conf.Master, conf.DeviceInfo.Vfid)
 	if err != nil {
 		return err
@@ -198,6 +206,14 @@ func releaseVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.
 			return fmt.Errorf("DPDK: failed to reset vlan tag for vf %d: %v", df.VFID, err)
 		}
 
+		return nil
+	}
+
+	netlinkExpected, err := utils.ShouldHaveNetlink(conf.Master, conf.DeviceInfo.Vfid)
+	if err != nil {
+		return fmt.Errorf("failed to determine if interface should have netlink device: %v", err)
+	}
+	if !netlinkExpected {
 		return nil
 	}
 
