@@ -11,6 +11,7 @@ import (
 	"github.com/containernetworking/cni/pkg/types"
 	"github.com/containernetworking/cni/pkg/version"
 	"github.com/intel/sriov-cni/pkg/config"
+	"github.com/intel/sriov-cni/pkg/utils"
 	"github.com/vishvananda/netlink"
 )
 
@@ -78,9 +79,14 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return fmt.Errorf("VF information are not available to invoke setupVF()")
 	}
 
+	netlinkExpected, err := utils.ShouldHaveNetlink(n.Master, n.DeviceInfo.Vfid)
+	if err != nil {
+		return fmt.Errorf("failed to determine if interface should have netlink device: %v", err)
+	}
+
 	// skip the IPAM allocation for the DPDK and L2 mode
 	var result *types.Result
-	if n.DPDKMode || n.L2Mode {
+	if n.DPDKMode || n.L2Mode || !netlinkExpected {
 		return result.Print()
 	}
 
