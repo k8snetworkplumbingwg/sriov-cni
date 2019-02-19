@@ -1,17 +1,12 @@
-FROM centos:centos7
+FROM openshift/origin-release:golang-1.11 as builder
 
 # Add everything
 ADD . /usr/src/sriov-cni
 
-ENV INSTALL_PKGS "git golang"
-RUN yum install -y $INSTALL_PKGS && \
-    rpm -V $INSTALL_PKGS && \
-    cd /usr/src/sriov-cni && \
-    ./build && \
-    yum autoremove -y $INSTALL_PKGS && \
-    yum clean all && \
-    rm -rf /tmp/*
+RUN cd /usr/src/sriov-cni && make build
 
+FROM openshift/origin-base
+COPY --from=builder /usr/src/sriov-cni/build/sriov /usr/bin/
 WORKDIR /
 
 LABEL io.k8s.display-name="SR-IOV CNI"
