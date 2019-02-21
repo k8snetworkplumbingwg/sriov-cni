@@ -45,7 +45,6 @@ options ixgbe max_vfs=8,8
 * `name` (string, required): the name of the network
 * `type` (string, required): "sriov"
 * `master` (string, required): name of the PF
-* `if0name` (string, optional): interface name in the Container
 * `l2enable` (boolean, optional): if `true` then add VF as L2 mode only, IPAM will not be executed
 * `vlan` (int, optional): VLAN ID to assign for the VF
 * `ipam` (dictionary, optional): IPAM configuration to be used for this network.
@@ -112,7 +111,6 @@ lo        Link encap:Local Loopback
     "name": "mynet",
     "type": "sriov",
     "master": "enp1s0f1",
-    "if0name": "net0",
     "dpdk": {
         "kernel_driver":"ixgbevf",
         "dpdk_driver":"igb_uio",

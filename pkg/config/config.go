@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 
 	sriovtypes "github.com/intel/sriov-cni/pkg/types"
 	"github.com/intel/sriov-cni/pkg/utils"
@@ -56,13 +55,6 @@ func LoadConf(bytes []byte) (*sriovtypes.NetConf, error) {
 		return nil, fmt.Errorf("error: SRIOV-CNI loadConf: VF pci addr OR Master name is required")
 	}
 
-	if n.IF0NAME != "" {
-		valid := checkIf0name(n.IF0NAME)
-		if !valid {
-			return nil, fmt.Errorf(`"if0name" field should not be  equal to (eth0 | eth1 | lo | ""). It specifies the virtualized interface name in the pod`)
-		}
-	}
-
 	if n.CNIDir == "" {
 		n.CNIDir = defaultCNIDir
 	}
@@ -73,17 +65,6 @@ func LoadConf(bytes []byte) (*sriovtypes.NetConf, error) {
 	}
 
 	return n, nil
-}
-
-func checkIf0name(ifname string) bool {
-	op := []string{"eth0", "eth1", "lo", ""}
-	for _, if0name := range op {
-		if strings.Compare(if0name, ifname) == 0 {
-			return false
-		}
-	}
-
-	return true
 }
 
 func getVfInfo(vfPci string) (*sriovtypes.VfInformation, error) {

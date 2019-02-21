@@ -33,10 +33,6 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 	defer netns.Close()
 
-	if n.IF0NAME != "" {
-		args.IfName = n.IF0NAME
-	}
-
 	// Try assigning a VF from PF
 	if n.DeviceInfo == nil && n.Master != "" {
 		// Populate device info from PF
@@ -115,10 +111,6 @@ func cmdDel(args *skel.CmdArgs) error {
 	n, err := config.LoadConf(args.StdinData)
 	if err != nil {
 		return err
-	}
-
-	if n.IF0NAME != "" {
-		args.IfName = n.IF0NAME
 	}
 
 	// skip the IPAM release for the DPDK and L2 mode

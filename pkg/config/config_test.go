@@ -143,40 +143,6 @@ var _ = Describe("Config", func() {
 			_, err := LoadConf(conf)
 			Expect(err).Should(MatchError("error: SRIOV-CNI loadConf: VF pci addr OR Master name is required"))
 		})
-		It("Assuming incorrect config file - forbidden if0name", func() {
-			conf := []byte(`{
-        "name": "mynet",
-        "type": "sriov",
-	"if0name": "eth0",
-        "master": "enp175s0f1",
-        "mac":"66:77:88:99:aa:bb",
-        "vf": 0,
-        "ipam": {
-            "type": "host-local",
-            "subnet": "10.55.206.0/26",
-            "routes": [
-                { "dst": "0.0.0.0/0" }
-            ],
-            "gateway": "10.55.206.1"
-        }
-                        }`)
-			_, err := LoadConf(conf)
-			Expect(err).Should(MatchError("\"if0name\" field should not be  equal to (eth0 | eth1 | lo | \"\"). It specifies the virtualized interface name in the pod"))
-		})
-	})
-	Context("Checking checkIf0name function", func() {
-		It("Assuming correct interfaces", func() {
-			reservedIface := []string{"eth0", "eth1", "lo", ""}
-			for _, iface := range reservedIface {
-				Expect(checkIf0name(iface)).Should(BeFalse())
-			}
-		})
-		It("Assuming forbidden interfaces", func() {
-			forbiddenIface := []string{"eno0", "eth11", "!@#"}
-			for _, iface := range forbiddenIface {
-				Expect(checkIf0name(iface)).Should(BeTrue())
-			}
-		})
 	})
 	Context("Checking getVfInfo function", func() {
 		It("Assuming existing PF", func() {
