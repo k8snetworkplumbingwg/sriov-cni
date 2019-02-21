@@ -16,7 +16,7 @@ var (
 	// SysBusPci is sysfs pci device directory
 	SysBusPci = "/sys/bus/pci/devices"
 	// UserspaceDrivers is a list of driver names that don't have netlink representation for their devices
-	UserspaceDrivers = []string{"vfio-pci", "uio_pci_generic"}
+	UserspaceDrivers = []string{"vfio-pci", "uio_pci_generic", "igb_uio"}
 )
 
 // GetSriovNumVfs takes in a PF name(ifName) as string and returns number of VF configured as int
