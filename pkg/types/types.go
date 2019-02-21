@@ -20,7 +20,6 @@ type NetConf struct {
 	DPDKConf   *dpdk.Conf     `json:"dpdk,omitempty"`
 	CNIDir     string         `json:"cniDir"`
 	Master     string         `json:"master"`
-	IF0NAME    string         `json:"if0name"`
 	L2Mode     bool           `json:"l2enable"`
 	Vlan       int            `json:"vlan"`
 	DeviceID   string         `json:"deviceID"`
