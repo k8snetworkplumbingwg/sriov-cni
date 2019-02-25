@@ -69,12 +69,12 @@ var _ = Describe("Utils", func() {
 	})
 	Context("Checking GetVFLinkNames function", func() {
 		It("Assuming existing vf", func() {
-			result, err := GetVFLinkNames("enp175s0f1", 0)
+			result, err := GetVFLinkNamesFromVFID("enp175s0f1", 0)
 			Expect(result).To(ContainElement("enp175s6"), "Existing PF should have at least one VF")
 			Expect(err).NotTo(HaveOccurred(), "Existing PF should not return an error")
 		})
 		It("Assuming not existing vf", func() {
-			_, err := GetVFLinkNames("enp175s0f1", 3)
+			_, err := GetVFLinkNamesFromVFID("enp175s0f1", 3)
 			Expect(err).To(HaveOccurred(), "Not existing VF should return an error")
 		})
 	})

@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -160,8 +161,29 @@ func ShouldHaveNetlink(pfName string, vfID int) (bool, error) {
 	return true, nil
 }
 
-// GetVFLinkNames returns VF's network interface name given it's PF name as string and VF id as int
-func GetVFLinkNames(pfName string, vfID int) ([]string, error) {
+// GetVFLinkNames returns VF's network interface name given it's PCI addr
+func GetVFLinkNames(pciAddr string) ([]string, error) {
+	var names []string
+	vfDir := filepath.Join(SysBusPci, pciAddr, "net")
+	if _, err := os.Lstat(vfDir); err != nil {
+		return nil, err
+	}
+
+	fInfos, err := ioutil.ReadDir(vfDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read net dir of the device %s: %v", pciAddr, err)
+	}
+
+	names = make([]string, 0)
+	for _, f := range fInfos {
+		names = append(names, f.Name())
+	}
+
+	return names, nil
+}
+
+// GetVFLinkNamesFromVFID returns VF's network interface name given it's PF name as string and VF id as int
+func GetVFLinkNamesFromVFID(pfName string, vfID int) ([]string, error) {
 	var names []string
 	vfDir := filepath.Join(NetDirectory, pfName, "device", fmt.Sprintf("virtfn%d", vfID), "net")
 	if _, err := os.Lstat(vfDir); err != nil {
@@ -179,4 +201,76 @@ func GetVFLinkNames(pfName string, vfID int) ([]string, error) {
 	}
 
 	return names, nil
+}
+
+// HasDpdkDriver checks if a device is attached to dpdk supported driver
+func HasDpdkDriver(pciAddr string) (bool, error) {
+	driverLink := filepath.Join(SysBusPci, pciAddr, "driver")
+	driverPath, err := filepath.EvalSymlinks(driverLink)
+	if err != nil {
+		return false, err
+	}
+	driverStat, err := os.Stat(driverPath)
+	if err != nil {
+		return false, err
+	}
+	driverName := driverStat.Name()
+	for _, drv := range UserspaceDrivers {
+		if driverName == drv {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// SaveNetConf takes in container ID, data dir and Pod interface name as string and a json encoded struct Conf
+// and save this Conf in data dir
+func SaveNetConf(cid, dataDir, podIfName string, conf interface{}) error {
+	netConfBytes, err := json.Marshal(conf)
+	if err != nil {
+		return fmt.Errorf("error serializing delegate netconf: %v", err)
+	}
+
+	s := []string{cid, podIfName}
+	cRef := strings.Join(s, "-")
+
+	// save the rendered netconf for cmdDel
+	if err = saveScratchNetConf(cRef, dataDir, netConfBytes); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func saveScratchNetConf(containerID, dataDir string, netconf []byte) error {
+	if err := os.MkdirAll(dataDir, 0700); err != nil {
+		return fmt.Errorf("failed to create the sriov data directory(%q): %v", dataDir, err)
+	}
+
+	path := filepath.Join(dataDir, containerID)
+
+	err := ioutil.WriteFile(path, netconf, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to write container data in the path(%q): %v", path, err)
+	}
+
+	return err
+}
+
+// ReadScratchNetConf takes in container ID, Pod interface name and data dir as string and returns a pointer to Conf
+func ReadScratchNetConf(cRefPath string) ([]byte, error) {
+	data, err := ioutil.ReadFile(cRefPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read container data in the path(%q): %v", cRefPath, err)
+	}
+
+	return data, err
+}
+
+// CleanCachedNetConf removed cached NetConf from disk
+func CleanCachedNetConf(cRefPath string) error {
+	if err := os.Remove(cRefPath); err != nil {
+		return fmt.Errorf("error removing NetConf file %s: %q", cRefPath, err)
+	}
+	return nil
 }

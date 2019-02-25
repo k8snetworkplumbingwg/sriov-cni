@@ -15,11 +15,11 @@
       * [Contacts](#contacts)
 
 # SR-IOV CNI plugin
-This repository contains the sriov CNI plugin that allows DPDK driver binding as well as the orginal features of [sriov-cni](https://github.com/hustcat/sriov-cni). To learn about CNI please visit [containernetworking/cni](https://github.com/containernetworking/cni).
-
 NIC with [SR-IOV](http://blog.scottlowe.org/2009/12/02/what-is-sr-iov/) capabilities work by introducing the idea of physical functions (PFs) and virtual functions (VFs). 
 
-PF is used by host. Each of the VFs can be treated as a separate physical NIC and assigned to one container, and configured with separate MAC, VLAN and IP, etc.
+A PF is used by host and VF configurations are applied through the PF. Each VF can be treated as a separate physical NIC and assigned to one container, and configured with it's own MAC, VLAN and IP, etc.
+
+SR-IOV CNI plugin works with [SR-IOV device plugin](https://github.com/intel/sriov-network-device-plugin) for VF allocation for a container. A metaplugin such as [Multus](https://github.com/intel/multus-cni) gets the allocated VF's `deviceID`(PCI address) and responsible to invoke SR-IOV cni plugin with that `deviceID`.
 
 ## Build
 
@@ -27,11 +27,13 @@ This plugin requires Go 1.5+ to build.
 
 Go 1.5 users will need to set `GO15VENDOREXPERIMENT=1` to get vendored dependencies. This flag is set by default in 1.6.
 
+To build the plugin binary:
+
 ```
 # make
 ```
 
-Upon successful build the plugin binary will be available in `build/sriov`. 
+Upon successful build the plugin binary will be available in `build/sriov`.
 
 ## Enable SR-IOV
 ### Intel cards
@@ -135,22 +137,14 @@ echo 8 > /sys/class/net/enp2s0f0/device/sriov_numvfs
 ### Main parameters
 * `name` (string, required): the name of the network
 * `type` (string, required): "sriov"
-* `master` (string, required): name of the PF
-* `l2enable` (boolean, optional): if `true` then add VF as L2 mode only, IPAM will not be executed
+* `deviceID` (string, required): A valid pci address of an SRIOV NIC's VF. e.g. "0000:03:02.3"
 * `vlan` (int, optional): VLAN ID to assign for the VF
 * `ipam` (dictionary, optional): IPAM configuration to be used for this network.
-* `dpdk` (dictionary, optional): DPDK configuration
+* `dpdkMode` (bool, optional): `true`Idicates whether VF is attached with DPDK enabled driver. Default is `false`
+
 
 ### Using DPDK drivers:
-If this plugin is used to bind a VF to dpdk driver inside the container, then the IPAM configuration will be ignored.
-
-### DPDK parameters
-If given, The DPDK configuration expected to have the following parameters
-
-* `kernel_driver` (string, required): kernel driver name
-* `dpdk_driver` (string, required): DPDK capable driver name
-* `dpdk_tool` (string, required): path to the dpdk-devbind.py script
-
+If this plugin is used with a VF bound to a dpdk driver then the IPAM configuration will be ignored.
 
 ## Usage
 
@@ -159,18 +153,22 @@ If given, The DPDK configuration expected to have the following parameters
 ```
 # cat > /etc/cni/net.d/10-mynet.conf <<EOF
 {
-    "name": "mynet",
+    "name": "sriov-net",
     "type": "sriov",
-    "master": "enp1s0f1",
-    "ipam": {
-        "type": "host-local",
-        "subnet": "10.55.206.0/26",
-        "routes": [
-            { "dst": "0.0.0.0/0" }
-        ],
-        "gateway": "10.55.206.1"
-    }
+        "deviceID": "0000:03:02.0",
+        "vlan": 2222,
+        "ipam": {
+                "type": "host-local",
+                "subnet": "10.56.217.0/24",
+                "rangeStart": "10.56.217.171",
+                "rangeEnd": "10.56.217.181",
+                "routes": [
+                        { "dst": "0.0.0.0/0" }
+                ],
+                "gateway": "10.56.217.1"
+        }
 }
+
 EOF
 ```
 
@@ -196,17 +194,16 @@ lo        Link encap:Local Loopback
 
 ### Configuration with DPDK:
 
+> Note: In dpdk mode IPAM configuration is ignored.
+
 ```
 # cat > /etc/cni/net.d/20-mynet-dpdk.conf <<EOF
 {
-    "name": "mynet",
+    "name": "sriov-dpdk",
     "type": "sriov",
-    "master": "enp1s0f1",
-    "dpdk": {
-        "kernel_driver":"ixgbevf",
-        "dpdk_driver":"igb_uio",
-        "dpdk_tool":"/opt/dpdk/usertools/dpdk-devbind.py"
-    }
+    "deviceID": "0000:03:02.0",
+    "vlan": 1000,
+    "dpdkMode": true
 }
 EOF
 ```
