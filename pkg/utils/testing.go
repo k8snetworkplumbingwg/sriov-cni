@@ -82,37 +82,40 @@ func CreateTmpSysFs() error {
 	}
 
 	ts.dirRoot = tmpdir
-	syscall.Chroot(ts.dirRoot)
+	//syscall.Chroot(ts.dirRoot)
 
 	for _, dir := range ts.dirList {
-		if err := os.MkdirAll(filepath.Join("/", dir), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Join(ts.dirRoot, dir), 0755); err != nil {
 			return err
 		}
 	}
 	for filename, body := range ts.fileList {
 
-		if err := ioutil.WriteFile(filepath.Join("/", filename), body, 0644); err != nil {
+		if err := ioutil.WriteFile(filepath.Join(ts.dirRoot, filename), body, 0644); err != nil {
 			return err
 		}
 	}
 
 	for link, target := range ts.netSymlinks {
-		if err := createSymlinks(filepath.Join("/", link), filepath.Join("/", target)); err != nil {
+		if err := createSymlinks(filepath.Join(ts.dirRoot, link), filepath.Join(ts.dirRoot, target)); err != nil {
 			return err
 		}
 	}
 
 	for link, target := range ts.devSymlinks {
-		if err := createSymlinks(filepath.Join("/", link), filepath.Join("/", target)); err != nil {
+		if err := createSymlinks(filepath.Join(ts.dirRoot, link), filepath.Join(ts.dirRoot, target)); err != nil {
 			return err
 		}
 	}
 
 	for link, target := range ts.vfSymlinks {
-		if err := createSymlinks(filepath.Join("/", link), filepath.Join("/", target)); err != nil {
+		if err := createSymlinks(filepath.Join(ts.dirRoot, link), filepath.Join(ts.dirRoot, target)); err != nil {
 			return err
 		}
 	}
+
+	SysBusPci = filepath.Join(ts.dirRoot, SysBusPci)
+	NetDirectory = filepath.Join(ts.dirRoot, NetDirectory)
 	return nil
 }
 

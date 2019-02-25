@@ -24,7 +24,7 @@ func init() {
 }
 
 func cmdAdd(args *skel.CmdArgs) error {
-	n, err := config.LoadConf(args.StdinData)
+	netConf, err := config.LoadConf(args.StdinData)
 	if err != nil {
 		return fmt.Errorf("SRIOV-CNI failed to load netconf: %v", err)
 	}
@@ -35,62 +35,46 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 	defer netns.Close()
 
-	// Try assigning a VF from PF
-	if n.DeviceInfo == nil && n.Master != "" {
-		// Populate device info from PF
-		if err := sriov.AssignFreeVF(n); err != nil {
-			return fmt.Errorf("unable to get VF information %+v", err)
+	sm := sriov.NewSriovManager()
+	if err := sm.ApplyVFConfig(netConf); err != nil {
+		return fmt.Errorf("SRIOV-CNI failed to configure VF %q", err)
+	}
+
+	// skip the IPAM allocation for the DPDK
+	var result *types.Result
+	if netConf.DPDKMode {
+		// Cache NetConf for CmdDel
+		if err = utils.SaveNetConf(args.ContainerID, config.DefaultCNIDir, args.IfName, netConf); err != nil {
+			return fmt.Errorf("error saving NetConf %q", err)
 		}
+
+		return result.Print()
 	}
 
-	if n.Sharedvf && !n.L2Mode {
-		return fmt.Errorf("l2enable mode must be true to use shared net interface %q", n.Master)
-	}
-
-	// fill in DpdkConf from DeviceInfo
-	if n.DPDKMode {
-		n.DPDKConf.PCIaddr = n.DeviceInfo.PCIaddr
-		n.DPDKConf.Ifname = args.IfName
-		n.DPDKConf.VFID = n.DeviceInfo.Vfid
-	}
-
-	if n.DeviceInfo != nil && n.DeviceInfo.PCIaddr != "" && n.DeviceInfo.Vfid >= 0 && n.DeviceInfo.Pfname != "" {
-		err = sriov.SetupVF(n, args.IfName, args.ContainerID, netns)
+	if netConf.DeviceID != "" && netConf.VFID >= 0 && netConf.Master != "" {
+		err = sm.SetupVF(netConf, args.IfName, args.ContainerID, netns)
 		defer func() {
 			if err != nil {
-				if !n.DPDKMode {
-					err = netns.Do(func(_ ns.NetNS) error {
-						_, err := netlink.LinkByName(args.IfName)
-						return err
-					})
-				}
-				if n.DPDKMode || err == nil {
-					sriov.ReleaseVF(n, args.IfName, args.ContainerID, netns)
+				err := netns.Do(func(_ ns.NetNS) error {
+					_, err := netlink.LinkByName(args.IfName)
+					return err
+				})
+				if err == nil {
+					sm.ReleaseVF(netConf, args.IfName, args.ContainerID, netns)
 				}
 			}
 		}()
 		if err != nil {
-			return fmt.Errorf("failed to set up pod interface %q from the device %q: %v", args.IfName, n.Master, err)
+			return fmt.Errorf("failed to set up pod interface %q from the device %q: %v", args.IfName, netConf.Master, err)
 		}
 	} else {
 		return fmt.Errorf("VF information are not available to invoke setupVF()")
 	}
 
-	netlinkExpected, err := utils.ShouldHaveNetlink(n.Master, n.DeviceInfo.Vfid)
-	if err != nil {
-		return fmt.Errorf("failed to determine if interface should have netlink device: %v", err)
-	}
-
-	// skip the IPAM allocation for the DPDK and L2 mode
-	var result *types.Result
-	if n.DPDKMode || n.L2Mode || !netlinkExpected {
-		return result.Print()
-	}
-
 	// run the IPAM plugin and get back the config to apply
-	result, err = ipam.ExecAdd(n.IPAM.Type, args.StdinData)
+	result, err = ipam.ExecAdd(netConf.IPAM.Type, args.StdinData)
 	if err != nil {
-		return fmt.Errorf("failed to set up IPAM plugin type %q from the device %q: %v", n.IPAM.Type, n.Master, err)
+		return fmt.Errorf("failed to set up IPAM plugin type %q from the device %q: %v", netConf.IPAM.Type, netConf.Master, err)
 	}
 
 	if result.IP4 == nil {
@@ -99,7 +83,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 	defer func() {
 		if err != nil {
-			ipam.ExecDel(n.IPAM.Type, args.StdinData)
+			ipam.ExecDel(netConf.IPAM.Type, args.StdinData)
 		}
 	}()
 
@@ -110,46 +94,65 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return err
 	}
 
-	result.DNS = n.DNS
+	// Cache NetConf for CmdDel
+	if err = utils.SaveNetConf(args.ContainerID, config.DefaultCNIDir, args.IfName, netConf); err != nil {
+		return fmt.Errorf("error saving NetConf %q", err)
+	}
+
+	result.DNS = netConf.DNS
 	return result.Print()
 }
 
 func cmdDel(args *skel.CmdArgs) error {
-	n, err := config.LoadConf(args.StdinData)
-	if err != nil {
-		return err
-	}
-
-	// skip the IPAM release for the DPDK and L2 mode
-	if !n.DPDKMode && !n.L2Mode && n.IPAM.Type != "" {
-		err = ipam.ExecDel(n.IPAM.Type, args.StdinData)
-		if err != nil {
-			return err
-		}
-	}
-
+	// https://github.com/kubernetes/kubernetes/pull/35240
 	if args.Netns == "" {
 		return nil
 	}
 
-	netns, err := ns.GetNS(args.Netns)
+	netConf, cRefPath, err := config.LoadConfFromCache(args)
 	if err != nil {
-		// according to:
-		// https://github.com/kubernetes/kubernetes/issues/43014#issuecomment-287164444
-		// if provided path does not exist (e.x. when node was restarted)
-		// plugin should silently return with success after releasing
-		// IPAM resources
-		_, ok := err.(ns.NSPathNotExistErr)
-		if ok {
-			return nil
+		return err
+	}
+
+	defer func() {
+		if err == nil && cRefPath != "" {
+			utils.CleanCachedNetConf(cRefPath)
+		}
+	}()
+
+	sm := sriov.NewSriovManager()
+
+	if !netConf.DPDKMode {
+		if netConf.IPAM.Type != "" {
+			err = ipam.ExecDel(netConf.IPAM.Type, args.StdinData)
+			if err != nil {
+				return err
+			}
 		}
 
-		return fmt.Errorf("failed to open netns %q: %v", netns, err)
-	}
-	defer netns.Close()
+		netns, err := ns.GetNS(args.Netns)
+		if err != nil {
+			// according to:
+			// https://github.com/kubernetes/kubernetes/issues/43014#issuecomment-287164444
+			// if provided path does not exist (e.x. when node was restarted)
+			// plugin should silently return with success after releasing
+			// IPAM resources
+			_, ok := err.(ns.NSPathNotExistErr)
+			if ok {
+				return nil
+			}
 
-	if err = sriov.ReleaseVF(n, args.IfName, args.ContainerID, netns); err != nil {
-		return err
+			return fmt.Errorf("failed to open netns %s: %q", netns, err)
+		}
+		defer netns.Close()
+
+		if err = sm.ReleaseVF(netConf, args.IfName, args.ContainerID, netns); err != nil {
+			return err
+		}
+	}
+
+	if err := sm.ResetVFConfig(netConf); err != nil {
+		return fmt.Errorf("cmdDel() error reseting VF: %q", err)
 	}
 
 	return nil
