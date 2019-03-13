@@ -1,7 +1,9 @@
 package sriov
 
 import (
-	"github.com/containernetworking/cni/pkg/ns"
+	"net"
+
+	"github.com/containernetworking/plugins/pkg/ns"
 	sriovtypes "github.com/intel/sriov-cni/pkg/types"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -226,7 +228,15 @@ var _ = Describe("Sriov", func() {
 			}()
 			Expect(err).NotTo(HaveOccurred())
 			mocked := &MockNetlinkManager{}
-			fakeLink := &FakeLink{netlink.LinkAttrs{Index: 1000, Name: "dummylink"}}
+			fakeMac, err := net.ParseMAC("6e:16:06:0e:b7:e9")
+
+			Expect(err).NotTo(HaveOccurred())
+
+			fakeLink := &FakeLink{netlink.LinkAttrs{
+				Index:        1000,
+				Name:         "dummylink",
+				HardwareAddr: fakeMac,
+			}}
 
 			mocked.On("LinkByName", mock.AnythingOfType("string")).Return(fakeLink, nil)
 			mocked.On("LinkSetDown", fakeLink).Return(nil)
@@ -235,8 +245,9 @@ var _ = Describe("Sriov", func() {
 			mocked.On("LinkSetUp", fakeLink).Return(nil)
 			mocked.On("LinkSetVfVlan", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int")).Return(nil)
 			sm := sriovManager{nLink: mocked}
-			err = sm.SetupVF(netconf, podifName, contID, targetNetNS)
+			macAddr, err := sm.SetupVF(netconf, podifName, contID, targetNetNS)
 			Expect(err).NotTo(HaveOccurred())
+			Expect(macAddr).To(Equal("6e:16:06:0e:b7:e9"))
 		})
 		Context("Checking ReleaseVF function", func() {
 			var (
