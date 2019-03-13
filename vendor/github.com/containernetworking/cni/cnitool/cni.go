@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 CNI authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,17 +15,18 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/containernetworking/cni/libcni"
 )
 
 const (
-	EnvCNIPath = "CNI_PATH"
-	EnvNetDir  = "NETCONFPATH"
+	EnvCNIPath        = "CNI_PATH"
+	EnvNetDir         = "NETCONFPATH"
+	EnvCapabilityArgs = "CAP_ARGS"
 
 	DefaultNetDir = "/etc/cni/net.d"
 
@@ -43,29 +44,41 @@ func main() {
 	if netdir == "" {
 		netdir = DefaultNetDir
 	}
-	netconf, err := libcni.LoadConf(netdir, os.Args[2])
+	netconf, err := libcni.LoadConfList(netdir, os.Args[2])
 	if err != nil {
 		exit(err)
+	}
+
+	var capabilityArgs map[string]interface{}
+	args := os.Getenv(EnvCapabilityArgs)
+	if len(args) > 0 {
+		if err = json.Unmarshal([]byte(args), &capabilityArgs); err != nil {
+			exit(err)
+		}
 	}
 
 	netns := os.Args[3]
 
 	cninet := &libcni.CNIConfig{
-		Path: strings.Split(os.Getenv(EnvCNIPath), ":"),
+		Path: filepath.SplitList(os.Getenv(EnvCNIPath)),
 	}
 
 	rt := &libcni.RuntimeConf{
-		ContainerID: "cni",
-		NetNS:       netns,
-		IfName:      "eth0",
+		ContainerID:    "cni",
+		NetNS:          netns,
+		IfName:         "eth0",
+		CapabilityArgs: capabilityArgs,
 	}
 
 	switch os.Args[1] {
 	case CmdAdd:
-		_, err := cninet.AddNetwork(netconf, rt)
+		result, err := cninet.AddNetworkList(netconf, rt)
+		if result != nil {
+			_ = result.Print()
+		}
 		exit(err)
 	case CmdDel:
-		exit(cninet.DelNetwork(netconf, rt))
+		exit(cninet.DelNetworkList(netconf, rt))
 	}
 }
 
