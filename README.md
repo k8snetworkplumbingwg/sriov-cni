@@ -44,7 +44,7 @@ Given Intel ixgbe NIC on CentOS, Fedora or RHEL:
 options ixgbe max_vfs=8,8
 ```
 ### Mellanox cards
-SRIOV-CNI support Mellanox ConnectXÂ®-4 Lx and ConnectXÂ®-5 adapter cards.
+SRIOV-CNI support Mellanox ConnectX®-4 Lx and ConnectX®-5 adapter cards.
 To enable SR-IOV functionality the following steps are required:
 
 1- Enable SR-IOV in the NIC's Firmware.
@@ -140,7 +140,7 @@ echo 8 > /sys/class/net/enp2s0f0/device/sriov_numvfs
 * `deviceID` (string, required): A valid pci address of an SRIOV NIC's VF. e.g. "0000:03:02.3"
 * `vlan` (int, optional): VLAN ID to assign for the VF
 * `ipam` (dictionary, optional): IPAM configuration to be used for this network.
-* `dpdkMode` (bool, optional): `true`Idicates whether VF is attached with DPDK enabled driver. Default is `false`
+* `dpdkMode` (bool, optional): `true` Indicates whether VF is attached with DPDK enabled driver. Default is `false`
 
 
 ### Using DPDK drivers:
@@ -153,6 +153,7 @@ If this plugin is used with a VF bound to a dpdk driver then the IPAM configurat
 ```
 # cat > /etc/cni/net.d/10-mynet.conf <<EOF
 {
+    "cniVersion": "0.3.1",
     "name": "sriov-net",
     "type": "sriov",
         "deviceID": "0000:03:02.0",
@@ -199,6 +200,7 @@ lo        Link encap:Local Loopback
 ```
 # cat > /etc/cni/net.d/20-mynet-dpdk.conf <<EOF
 {
+    "cniVersion": "0.3.1",
     "name": "sriov-dpdk",
     "type": "sriov",
     "deviceID": "0000:03:02.0",

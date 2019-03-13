@@ -5,8 +5,7 @@ import (
 	"os"
 	"sort"
 
-	"github.com/containernetworking/cni/pkg/ns"
-	// "github.com/intel/sriov-cni/pkg/config"
+	"github.com/containernetworking/plugins/pkg/ns"
 
 	sriovtypes "github.com/intel/sriov-cni/pkg/types"
 	"github.com/intel/sriov-cni/pkg/utils"
@@ -107,7 +106,7 @@ func (p *pciUtilsImpl) getPciAddress(ifName string, vf int) (string, error) {
 
 // Manager provides interface invoke sriov nic related operations
 type Manager interface {
-	SetupVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.NetNS) error
+	SetupVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.NetNS) (string, error)
 	ReleaseVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.NetNS) error
 	ResetVFConfig(conf *sriovtypes.NetConf) error
 	ApplyVFConfig(conf *sriovtypes.NetConf) error
@@ -126,9 +125,9 @@ func NewSriovManager() Manager {
 	}
 }
 
-// SetupVF sets up a VF in Pod netns
-func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.NetNS) error {
-
+// SetupVF sets up a VF in Pod netns returns first interface's MAC addres as string
+func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.NetNS) (string, error) {
+	var macAddress string
 	vfLinks := conf.HostIFNames
 
 	// Sort links name if there are 2 or more PF links found for a VF;
@@ -156,17 +155,17 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, cid s
 
 		// 1. Set link down
 		if err := s.nLink.LinkSetDown(linkObj); err != nil {
-			return fmt.Errorf("failed to down vf device %q: %v", linkName, err)
+			return "", fmt.Errorf("failed to down vf device %q: %v", linkName, err)
 		}
 
 		// 2. Set temp name
 		if err := s.nLink.LinkSetName(linkObj, tempName); err != nil {
-			return fmt.Errorf("error setting temp IF name %s for %s", tempName, linkName)
+			return "", fmt.Errorf("error setting temp IF name %s for %s", tempName, linkName)
 		}
 
 		// 3. Change netns
 		if err := s.nLink.LinkSetNsFd(linkObj, int(netns.Fd())); err != nil {
-			return fmt.Errorf("failed to move IF %s to netns: %q", tempName, err)
+			return "", fmt.Errorf("failed to move IF %s to netns: %q", tempName, err)
 		}
 
 		// 4. Set Pod IF name
@@ -179,14 +178,18 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, cid s
 			if err := s.nLink.LinkSetUp(linkObj); err != nil {
 				return fmt.Errorf("error bringing interface up in container ns: %q", err)
 			}
+			// Only adding one mac address
+			if macAddress == "" {
+				macAddress = linkObj.Attrs().HardwareAddr.String()
+			}
 			return nil
 		}); err != nil {
-			return fmt.Errorf("error setting up interface in container namespace: %q", err)
+			return "", fmt.Errorf("error setting up interface in container namespace: %q", err)
 		}
 		conf.ContIFNames = append(conf.ContIFNames, ifName)
 	}
 
-	return nil
+	return macAddress, nil
 }
 
 // ReleaseVF reset a VF from Pod netns and return it to init netns
