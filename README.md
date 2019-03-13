@@ -17,9 +17,9 @@
 # SR-IOV CNI plugin
 This repository contains the sriov CNI plugin that allows DPDK driver binding as well as the orginal featuers of [sriov-cni](https://github.com/hustcat/sriov-cni). To learn about CNI please visit [containernetworking/cni](https://github.com/containernetworking/cni).
 
-NIC with [SR-IOV](http://blog.scottlowe.org/2009/12/02/what-is-sr-iov/) capabilities works by introducing the idea of physical functions (PFs) and virtual functions (VFs). 
+NIC with [SR-IOV](http://blog.scottlowe.org/2009/12/02/what-is-sr-iov/) capabilities work by introducing the idea of physical functions (PFs) and virtual functions (VFs). 
 
-PF is used by host. Each VFs can be treated as a separate physical NIC and assigned to one container, and configured with separate MAC, VLAN and IP, etc.
+PF is used by host. Each of the VFs can be treated as a separate physical NIC and assigned to one container, and configured with separate MAC, VLAN and IP, etc.
 
 ## Build
 
@@ -42,7 +42,7 @@ Given Intel ixgbe NIC on CentOS, Fedora or RHEL:
 options ixgbe max_vfs=8,8
 ```
 ### Mellanox cards
-SRIOV-CNI support Mellanox ConnectX®-4 Lx and ConnectX®-5 adapter cards.
+SRIOV-CNI support Mellanox ConnectXÂ®-4 Lx and ConnectXÂ®-5 adapter cards.
 To enable SR-IOV functionality the following steps are required:
 
 1- Enable SR-IOV in the NIC's Firmware.
@@ -142,7 +142,7 @@ echo 8 > /sys/class/net/enp2s0f0/device/sriov_numvfs
 * `dpdk` (dictionary, optional): DPDK configuration
 
 ### Using DPDK drivers:
-If this plugin is use to bind a VF to dpdk driver then the IPAM configtuations will be ignored.
+If this plugin is used to bind a VF to dpdk driver inside the container, then the IPAM configtuations will be ignored.
 
 ### DPDK parameters
 If given, The DPDK configuration expected to have the following parameters
