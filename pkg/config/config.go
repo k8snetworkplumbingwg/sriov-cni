@@ -14,14 +14,13 @@ import (
 var (
 	// DefaultCNIDir used for caching NetConf
 	DefaultCNIDir = "/var/lib/cni/sriov"
-	// sriovManager  vfProvider
 )
 
 // LoadConf parses and validates stdin netconf and returns NetConf object
 func LoadConf(bytes []byte) (*sriovtypes.NetConf, error) {
 	n := &sriovtypes.NetConf{}
 	if err := json.Unmarshal(bytes, n); err != nil {
-		return nil, fmt.Errorf("failed to load netconf: %v", err)
+		return nil, fmt.Errorf("LoadConf(): failed to load netconf: %v", err)
 	}
 
 	// DeviceID takes precedence; if we are given a VF pciaddr then work from there
@@ -29,37 +28,33 @@ func LoadConf(bytes []byte) (*sriovtypes.NetConf, error) {
 		// Get rest of the VF information
 		pfName, vfID, err := getVfInfo(n.DeviceID)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("LoadConf(): failed to get VF information: %q", err)
 		}
 		n.VFID = vfID
 		n.Master = pfName
 	} else {
-		return nil, fmt.Errorf("error: SRIOV-CNI loadConf: VF pci addr is required")
+		return nil, fmt.Errorf("LoadConf(): VF pci addr is required")
 	}
 
-	if n.DPDKMode {
-		// Detect attached driver
-		if dpdkDriver, err := utils.HasDpdkDriver(n.DeviceID); err != nil {
-			return nil, fmt.Errorf("error getting driver information for device %s %q", n.DeviceID, err)
-		} else if n.DPDKMode != dpdkDriver {
-			return nil, fmt.Errorf("dpdkMode requires dpdk supported driver")
-		}
-	} else {
-		// Assuming VF is netdev interface; Get interface name(s)
-		hostIFNames, err := utils.GetVFLinkNames(n.DeviceID)
+	// Assuming VF is netdev interface; Get interface name(s)
+	hostIFNames, err := utils.GetVFLinkNames(n.DeviceID)
+	if err != nil || hostIFNames == "" {
+		// VF interface not found; check if VF has dpdk driver
+		hasDpdkDriver, err := utils.HasDpdkDriver(n.DeviceID)
 		if err != nil {
-			return nil, fmt.Errorf("error reading netdev interface name for VF:%s %q", n.DeviceID, err)
+			return nil, fmt.Errorf("LoadConf(): failed to detect if VF %s has dpdk driver %q", n.DeviceID, err)
 		}
-
-		if len(hostIFNames) > 0 {
-			n.HostIFNames = hostIFNames
-		}
-		if len(hostIFNames) < 1 {
-			return nil, fmt.Errorf("netdev interface name not found for VF: %s", n.DeviceID)
-		}
+		n.DPDKMode = hasDpdkDriver
 	}
 
-	n.ContIFNames = make([]string, 0)
+	if hostIFNames != "" {
+		n.HostIFNames = hostIFNames
+	}
+
+	if hostIFNames == "" && !n.DPDKMode {
+		return nil, fmt.Errorf("LoadConf(): the VF %s does not have a interface name or a dpdk driver", n.DeviceID)
+	}
+
 	return n, nil
 }
 

@@ -1,11 +1,18 @@
 language: go
+sudo: required
 
 go:
   - "1.10"
+env:
+  global:
+  - PATH=$GOROOT/bin:$GOPATH/bin:$PATH
 
 before_install:
+   # Install Glide
+  - mkdir -p "${GOPATH}/bin"
+  - curl https://glide.sh/get | bash
   - go get -v golang.org/x/lint/golint
 
 script:
   - make
-  - make test
+  - sudo -E env "PATH=$PATH" make test

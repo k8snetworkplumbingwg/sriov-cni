@@ -141,37 +141,17 @@ func GetSharedPF(ifName string) (string, error) {
 	return pfName, fmt.Errorf("Shared PF not found")
 }
 
-// ShouldHaveNetlink determines whether VF is expected to have a netlink interface
-func ShouldHaveNetlink(pfName string, vfID int) (bool, error) {
-	driverLink := filepath.Join(NetDirectory, pfName, "device", fmt.Sprintf("virtfn%d", vfID), "driver")
-	driverPath, err := filepath.EvalSymlinks(driverLink)
-	if err != nil {
-		return false, err
-	}
-	driverStat, err := os.Stat(driverPath)
-	if err != nil {
-		return false, err
-	}
-	driverName := driverStat.Name()
-	for _, drv := range UserspaceDrivers {
-		if driverName == drv {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
 // GetVFLinkNames returns VF's network interface name given it's PCI addr
-func GetVFLinkNames(pciAddr string) ([]string, error) {
+func GetVFLinkNames(pciAddr string) (string, error) {
 	var names []string
 	vfDir := filepath.Join(SysBusPci, pciAddr, "net")
 	if _, err := os.Lstat(vfDir); err != nil {
-		return nil, err
+		return "", err
 	}
 
 	fInfos, err := ioutil.ReadDir(vfDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read net dir of the device %s: %v", pciAddr, err)
+		return "", fmt.Errorf("failed to read net dir of the device %s: %v", pciAddr, err)
 	}
 
 	names = make([]string, 0)
@@ -179,7 +159,7 @@ func GetVFLinkNames(pciAddr string) ([]string, error) {
 		names = append(names, f.Name())
 	}
 
-	return names, nil
+	return names[0], nil
 }
 
 // GetVFLinkNamesFromVFID returns VF's network interface name given it's PF name as string and VF id as int
