@@ -42,35 +42,35 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return fmt.Errorf("SRIOV-CNI failed to configure VF %q", err)
 	}
 
+	result := &current.Result{}
+	result.Interfaces = []*current.Interface{{
+		Name:    args.IfName,
+		Sandbox: netns.Path(),
+	}}
+
 	// skip the IPAM allocation for the DPDK
-	var result *current.Result
 	if netConf.DPDKMode {
 		// Cache NetConf for CmdDel
 		if err = utils.SaveNetConf(args.ContainerID, config.DefaultCNIDir, args.IfName, netConf); err != nil {
 			return fmt.Errorf("error saving NetConf %q", err)
 		}
-
 		return result.Print()
 	}
 
-	if netConf.DeviceID != "" && netConf.VFID >= 0 && netConf.Master != "" {
-		macAddr, err = sm.SetupVF(netConf, args.IfName, args.ContainerID, netns)
-		defer func() {
-			if err != nil {
-				err := netns.Do(func(_ ns.NetNS) error {
-					_, err := netlink.LinkByName(args.IfName)
-					return err
-				})
-				if err == nil {
-					sm.ReleaseVF(netConf, args.IfName, args.ContainerID, netns)
-				}
-			}
-		}()
+	macAddr, err = sm.SetupVF(netConf, args.IfName, args.ContainerID, netns)
+	defer func() {
 		if err != nil {
-			return fmt.Errorf("failed to set up pod interface %q from the device %q: %v", args.IfName, netConf.Master, err)
+			err := netns.Do(func(_ ns.NetNS) error {
+				_, err := netlink.LinkByName(args.IfName)
+				return err
+			})
+			if err == nil {
+				sm.ReleaseVF(netConf, args.IfName, args.ContainerID, netns)
+			}
 		}
-	} else {
-		return fmt.Errorf("VF information are not available to invoke setupVF()")
+	}()
+	if err != nil {
+		return fmt.Errorf("failed to set up pod interface %q from the device %q: %v", args.IfName, netConf.Master, err)
 	}
 
 	// run the IPAM plugin
@@ -96,11 +96,8 @@ func cmdAdd(args *skel.CmdArgs) error {
 			return errors.New("IPAM plugin returned missing IP config")
 		}
 
-		newResult.Interfaces = []*current.Interface{{
-			Name:    args.IfName,
-			Mac:     macAddr,
-			Sandbox: netns.Path(),
-		}}
+		newResult.Interfaces = result.Interfaces
+		newResult.Interfaces[0].Mac = macAddr
 
 		for _, ipc := range newResult.IPs {
 			// All addresses apply to the container interface (move from host)

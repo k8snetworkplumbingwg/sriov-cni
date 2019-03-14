@@ -213,8 +213,8 @@ var _ = Describe("Sriov", func() {
 				Master:      "enp175s0f1",
 				DeviceID:    "0000:af:06.0",
 				VFID:        0,
-				HostIFNames: []string{"enp175s6"},
-				ContIFNames: make([]string, 0),
+				HostIFNames: "enp175s6",
+				ContIFNames: "net1",
 			}
 		})
 
@@ -263,8 +263,8 @@ var _ = Describe("Sriov", func() {
 					Master:      "enp175s0f1",
 					DeviceID:    "0000:af:06.0",
 					VFID:        0,
-					HostIFNames: []string{"enp175s6"},
-					ContIFNames: []string{"net1"},
+					HostIFNames: "enp175s6",
+					ContIFNames: "net1",
 				}
 			})
 			It("Assuming existing interface", func() {
