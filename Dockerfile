@@ -1,11 +1,12 @@
-FROM openshift/origin-release:golang-1.11 as builder
+FROM golang:alpine as builder
 
-# Add everything
 ADD . /usr/src/sriov-cni
 
+ENV HTTP_PROXY $http_proxy
+ENV HTTPS_PROXY $https_proxy
 RUN cd /usr/src/sriov-cni && make build
 
-FROM openshift/origin-base
+FROM alpine
 COPY --from=builder /usr/src/sriov-cni/build/sriov /usr/bin/
 WORKDIR /
 
