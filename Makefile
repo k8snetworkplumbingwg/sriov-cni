@@ -21,7 +21,7 @@ export GOBIN
 # Docker
 IMAGEDIR=$(BASE)/images
 DOCKERFILE=$(CURDIR)/Dockerfile
-TAG=sriov-cni
+TAG=nfvpe/sriov-cni
 # Accept proxy settings for docker 
 DOCKERARGS=
 ifdef HTTP_PROXY

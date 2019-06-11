@@ -4,7 +4,11 @@ ADD . /usr/src/sriov-cni
 
 ENV HTTP_PROXY $http_proxy
 ENV HTTPS_PROXY $https_proxy
-RUN cd /usr/src/sriov-cni && make build
+
+RUN apk add --update --virtual build-dependencies build-base linux-headers && \
+    cd /usr/src/sriov-cni && \
+    make clean && \
+    make build
 
 FROM alpine
 COPY --from=builder /usr/src/sriov-cni/build/sriov /usr/bin/
