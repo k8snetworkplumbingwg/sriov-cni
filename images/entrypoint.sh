@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # Always exit on errors.
 set -e
@@ -8,16 +8,16 @@ CNI_BIN_DIR="/host/opt/cni/bin"
 SRIOV_BIN_FILE="/usr/bin/sriov"
 
 # Give help text for parameters.
-function usage()
+usage()
 {
-    echo -e "This is an entrypoint script for SR-IOV CNI to overlay its"
-    echo -e "binary into location in a filesystem. The binary file will"
-    echo -e "be copied to the corresponding directory."
-    echo -e ""
-    echo -e "./entrypoint.sh"
-    echo -e "\t-h --help"
-    echo -e "\t--cni-bin-dir=$CNI_BIN_DIR"
-    echo -e "\t--sriov-bin-file=$SRIOV_BIN_FILE"
+    /bin/echo -e "This is an entrypoint script for SR-IOV CNI to overlay its"
+    /bin/echo -e "binary into location in a filesystem. The binary file will"
+    /bin/echo -e "be copied to the corresponding directory."
+    /bin/echo -e ""
+    /bin/echo -e "./entrypoint.sh"
+    /bin/echo -e "\t-h --help"
+    /bin/echo -e "\t--cni-bin-dir=$CNI_BIN_DIR"
+    /bin/echo -e "\t--sriov-bin-file=$SRIOV_BIN_FILE"
 }
 
 # Parse parameters given as arguments to this script.
@@ -36,7 +36,7 @@ while [ "$1" != "" ]; do
             SRIOV_BIN_FILE=$VALUE
             ;;
         *)
-            echo "ERROR: unknown parameter \"$PARAM\""
+            /bin/echo "ERROR: unknown parameter \"$PARAM\""
             usage
             exit 1
             ;;
@@ -45,14 +45,11 @@ while [ "$1" != "" ]; do
 done
 
 
-# Create array of known locations
-declare -a arr=($CNI_BIN_DIR $SRIOV_BIN_FILE)
-
 # Loop through and verify each location each.
-for i in "${arr[@]}"
+for i in $CNI_BIN_DIR $SRIOV_BIN_FILE
 do
   if [ ! -e "$i" ]; then
-    echo "Location $i does not exist"
+    /bin/echo "Location $i does not exist"
     exit 1;
   fi
 done
@@ -62,5 +59,6 @@ cp -f $SRIOV_BIN_FILE $CNI_BIN_DIR
 
 echo "Entering sleep... (success)"
 
-# Sleep forever.
-sleep infinity
+# Sleep forever. 
+# sleep infinity is not available in alpine; instead lets go sleep for ~68 years. Hopefully that's enough sleep
+sleep 2147483647
