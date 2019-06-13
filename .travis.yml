@@ -20,7 +20,7 @@ deploy:
   # Push image to Dockerhub on merge to master
   - provider: script
     skip_cleanup: true
-    script: docker push nfvpe/sriov-cni
+    script: docker push nfvpe/sriov-cni:release-v2
     on:
       branch: master
   # Push image to Dockerhub on tag
