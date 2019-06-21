@@ -4,6 +4,7 @@ import (
 	"net"
 
 	"github.com/containernetworking/plugins/pkg/ns"
+	"github.com/containernetworking/plugins/pkg/testutils"
 	sriovtypes "github.com/intel/sriov-cni/pkg/types"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -47,6 +48,34 @@ func (_m *MockNetlinkManager) LinkSetVfVlan(_a0 netlink.Link, _a1 int, _a2 int) 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(netlink.Link, int, int) error); ok {
 		r0 = rf(_a0, _a1, _a2)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// LinkSetVfHardwareAddr provides a mock function with given fields: _a0, _a1, _a2
+func (_m *MockNetlinkManager) LinkSetVfHardwareAddr(_a0 netlink.Link, _a1 int, _a2 net.HardwareAddr) error {
+	ret := _m.Called(_a0, _a1, _a2)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(netlink.Link, int, net.HardwareAddr) error); ok {
+		r0 = rf(_a0, _a1, _a2)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// LinkSetHardwareAddr provides a mock function with given fields: _a0, _a1
+func (_m *MockNetlinkManager) LinkSetHardwareAddr(_a0 netlink.Link, _a1 net.HardwareAddr) error {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(netlink.Link, net.HardwareAddr) error); ok {
+		r0 = rf(_a0, _a1)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -220,7 +249,7 @@ var _ = Describe("Sriov", func() {
 
 		It("Assuming existing interface", func() {
 			var targetNetNS ns.NetNS
-			targetNetNS, err := ns.NewNS()
+			targetNetNS, err := testutils.NewNS()
 			defer func() {
 				if targetNetNS != nil {
 					targetNetNS.Close()
@@ -269,7 +298,7 @@ var _ = Describe("Sriov", func() {
 			})
 			It("Assuming existing interface", func() {
 				var targetNetNS ns.NetNS
-				targetNetNS, err := ns.NewNS()
+				targetNetNS, err := testutils.NewNS()
 				defer func() {
 					if targetNetNS != nil {
 						targetNetNS.Close()
