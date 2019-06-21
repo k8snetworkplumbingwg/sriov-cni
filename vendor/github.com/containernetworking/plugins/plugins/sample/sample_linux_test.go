@@ -29,7 +29,7 @@ var _ = Describe("sample test", func() {
 
 	BeforeEach(func() {
 		var err error
-		targetNs, err = ns.NewNS()
+		targetNs, err = testutils.NewNS()
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -69,7 +69,7 @@ var _ = Describe("sample test", func() {
 			IfName:      ifname,
 			StdinData:   []byte(conf),
 		}
-		_, _, err := testutils.CmdAddWithResult(targetNs.Path(), "eth0", []byte(conf), func() error { return cmdAdd(args) })
+		_, _, err := testutils.CmdAddWithArgs(args, func() error { return cmdAdd(args) })
 		Expect(err).NotTo(HaveOccurred())
 
 	})
@@ -104,7 +104,7 @@ var _ = Describe("sample test", func() {
 			IfName:      "eth0",
 			StdinData:   []byte(conf),
 		}
-		_, _, err := testutils.CmdAddWithResult(targetNs.Path(), "eth0", []byte(conf), func() error { return cmdAdd(args) })
+		_, _, err := testutils.CmdAddWithArgs(args, func() error { return cmdAdd(args) })
 		Expect(err).To(MatchError("anotherAwesomeArg must be specified"))
 
 	})
@@ -130,7 +130,7 @@ var _ = Describe("sample test", func() {
 			IfName:      "eth0",
 			StdinData:   []byte(conf),
 		}
-		_, _, err := testutils.CmdAddWithResult(targetNs.Path(), "eth0", []byte(conf), func() error { return cmdAdd(args) })
+		_, _, err := testutils.CmdAddWithArgs(args, func() error { return cmdAdd(args) })
 		Expect(err).NotTo(HaveOccurred())
 
 	})

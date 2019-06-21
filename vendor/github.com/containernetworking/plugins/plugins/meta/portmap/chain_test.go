@@ -1,4 +1,4 @@
-// Copyright 2017 CNI authors
+// Copyright 2017-2018 CNI authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"runtime"
 
 	"github.com/containernetworking/plugins/pkg/ns"
+	"github.com/containernetworking/plugins/pkg/testutils"
 	"github.com/coreos/go-iptables/iptables"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -40,7 +41,7 @@ var _ = Describe("chain tests", func() {
 		currNs, err := ns.GetCurrentNS()
 		Expect(err).NotTo(HaveOccurred())
 
-		testNs, err := ns.NewNS()
+		testNs, err := testutils.NewNS()
 		Expect(err).NotTo(HaveOccurred())
 
 		tlChainName := fmt.Sprintf("cni-test-%d", rand.Intn(10000000))
@@ -116,8 +117,8 @@ var _ = Describe("chain tests", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(haveRules).To(Equal([]string{
 			"-N " + tlChainName,
-			"-A " + tlChainName + " -d 203.0.113.1/32 -j " + testChain.name,
 			"-A " + tlChainName + ` -m comment --comment "canary value" -j ACCEPT`,
+			"-A " + tlChainName + " -d 203.0.113.1/32 -j " + testChain.name,
 		}))
 
 		// Check that the chain and rule was created
@@ -177,6 +178,7 @@ var _ = Describe("chain tests", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		chains, err := ipt.ListChains(TABLE)
+		Expect(err).NotTo(HaveOccurred())
 		for _, chain := range chains {
 			if chain == testChain.name {
 				Fail("Chain was not deleted")
@@ -186,6 +188,7 @@ var _ = Describe("chain tests", func() {
 		err = testChain.teardown(ipt)
 		Expect(err).NotTo(HaveOccurred())
 		chains, err = ipt.ListChains(TABLE)
+		Expect(err).NotTo(HaveOccurred())
 		for _, chain := range chains {
 			if chain == testChain.name {
 				Fail("Chain was not deleted")

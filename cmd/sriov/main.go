@@ -17,6 +17,11 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
+type envArgs struct {
+	types.CommonArgs
+	MAC types.UnmarshallableString `json:"mac,omitempty"`
+}
+
 func init() {
 	// this ensures that main runs only on main thread (thread group leader).
 	// since namespace ops (unshare, setns) are done for a single thread, we
@@ -24,11 +29,35 @@ func init() {
 	runtime.LockOSThread()
 }
 
+func getEnvArgs(envArgsString string) (*envArgs, error) {
+	if envArgsString != "" {
+		e := envArgs{}
+		err := types.LoadArgs(envArgsString, &e)
+		if err != nil {
+			return nil, err
+		}
+		return &e, nil
+	}
+	return nil, nil
+}
+
 func cmdAdd(args *skel.CmdArgs) error {
 	var macAddr string
 	netConf, err := config.LoadConf(args.StdinData)
 	if err != nil {
 		return fmt.Errorf("SRIOV-CNI failed to load netconf: %v", err)
+	}
+
+	envArgs, err := getEnvArgs(args.Args)
+	if err != nil {
+		return fmt.Errorf("SRIOV-CNI failed to parse args: %v", err)
+	}
+
+	if envArgs != nil {
+		MAC := string(envArgs.MAC)
+		if MAC != "" {
+			netConf.MAC = MAC
+		}
 	}
 
 	netns, err := ns.GetNS(args.Netns)
@@ -176,6 +205,10 @@ func cmdDel(args *skel.CmdArgs) error {
 	return nil
 }
 
+func cmdCheck(args *skel.CmdArgs) error {
+	return nil
+}
+
 func main() {
-	skel.PluginMain(cmdAdd, cmdDel, version.All)
+	skel.PluginMain(cmdAdd, cmdCheck, cmdDel, version.All, "")
 }

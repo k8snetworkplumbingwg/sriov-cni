@@ -1,7 +1,7 @@
 package: github.com/intel/sriov-cni
 import:
 - package: github.com/containernetworking/cni
-  version: a2da8f8d7fd8e6dc25f336408a8ac86f050fbd88
+  version: dc953e2fd91f9bc624b03cf9ea3706796bfee920
   subpackages:
   - pkg/invoke
   - pkg/skel
@@ -9,7 +9,7 @@ import:
   - pkg/types
   - pkg/version
 - package: github.com/containernetworking/plugins
-  version: v0.7.4
+  version: 2b6808807facbadf4f1190d7665d7e1fc19efd93
   subpackages:
   - pkg/ip
   - pkg/ipam
@@ -46,13 +46,13 @@ import:
   - matchers/support/goraph/util
   - types
 - package: github.com/vishvananda/netlink
-  version: 6e453822d85ef5721799774b654d4d02fed62afb
+  version: 99a56c251ae6d00ce3d73cf8ee0b9ecb94fe323b
   subpackages:
   - nl
 - package: github.com/vishvananda/netns
   version: 54f0e4339ce73702a0607f49922aaa1e749b418d
 - package: golang.org/x/sys
-  version: 076b546753157f758b316e59bcb51e6807c04057
+  version: 4d873483be9efe35302dde6ef22f029f383de699
   subpackages:
   - unix
 - package: github.com/stretchr/testify

@@ -1,8 +1,8 @@
-hash: 25e9271fca0de47d3e14bae4c999cc53ea4787f50817c941cc3a6cf835045ba6
-updated: 2019-03-13T16:15:00.478512528Z
+hash: cbac5e861db9823a8be2c60df719c0f91d7be8cdd712aed4bc9ac7ad2ad4bad5
+updated: 2019-06-21T13:22:27.235957248-07:00
 imports:
 - name: github.com/containernetworking/cni
-  version: a2da8f8d7fd8e6dc25f336408a8ac86f050fbd88
+  version: dc953e2fd91f9bc624b03cf9ea3706796bfee920
   subpackages:
   - pkg/invoke
   - pkg/skel
@@ -12,7 +12,7 @@ imports:
   - pkg/types/current
   - pkg/version
 - name: github.com/containernetworking/plugins
-  version: 9ebe139e77e82afb122e335328007bca86905ae4
+  version: 2b6808807facbadf4f1190d7665d7e1fc19efd93
   subpackages:
   - pkg/ip
   - pkg/ipam
@@ -20,7 +20,7 @@ imports:
   - pkg/utils/hwaddr
   - pkg/utils/sysctl
 - name: github.com/coreos/go-iptables
-  version: 259c8e6a4275d497442c721fa52204d7a58bde8b
+  version: 78b5fff24e6df8886ef8eca9411f683a884349a5
   subpackages:
   - iptables
 - name: github.com/onsi/ginkgo
@@ -54,19 +54,21 @@ imports:
   - matchers/support/goraph/node
   - matchers/support/goraph/util
   - types
+- name: github.com/safchain/ethtool
+  version: 42ed695e3de80b9d695f280295fd7994639f209d
 - name: github.com/stretchr/testify
   version: ffdc059bfe9ce6a4e144ba849dbedead332c6053
   subpackages:
   - assert
   - mock
 - name: github.com/vishvananda/netlink
-  version: 6e453822d85ef5721799774b654d4d02fed62afb
+  version: 99a56c251ae6d00ce3d73cf8ee0b9ecb94fe323b
   subpackages:
   - nl
 - name: github.com/vishvananda/netns
   version: 54f0e4339ce73702a0607f49922aaa1e749b418d
 - name: golang.org/x/sys
-  version: 076b546753157f758b316e59bcb51e6807c04057
+  version: 4d873483be9efe35302dde6ef22f029f383de699
   subpackages:
   - unix
 testImports:

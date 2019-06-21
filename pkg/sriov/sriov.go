@@ -2,6 +2,7 @@ package sriov
 
 import (
 	"fmt"
+	"net"
 	"os"
 
 	"github.com/containernetworking/plugins/pkg/ns"
@@ -18,6 +19,8 @@ import (
 type NetlinkManager interface {
 	LinkByName(string) (netlink.Link, error)
 	LinkSetVfVlan(netlink.Link, int, int) error
+	LinkSetVfHardwareAddr(netlink.Link, int, net.HardwareAddr) error
+	LinkSetHardwareAddr(netlink.Link, net.HardwareAddr) error
 	LinkSetUp(netlink.Link) error
 	LinkSetDown(netlink.Link) error
 	LinkSetNsFd(netlink.Link, int) error
@@ -37,6 +40,16 @@ func (n *MyNetlink) LinkByName(name string) (netlink.Link, error) {
 // LinkSetVfVlan using NetlinkManager
 func (n *MyNetlink) LinkSetVfVlan(link netlink.Link, vf, vlan int) error {
 	return netlink.LinkSetVfVlan(link, vf, vlan)
+}
+
+// LinkSetVfHardwareAddr using NetlinkManager
+func (n *MyNetlink) LinkSetVfHardwareAddr(link netlink.Link, vf int, hwaddr net.HardwareAddr) error {
+	return netlink.LinkSetVfHardwareAddr(link, vf, hwaddr)
+}
+
+// LinkSetHardwareAddr using NetlinkManager
+func (n *MyNetlink) LinkSetHardwareAddr(link netlink.Link, hwaddr net.HardwareAddr) error {
+	return netlink.LinkSetHardwareAddr(link, hwaddr)
 }
 
 // LinkSetUp using NetlinkManager
@@ -100,9 +113,8 @@ func NewSriovManager() Manager {
 	}
 }
 
-// SetupVF sets up a VF in Pod netns returns first interface's MAC addres as string
+// SetupVF sets up a VF in Pod netns
 func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.NetNS) (string, error) {
-	var macAddress string
 	linkName := conf.HostIFNames
 
 	linkObj, err := s.nLink.LinkByName(linkName)
@@ -123,25 +135,40 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, cid s
 		return "", fmt.Errorf("error setting temp IF name %s for %s", tempName, linkName)
 	}
 
-	// 3. Change netns
+	// 3. Set MAC address
+	if conf.MAC != "" {
+		hwaddr, err := net.ParseMAC(conf.MAC)
+		if err != nil {
+			return "", fmt.Errorf("failed to parse MAC address %s: %v", conf.MAC, err)
+		}
+
+		// Save the original effective MAC address before overriding it
+		conf.EffectiveMAC = linkObj.Attrs().HardwareAddr.String()
+
+		if err = s.nLink.LinkSetHardwareAddr(linkObj, hwaddr); err != nil {
+			return "", fmt.Errorf("failed to set netlink MAC address to %s: %v", hwaddr, err)
+		}
+	}
+
+	// 4. Change netns
 	if err := s.nLink.LinkSetNsFd(linkObj, int(netns.Fd())); err != nil {
 		return "", fmt.Errorf("failed to move IF %s to netns: %q", tempName, err)
 	}
 
-	// 4. Set Pod IF name
+	var macAddress string
+
 	if err := netns.Do(func(_ ns.NetNS) error {
+		// 5. Set Pod IF name
 		if err := s.nLink.LinkSetName(linkObj, podifName); err != nil {
 			return fmt.Errorf("error setting container interface name %s for %s", linkName, tempName)
 		}
 
-		// 5. Bring IF up in Pod netns
+		// 6. Bring IF up in Pod netns
 		if err := s.nLink.LinkSetUp(linkObj); err != nil {
 			return fmt.Errorf("error bringing interface up in container ns: %q", err)
 		}
-		// Only adding one mac address
-		if macAddress == "" {
-			macAddress = linkObj.Attrs().HardwareAddr.String()
-		}
+
+		macAddress = linkObj.Attrs().HardwareAddr.String()
 		return nil
 	}); err != nil {
 		return "", fmt.Errorf("error setting up interface in container namespace: %q", err)
@@ -180,6 +207,18 @@ func (s *sriovManager) ReleaseVF(conf *sriovtypes.NetConf, podifName string, cid
 		err = s.nLink.LinkSetName(linkObj, conf.HostIFNames)
 		if err != nil {
 			return fmt.Errorf("failed to rename link %s to host name %s: %q", podifName, conf.HostIFNames, err)
+		}
+
+		// reset effective MAC address
+		if conf.MAC != "" {
+			hwaddr, err := net.ParseMAC(conf.EffectiveMAC)
+			if err != nil {
+				return fmt.Errorf("failed to parse original effective MAC address %s: %v", conf.EffectiveMAC, err)
+			}
+
+			if err = s.nLink.LinkSetHardwareAddr(linkObj, hwaddr); err != nil {
+				return fmt.Errorf("failed to restore original effective netlink MAC address %s: %v", hwaddr, err)
+			}
 		}
 
 		// move VF device to init netns
@@ -229,6 +268,16 @@ func (s *sriovManager) resetVfVlan(pfName, vfName string) error {
 	return nil
 }
 
+func getVfInfo(link netlink.Link, id int) *netlink.VfInfo {
+	attrs := link.Attrs()
+	for _, vf := range attrs.Vfs {
+		if vf.ID == id {
+			return &vf
+		}
+	}
+	return nil
+}
+
 // ApplyVFConfig configure a VF with parameters given in NetConf
 func (s *sriovManager) ApplyVFConfig(conf *sriovtypes.NetConf) error {
 
@@ -245,6 +294,23 @@ func (s *sriovManager) ApplyVFConfig(conf *sriovtypes.NetConf) error {
 	}
 
 	// 2. Set mac address
+	if conf.MAC != "" {
+		hwaddr, err := net.ParseMAC(conf.MAC)
+		if err != nil {
+			return fmt.Errorf("failed to parse MAC address %s: %v", conf.MAC, err)
+		}
+
+		// Save the original administrative MAC address before overriding it
+		vf := getVfInfo(pfLink, conf.VFID)
+		if vf == nil {
+			return fmt.Errorf("failed to find vf %d", conf.VFID)
+		}
+		conf.AdminMAC = vf.Mac.String()
+
+		if err = s.nLink.LinkSetVfHardwareAddr(pfLink, conf.VFID, hwaddr); err != nil {
+			return fmt.Errorf("failed to set MAC address to %s: %v", hwaddr, err)
+		}
+	}
 
 	// 3. Set link rate
 
@@ -265,5 +331,17 @@ func (s *sriovManager) ResetVFConfig(conf *sriovtypes.NetConf) error {
 			return fmt.Errorf("failed to set vf %d vlan: %v", conf.VFID, err)
 		}
 	}
+
+	// Restore the original administrative MAC address
+	if conf.MAC != "" {
+		hwaddr, err := net.ParseMAC(conf.AdminMAC)
+		if err != nil {
+			return fmt.Errorf("failed to parse original administrative MAC address %s: %v", conf.AdminMAC, err)
+		}
+		if err = s.nLink.LinkSetVfHardwareAddr(pfLink, conf.VFID, hwaddr); err != nil {
+			return fmt.Errorf("failed to restore original administrative MAC address %s: %v", hwaddr, err)
+		}
+	}
+
 	return nil
 }
