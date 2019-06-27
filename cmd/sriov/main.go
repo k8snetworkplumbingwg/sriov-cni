@@ -1,10 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"runtime"
 
+	"github.com/containernetworking/cni/pkg/invoke"
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
 	"github.com/containernetworking/cni/pkg/types/current"
@@ -93,7 +95,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return result.Print()
 	}
 
-	macAddr, err = sm.SetupVF(netConf, args.IfName, args.ContainerID, netns)
+	ipAddr, macAddr, err := sm.SetupVF(netConf, args.IfName, args.ContainerID, netns)
 	defer func() {
 		if err != nil {
 			err := netns.Do(func(_ ns.NetNS) error {
@@ -147,6 +149,29 @@ func cmdAdd(args *skel.CmdArgs) error {
 			return err
 		}
 		result = newResult
+	} else {
+		result.IPs = []*current.IPConfig{{}}
+		result.IPs[0].Address = *ipAddr
+		result.IPs[0].Interface = current.Int(0)
+		result.IPs[0].Version = "4"
+	}
+
+	// execute delegates if they exist
+	if len(netConf.Delegates) > 0 {
+		resultBytes, _ := json.Marshal(result)
+		rawPrevResult := make(map[string]interface{})
+		json.Unmarshal(resultBytes, &rawPrevResult)
+		netConf.RawPrevResult = &rawPrevResult
+		rawNetConf, err := json.Marshal(netConf)
+		if err != nil {
+			return fmt.Errorf("Error executing delegate. Could not marshal netConf with prevResult: %v", err)
+		}
+		for _, delegate := range netConf.Delegates {
+			r, err := invoke.DelegateAdd(delegate.Type, rawNetConf)
+			if err != nil {
+				fmt.Errorf("error in executing delegate: %v. Result: %v. Netconf passed: (%v)", err, r, string(rawNetConf))
+			}
+		}
 	}
 
 	// Cache NetConf for CmdDel
