@@ -83,6 +83,20 @@ func (_m *MockNetlinkManager) LinkSetHardwareAddr(_a0 netlink.Link, _a1 net.Hard
 	return r0
 }
 
+// LinkSetVfVlanQos provides a mock function with given fields: _a0, _a1, _a2, _a3
+func (_m *MockNetlinkManager) LinkSetVfVlanQos(_a0 netlink.Link, _a1 int, _a2 int, _a3 int) error {
+	ret := _m.Called(_a0, _a1, _a2, _a3)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(netlink.Link, int, int, int) error); ok {
+		r0 = rf(_a0, _a1, _a2, _a3)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // LinkSetUp provides a mock function with given fields: _a0
 func (_m *MockNetlinkManager) LinkSetUp(_a0 netlink.Link) error {
 	ret := _m.Called(_a0)
@@ -273,6 +287,7 @@ var _ = Describe("Sriov", func() {
 			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
 			mocked.On("LinkSetUp", fakeLink).Return(nil)
 			mocked.On("LinkSetVfVlan", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int")).Return(nil)
+			mocked.On("LinkSetVfVlanQos", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("int")).Return(nil)
 			sm := sriovManager{nLink: mocked}
 			macAddr, err := sm.SetupVF(netconf, podifName, contID, targetNetNS)
 			Expect(err).NotTo(HaveOccurred())
