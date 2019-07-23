@@ -138,7 +138,8 @@ echo 8 > /sys/class/net/enp2s0f0/device/sriov_numvfs
 * `name` (string, required): the name of the network
 * `type` (string, required): "sriov"
 * `deviceID` (string, required): A valid pci address of an SRIOV NIC's VF. e.g. "0000:03:02.3"
-* `vlan` (int, optional): VLAN ID to assign for the VF
+* `vlan` (int, optional): VLAN ID to assign for the VF. Value must be in the range 0-4094 (0 for disabled, 1-4094 for valid VLAN IDs).
+* `vlanQoS` (int, optional): VLAN QoS to assign for the VF. Value must be in the range 0-7. This option requires `vlan` field to be set to a non-zero value. Otherwise, the error will be returned.
 * `mac` (string, optional): MAC address to assign for the VF
 * `ipam` (dictionary, optional): IPAM configuration to be used for this network.
 

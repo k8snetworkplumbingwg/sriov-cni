@@ -3,7 +3,6 @@ package sriov
 import (
 	"fmt"
 	"net"
-	"os"
 
 	"github.com/containernetworking/plugins/pkg/ns"
 
@@ -19,6 +18,7 @@ import (
 type NetlinkManager interface {
 	LinkByName(string) (netlink.Link, error)
 	LinkSetVfVlan(netlink.Link, int, int) error
+	LinkSetVfVlanQos(netlink.Link, int, int, int) error
 	LinkSetVfHardwareAddr(netlink.Link, int, net.HardwareAddr) error
 	LinkSetHardwareAddr(netlink.Link, net.HardwareAddr) error
 	LinkSetUp(netlink.Link) error
@@ -40,6 +40,11 @@ func (n *MyNetlink) LinkByName(name string) (netlink.Link, error) {
 // LinkSetVfVlan using NetlinkManager
 func (n *MyNetlink) LinkSetVfVlan(link netlink.Link, vf, vlan int) error {
 	return netlink.LinkSetVfVlan(link, vf, vlan)
+}
+
+// LinkSetVfVlanQos sets VLAN ID and QoS field for given VF using NetlinkManager
+func (n *MyNetlink) LinkSetVfVlanQos(link netlink.Link, vf, vlan, qos int) error {
+	return netlink.LinkSetVfVlanQos(link, vf, vlan, qos)
 }
 
 // LinkSetVfHardwareAddr using NetlinkManager
@@ -230,44 +235,6 @@ func (s *sriovManager) ReleaseVF(conf *sriovtypes.NetConf, podifName string, cid
 	})
 }
 
-func (s *sriovManager) resetVfVlan(pfName, vfName string) error {
-
-	// get the ifname sriov vf num
-	vfTotal, err := utils.GetSriovNumVfs(pfName)
-	if err != nil {
-		return err
-	}
-
-	if vfTotal <= 0 {
-		return fmt.Errorf("no virtual function in the device: %v", pfName)
-	}
-
-	// Get VF id
-	var vf int
-	idFound := false
-	for vf = 0; vf < vfTotal; vf++ {
-		vfDir := fmt.Sprintf("/sys/class/net/%s/device/virtfn%d/net/%s", pfName, vf, vfName)
-		if _, err := os.Stat(vfDir); !os.IsNotExist(err) {
-			idFound = true
-			break
-		}
-	}
-
-	if !idFound {
-		return fmt.Errorf("failed to get VF id for %s", vfName)
-	}
-
-	pfLink, err := s.nLink.LinkByName(pfName)
-	if err != nil {
-		return fmt.Errorf("master device %s not found", pfName)
-	}
-
-	if err = s.nLink.LinkSetVfVlan(pfLink, vf, 0); err != nil {
-		return fmt.Errorf("failed to reset vlan tag for vf %d: %v", vf, err)
-	}
-	return nil
-}
-
 func getVfInfo(link netlink.Link, id int) *netlink.VfInfo {
 	attrs := link.Attrs()
 	for _, vf := range attrs.Vfs {
@@ -288,8 +255,16 @@ func (s *sriovManager) ApplyVFConfig(conf *sriovtypes.NetConf) error {
 
 	// 1. Set vlan
 	if conf.Vlan != 0 {
-		if err = s.nLink.LinkSetVfVlan(pfLink, conf.VFID, conf.Vlan); err != nil {
-			return fmt.Errorf("failed to set vf %d vlan: %v", conf.VFID, err)
+		// set vlan qos if present in the config
+		if conf.VlanQoS != 0 {
+			if err = s.nLink.LinkSetVfVlanQos(pfLink, conf.VFID, conf.Vlan, conf.VlanQoS); err != nil {
+				return fmt.Errorf("failed to set vf %d vlan configuration: %v", conf.VFID, err)
+			}
+		} else {
+			// set vlan id field only
+			if err = s.nLink.LinkSetVfVlan(pfLink, conf.VFID, conf.Vlan); err != nil {
+				return fmt.Errorf("failed to set vf %d vlan: %v", conf.VFID, err)
+			}
 		}
 	}
 
@@ -327,7 +302,11 @@ func (s *sriovManager) ResetVFConfig(conf *sriovtypes.NetConf) error {
 
 	// Set vlan to 0
 	if conf.Vlan != 0 {
-		if err = s.nLink.LinkSetVfVlan(pfLink, conf.VFID, 0); err != nil {
+		if conf.VlanQoS != 0 {
+			if err = s.nLink.LinkSetVfVlanQos(pfLink, conf.VFID, 0, 0); err != nil {
+				return fmt.Errorf("failed to set vf %d vlan: %v", conf.VFID, err)
+			}
+		} else if err = s.nLink.LinkSetVfVlan(pfLink, conf.VFID, 0); err != nil {
 			return fmt.Errorf("failed to set vf %d vlan: %v", conf.VFID, err)
 		}
 	}

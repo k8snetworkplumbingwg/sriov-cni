@@ -13,6 +13,7 @@ type NetConf struct {
 	AdminMAC     string `json:"adminMAC"`
 	EffectiveMAC string `json:"effectiveMAC"`
 	Vlan         int    `json:"vlan"`
+	VlanQoS      int    `json:"vlanQoS"`
 	DeviceID     string `json:"deviceID"` // PCI address of a VF in valid sysfs format
 	VFID         int
 	HostIFNames  string // VF netdevice name(s)
