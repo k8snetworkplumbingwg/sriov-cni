@@ -46,13 +46,13 @@ import:
   - matchers/support/goraph/util
   - types
 - package: github.com/vishvananda/netlink
-  version: 99a56c251ae6d00ce3d73cf8ee0b9ecb94fe323b
+  version: b1e98597921720cee4147d6476110fc8fc56072d
   subpackages:
   - nl
 - package: github.com/vishvananda/netns
   version: 54f0e4339ce73702a0607f49922aaa1e749b418d
 - package: golang.org/x/sys
-  version: 4d873483be9efe35302dde6ef22f029f383de699
+  version: fae7ac547cb717d141c433a2a173315e216b64c4
   subpackages:
   - unix
 - package: github.com/stretchr/testify

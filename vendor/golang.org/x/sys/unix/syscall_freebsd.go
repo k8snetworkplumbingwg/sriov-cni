@@ -82,6 +82,18 @@ func nametomib(name string) (mib []_C_int, err error) {
 	return buf[0 : n/siz], nil
 }
 
+func direntIno(buf []byte) (uint64, bool) {
+	return readInt(buf, unsafe.Offsetof(Dirent{}.Fileno), unsafe.Sizeof(Dirent{}.Fileno))
+}
+
+func direntReclen(buf []byte) (uint64, bool) {
+	return readInt(buf, unsafe.Offsetof(Dirent{}.Reclen), unsafe.Sizeof(Dirent{}.Reclen))
+}
+
+func direntNamlen(buf []byte) (uint64, bool) {
+	return readInt(buf, unsafe.Offsetof(Dirent{}.Namlen), unsafe.Sizeof(Dirent{}.Namlen))
+}
+
 func Pipe(p []int) (err error) {
 	return Pipe2(p, 0)
 }
@@ -362,7 +374,7 @@ func Getdents(fd int, buf []byte) (n int, err error) {
 
 func Getdirentries(fd int, buf []byte, basep *uintptr) (n int, err error) {
 	if supportsABI(_ino64First) {
-		if unsafe.Sizeof(*basep) == 8 {
+		if basep == nil || unsafe.Sizeof(*basep) == 8 {
 			return getdirentries_freebsd12(fd, buf, (*uint64)(unsafe.Pointer(basep)))
 		}
 		// The freebsd12 syscall needs a 64-bit base. On 32-bit machines
