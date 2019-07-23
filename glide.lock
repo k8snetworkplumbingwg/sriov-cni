@@ -1,5 +1,5 @@
-hash: cbac5e861db9823a8be2c60df719c0f91d7be8cdd712aed4bc9ac7ad2ad4bad5
-updated: 2019-06-21T13:22:27.235957248-07:00
+hash: 0794d83725afacf6a30fcbbefe58ea32c12dbcedcffffcd2c9a21036bcca5d1e
+updated: 2019-07-25T12:32:04.793365038+01:00
 imports:
 - name: github.com/containernetworking/cni
   version: dc953e2fd91f9bc624b03cf9ea3706796bfee920
@@ -17,6 +17,7 @@ imports:
   - pkg/ip
   - pkg/ipam
   - pkg/ns
+  - pkg/testutils
   - pkg/utils/hwaddr
   - pkg/utils/sysctl
 - name: github.com/coreos/go-iptables
@@ -62,13 +63,13 @@ imports:
   - assert
   - mock
 - name: github.com/vishvananda/netlink
-  version: 99a56c251ae6d00ce3d73cf8ee0b9ecb94fe323b
+  version: b1e98597921720cee4147d6476110fc8fc56072d
   subpackages:
   - nl
 - name: github.com/vishvananda/netns
   version: 54f0e4339ce73702a0607f49922aaa1e749b418d
 - name: golang.org/x/sys
-  version: 4d873483be9efe35302dde6ef22f029f383de699
+  version: fae7ac547cb717d141c433a2a173315e216b64c4
   subpackages:
   - unix
 testImports:
