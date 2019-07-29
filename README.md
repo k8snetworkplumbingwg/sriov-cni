@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/intel/sriov-cni.svg?branch=master)](https://travis-ci.org/intel/sriov-cni)
+[![Build Status](https://travis-ci.org/intel/sriov-cni.svg?branch=master)](https://travis-ci.org/intel/sriov-cni) [![Go Report Card](https://goreportcard.com/badge/github.com/intel/sriov-cni)](https://goreportcard.com/report/github.com/intel/sriov-cni)
 
    * [SR-IOV CNI plugin](#sr-iov-cni-plugin)
       * [Build](#build)
