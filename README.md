@@ -142,6 +142,10 @@ echo 8 > /sys/class/net/enp2s0f0/device/sriov_numvfs
 * `vlanQoS` (int, optional): VLAN QoS to assign for the VF. Value must be in the range 0-7. This option requires `vlan` field to be set to a non-zero value. Otherwise, the error will be returned.
 * `mac` (string, optional): MAC address to assign for the VF
 * `ipam` (dictionary, optional): IPAM configuration to be used for this network.
+* `spoofchk` (string, optional): turn packet spoof checking on or off for the VF
+* `trust` (string, optional): turn trust setting on or off for the VF
+* `max_tx_rate` (int, optional): change the allowed maximum transmit bandwidth, in Mbps, for the VF. 
+Setting this to 0 disables rate limiting.
 
 
 ### Using DPDK drivers:
@@ -206,6 +210,24 @@ lo        Link encap:Local Loopback
     "type": "sriov",
     "deviceID": "0000:03:02.0",
     "vlan": 1000
+}
+EOF
+```
+
+### Configuration with VF Flags:
+
+
+```
+# cat > /etc/cni/net.d/20-mynet-dpdk.conf <<EOF
+{
+    "cniVersion": "0.3.1",
+    "name": "sriov-dpdk",
+    "type": "sriov",
+    "deviceID": "0000:03:02.0",
+    "vlan": 1000,
+    "max_tx_rate": 100,
+    "spoofchk": "off",
+    "trust": "on"
 }
 EOF
 ```

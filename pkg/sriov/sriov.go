@@ -25,6 +25,9 @@ type NetlinkManager interface {
 	LinkSetDown(netlink.Link) error
 	LinkSetNsFd(netlink.Link, int) error
 	LinkSetName(netlink.Link, string) error
+	LinkSetVfTxRate(netlink.Link, int, int) error
+	LinkSetVfSpoofchk(netlink.Link, int, bool) error
+	LinkSetVfTrust(netlink.Link, int, bool) error
 }
 
 // MyNetlink NetlinkManager
@@ -75,6 +78,21 @@ func (n *MyNetlink) LinkSetNsFd(link netlink.Link, fd int) error {
 // LinkSetName using NetlinkManager
 func (n *MyNetlink) LinkSetName(link netlink.Link, name string) error {
 	return netlink.LinkSetName(link, name)
+}
+
+// LinkSetVfTxRate using NetlinkManager
+func (n *MyNetlink) LinkSetVfTxRate(link netlink.Link, vf int, rate int) error {
+	return netlink.LinkSetVfTxRate(link, vf, rate)
+}
+
+// LinkSetVfSpoofchk using NetlinkManager
+func (n *MyNetlink) LinkSetVfSpoofchk(link netlink.Link, vf int, check bool) error {
+	return netlink.LinkSetVfSpoofchk(link, vf, check)
+}
+
+// LinkSetVfTrust using NetlinkManager
+func (n *MyNetlink) LinkSetVfTrust(link netlink.Link, vf int, state bool) error {
+	return netlink.LinkSetVfTrust(link, vf, state)
 }
 
 type pciUtils interface {
@@ -288,6 +306,33 @@ func (s *sriovManager) ApplyVFConfig(conf *sriovtypes.NetConf) error {
 	}
 
 	// 3. Set link rate
+	if conf.MaxTxRate != nil {
+		if err = s.nLink.LinkSetVfTxRate(pfLink, conf.VFID, *conf.MaxTxRate); err != nil {
+			return fmt.Errorf("failed to set vf %d max_tx_rate to %d Mbps: %v", conf.VFID, conf.MaxTxRate, err)
+		}
+	}
+
+	// 4. Set spoofchk flag
+	if conf.SpoofChk != "" {
+		spoofChk := false
+		if conf.SpoofChk == "on" {
+			spoofChk = true
+		}
+		if err = s.nLink.LinkSetVfSpoofchk(pfLink, conf.VFID, spoofChk); err != nil {
+			return fmt.Errorf("failed to set vf %d spoofchk flag to %s: %v", conf.VFID, conf.SpoofChk, err)
+		}
+	}
+
+	// 5. Set trust flag
+	if conf.Trust != "" {
+		trust := false
+		if conf.Trust == "on" {
+			trust = true
+		}
+		if err = s.nLink.LinkSetVfTrust(pfLink, conf.VFID, trust); err != nil {
+			return fmt.Errorf("failed to set vf %d trust flag to %s: %v", conf.VFID, conf.Trust, err)
+		}
+	}
 
 	return nil
 }
@@ -320,6 +365,21 @@ func (s *sriovManager) ResetVFConfig(conf *sriovtypes.NetConf) error {
 		if err = s.nLink.LinkSetVfHardwareAddr(pfLink, conf.VFID, hwaddr); err != nil {
 			return fmt.Errorf("failed to restore original administrative MAC address %s: %v", hwaddr, err)
 		}
+	}
+
+	// Set spoofchk to on
+	if err = s.nLink.LinkSetVfSpoofchk(pfLink, conf.VFID, true); err != nil {
+		return fmt.Errorf("failed to enable spoof checking for vf %d: %v", conf.VFID, err)
+	}
+
+	// Set trust to off
+	if err = s.nLink.LinkSetVfTrust(pfLink, conf.VFID, false); err != nil {
+		return fmt.Errorf("failed to disable trust for vf %d: %v", conf.VFID, err)
+	}
+
+	// Disable rate limiting
+	if err = s.nLink.LinkSetVfTxRate(pfLink, conf.VFID, 0); err != nil {
+		return fmt.Errorf("failed to disable rate limiting for vf %d %v", conf.VFID, err)
 	}
 
 	return nil
