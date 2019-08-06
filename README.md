@@ -12,6 +12,7 @@
       * [Usage](#usage)
          * [Configuration with IPAM:](#configuration-with-ipam)
          * [Configuration with DPDK:](#configuration-with-dpdk)
+      * [Multi Architecture Support](#multi-architecture-support)
       * [Contacts](#contacts)
 
 # SR-IOV CNI plugin
@@ -238,6 +239,19 @@ EOF
 
 
 [More info](https://github.com/containernetworking/cni/pull/259).
+
+## Multi Architecture Support
+The supported architectures:
+* AMD64
+* PPC64LE
+Buiding image for AMD64:
+```
+$ DOCKERFILE=Dockerfile make image 
+```
+Buiding image for PPC64LE:
+```
+$ DOCKERFILE=Dockerfile.ppc64le TAG=nfvpe/sriov-cni:ppc64le make image        
+```
 
 ## Contacts
 For any questions about Multus CNI, please reach out on github issue or feel free to contact the developers @kural OR @ahalim in our [Intel-Corp Slack](https://intel-corp.herokuapp.com/)
