@@ -21,15 +21,17 @@ Component | Version|
 |SR-IOV CNI Plugin            |<Input Version Here>|
 |Multus                       |<Input Version Here>|
 |SR-IOV Network Device Plugin |<Input Version Here>|
-|Kubernetes                  |<Input Version Here>| 
-|OS                          |<Input Version Here>|
+|Kubernetes                   |<Input Version Here>| 
+|OS                           |<Input Version Here>|
 
 ### Config Files
-##### CNI config ('/etc/cni/net.d/')
+Config file locations may be config dependent.
 
-##### Device pool config file location (default "/etc/pcidp/config.json")
+##### CNI config (Try '/etc/cni/net.d/')
 
-##### Multus config ('/etc/cni/multus/net.d)'
+##### Device pool config file location (Try '/etc/pcidp/config.json')
+
+##### Multus config (Try '/etc/cni/multus/net.d')
 
 ##### Kubernetes deployment type ( Bare Metal, Kubeadm etc.)
 
@@ -37,9 +39,10 @@ Component | Version|
 
 ##### SR-IOV Network Custom Resource Definition
 
+
 ### Logs
 ##### SR-IOV Network Device Plugin Logs (use `kubectl logs $PODNAME`)
 
-##### Multus logs (default "/var/log/multus.log" )
+##### Multus logs (If enabled. Try '/var/log/multus.log' )
 
 ##### Kubelet logs (journalctl -u kubelet)
