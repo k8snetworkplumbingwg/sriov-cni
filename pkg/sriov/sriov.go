@@ -28,6 +28,7 @@ type NetlinkManager interface {
 	LinkSetVfTxRate(netlink.Link, int, int) error
 	LinkSetVfSpoofchk(netlink.Link, int, bool) error
 	LinkSetVfTrust(netlink.Link, int, bool) error
+	LinkSetVfState(netlink.Link, int, uint32) error
 }
 
 // MyNetlink NetlinkManager
@@ -95,6 +96,12 @@ func (n *MyNetlink) LinkSetVfTrust(link netlink.Link, vf int, state bool) error 
 	return netlink.LinkSetVfTrust(link, vf, state)
 }
 
+// LinkSetVfState using NetlinkManager
+func (n *MyNetlink) LinkSetVfState(link netlink.Link, vf int, state uint32) error {
+	return netlink.LinkSetVfState(link, vf, state)
+}
+
+// LinkSetVfState using NetlinkManager
 type pciUtils interface {
 	getSriovNumVfs(ifName string) (int, error)
 	getVFLinkNamesFromVFID(pfName string, vfID int) ([]string, error)
@@ -334,6 +341,24 @@ func (s *sriovManager) ApplyVFConfig(conf *sriovtypes.NetConf) error {
 		}
 	}
 
+	// 6. Set link state
+	if conf.LinkState != "" {
+		var state uint32
+		switch conf.LinkState {
+		case "auto":
+			state = 0
+		case "enable":
+			state = 1
+		case "disable":
+			state = 2
+		default:
+			// we assume the value was already validated earlier
+		}
+		if err = s.nLink.LinkSetVfState(pfLink, conf.VFID, state); err != nil {
+			return fmt.Errorf("failed to set vf %d link state to %d: %v", conf.VFID, state, err)
+		}
+	}
+
 	return nil
 }
 
@@ -380,6 +405,11 @@ func (s *sriovManager) ResetVFConfig(conf *sriovtypes.NetConf) error {
 	// Disable rate limiting
 	if err = s.nLink.LinkSetVfTxRate(pfLink, conf.VFID, 0); err != nil {
 		return fmt.Errorf("failed to disable rate limiting for vf %d %v", conf.VFID, err)
+	}
+
+	// Reset link state to `auto`
+	if err = s.nLink.LinkSetVfState(pfLink, conf.VFID, 0); err != nil {
+		return fmt.Errorf("failed to set link state to auto for vf %d: %v", conf.VFID, err)
 	}
 
 	return nil
