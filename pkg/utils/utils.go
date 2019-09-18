@@ -154,6 +154,10 @@ func GetVFLinkNames(pciAddr string) (string, error) {
 		return "", fmt.Errorf("failed to read net dir of the device %s: %v", pciAddr, err)
 	}
 
+	if len(fInfos) == 0 {
+		return "", fmt.Errorf("VF device %s sysfs path (%s) has no entries", pciAddr, vfDir)
+	}
+
 	names = make([]string, 0)
 	for _, f := range fInfos {
 		names = append(names, f.Name())
