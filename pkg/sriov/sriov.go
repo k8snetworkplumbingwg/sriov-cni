@@ -346,11 +346,11 @@ func (s *sriovManager) ApplyVFConfig(conf *sriovtypes.NetConf) error {
 		var state uint32
 		switch conf.LinkState {
 		case "auto":
-			state = 0
+			state = netlink.VF_LINK_STATE_AUTO
 		case "enable":
-			state = 1
+			state = netlink.VF_LINK_STATE_ENABLE
 		case "disable":
-			state = 2
+			state = netlink.VF_LINK_STATE_DISABLE
 		default:
 			// the value should have been validated earlier, return error if we somehow got here
 			return fmt.Errorf("unknown link state %s when setting it for vf %d: %v", state, conf.VFID, err)
