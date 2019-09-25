@@ -353,7 +353,7 @@ func (s *sriovManager) ApplyVFConfig(conf *sriovtypes.NetConf) error {
 			state = netlink.VF_LINK_STATE_DISABLE
 		default:
 			// the value should have been validated earlier, return error if we somehow got here
-			return fmt.Errorf("unknown link state %s when setting it for vf %d: %v", state, conf.VFID, err)
+			return fmt.Errorf("unknown link state %s when setting it for vf %d: %v", conf.LinkState, conf.VFID, err)
 		}
 		if err = s.nLink.LinkSetVfState(pfLink, conf.VFID, state); err != nil {
 			return fmt.Errorf("failed to set vf %d link state to %d: %v", conf.VFID, state, err)
