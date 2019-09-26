@@ -101,7 +101,6 @@ func (n *MyNetlink) LinkSetVfState(link netlink.Link, vf int, state uint32) erro
 	return netlink.LinkSetVfState(link, vf, state)
 }
 
-// LinkSetVfState using NetlinkManager
 type pciUtils interface {
 	getSriovNumVfs(ifName string) (int, error)
 	getVFLinkNamesFromVFID(pfName string, vfID int) ([]string, error)
