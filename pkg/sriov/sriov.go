@@ -408,8 +408,13 @@ func (s *sriovManager) ResetVFConfig(conf *sriovtypes.NetConf) error {
 	}
 
 	// Reset link state to `auto`
-	if err = s.nLink.LinkSetVfState(pfLink, conf.VFID, 0); err != nil {
-		return fmt.Errorf("failed to set link state to auto for vf %d: %v", conf.VFID, err)
+	if conf.LinkState != "" {
+		// While resetting to `auto` can be a reasonable thing to do regardless of whether it was explicitly
+		// specified in the network definition, reset only when link_state was explicitly specified, to
+		// accommodate for drivers / NICs that don't support the netlink command (e.g. igb driver)
+		if err = s.nLink.LinkSetVfState(pfLink, conf.VFID, 0); err != nil {
+			return fmt.Errorf("failed to set link state to auto for vf %d: %v", conf.VFID, err)
+		}
 	}
 
 	return nil
