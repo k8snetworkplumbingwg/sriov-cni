@@ -144,6 +144,7 @@ echo 8 > /sys/class/net/enp2s0f0/device/sriov_numvfs
 * `ipam` (dictionary, optional): IPAM configuration to be used for this network.
 * `spoofchk` (string, optional): turn packet spoof checking on or off for the VF
 * `trust` (string, optional): turn trust setting on or off for the VF
+* `link_state` (string, optional): enforce link state for the VF. Allowed values: auto, enable, disable. Note that driver support may differ for this feature. For example, `i40e` is known to work but `igb` doesn't.
 * `max_tx_rate` (int, optional): change the allowed maximum transmit bandwidth, in Mbps, for the VF. 
 Setting this to 0 disables rate limiting.
 
@@ -228,6 +229,7 @@ EOF
     "max_tx_rate": 100,
     "spoofchk": "off",
     "trust": "on"
+    "link_state": "enable"
 }
 EOF
 ```

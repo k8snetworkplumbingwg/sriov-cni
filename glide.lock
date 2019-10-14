@@ -1,5 +1,5 @@
-hash: 0794d83725afacf6a30fcbbefe58ea32c12dbcedcffffcd2c9a21036bcca5d1e
-updated: 2019-07-25T12:32:04.793365038+01:00
+hash: bdc1c5bc69fdf4f5090517250bd6b594ad7a13615c00ec2715351be3f5fae0d9
+updated: 2019-09-25T00:30:57.166016471+03:00
 imports:
 - name: github.com/containernetworking/cni
   version: dc953e2fd91f9bc624b03cf9ea3706796bfee920
@@ -58,12 +58,12 @@ imports:
 - name: github.com/safchain/ethtool
   version: 42ed695e3de80b9d695f280295fd7994639f209d
 - name: github.com/stretchr/testify
-  version: ffdc059bfe9ce6a4e144ba849dbedead332c6053
+  version: 221dbe5ed46703ee255b1da0dec05086f5035f62
   subpackages:
   - assert
   - mock
 - name: github.com/vishvananda/netlink
-  version: b1e98597921720cee4147d6476110fc8fc56072d
+  version: 07ace697bea4b7641fbc6dcf7c90432c6b8bea5c
   subpackages:
   - nl
 - name: github.com/vishvananda/netns
@@ -82,4 +82,6 @@ testImports:
   subpackages:
   - difflib
 - name: github.com/stretchr/objx
-  version: c61a9dfcced1815e7d40e214d00d1a8669a9f58c
+  version: 35313a95ee26395aa17d366c71a2ccf788fa69b6
+- name: gopkg.in/yaml.v2
+  version: 51d6538a90f86fe93ac480b35f37b2be17fef232

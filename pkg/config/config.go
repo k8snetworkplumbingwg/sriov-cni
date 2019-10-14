@@ -70,6 +70,11 @@ func LoadConf(bytes []byte) (*sriovtypes.NetConf, error) {
 		return nil, fmt.Errorf("LoadConf(): vlan QoS PCP %d invalid: value must be in the range 0-7", n.VlanQoS)
 	}
 
+	// validate that link state is one of supported values
+	if n.LinkState != "" && n.LinkState != "auto" && n.LinkState != "enable" && n.LinkState != "disable" {
+		return nil, fmt.Errorf("LoadConf(): invalid link_state value: %s", n.LinkState)
+	}
+
 	return n, nil
 }
 

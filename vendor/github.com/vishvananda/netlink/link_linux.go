@@ -34,6 +34,12 @@ const (
 	TUNTAP_MULTI_QUEUE_DEFAULTS TuntapFlag = TUNTAP_MULTI_QUEUE | TUNTAP_NO_PI
 )
 
+const (
+	VF_LINK_STATE_AUTO    uint32 = 0
+	VF_LINK_STATE_ENABLE  uint32 = 1
+	VF_LINK_STATE_DISABLE uint32 = 2
+)
+
 var lookupByDump = false
 
 var macvlanModes = [...]uint32{
@@ -522,6 +528,67 @@ func (h *Handle) LinkSetVfTxRate(link Link, vf, rate int) error {
 		Rate: uint32(rate),
 	}
 	info.AddRtAttr(nl.IFLA_VF_TX_RATE, vfmsg.Serialize())
+	req.AddData(data)
+
+	_, err := req.Execute(unix.NETLINK_ROUTE, 0)
+	return err
+}
+
+// LinkSetVfRate sets the min and max tx rate of a vf for the link.
+// Equivalent to: `ip link set $link vf $vf min_tx_rate $min_rate max_tx_rate $max_rate`
+func LinkSetVfRate(link Link, vf, minRate, maxRate int) error {
+	return pkgHandle.LinkSetVfRate(link, vf, minRate, maxRate)
+}
+
+// LinkSetVfRate sets the min and max tx rate of a vf for the link.
+// Equivalent to: `ip link set $link vf $vf min_tx_rate $min_rate max_tx_rate $max_rate`
+func (h *Handle) LinkSetVfRate(link Link, vf, minRate, maxRate int) error {
+	base := link.Attrs()
+	h.ensureIndex(base)
+	req := h.newNetlinkRequest(unix.RTM_SETLINK, unix.NLM_F_ACK)
+
+	msg := nl.NewIfInfomsg(unix.AF_UNSPEC)
+	msg.Index = int32(base.Index)
+	req.AddData(msg)
+
+	data := nl.NewRtAttr(unix.IFLA_VFINFO_LIST, nil)
+	info := data.AddRtAttr(nl.IFLA_VF_INFO, nil)
+	vfmsg := nl.VfRate{
+		Vf:        uint32(vf),
+		MinTxRate: uint32(minRate),
+		MaxTxRate: uint32(maxRate),
+	}
+	info.AddRtAttr(nl.IFLA_VF_RATE, vfmsg.Serialize())
+	req.AddData(data)
+
+	_, err := req.Execute(unix.NETLINK_ROUTE, 0)
+	return err
+}
+
+// LinkSetVfState enables/disables virtual link state on a vf.
+// Equivalent to: `ip link set $link vf $vf state $state`
+func LinkSetVfState(link Link, vf int, state uint32) error {
+	return pkgHandle.LinkSetVfState(link, vf, state)
+}
+
+// LinkSetVfState enables/disables virtual link state on a vf.
+// Equivalent to: `ip link set $link vf $vf state $state`
+func (h *Handle) LinkSetVfState(link Link, vf int, state uint32) error {
+	base := link.Attrs()
+	h.ensureIndex(base)
+	req := h.newNetlinkRequest(unix.RTM_SETLINK, unix.NLM_F_ACK)
+
+	msg := nl.NewIfInfomsg(unix.AF_UNSPEC)
+	msg.Index = int32(base.Index)
+	req.AddData(msg)
+
+	data := nl.NewRtAttr(unix.IFLA_VFINFO_LIST, nil)
+	info := data.AddRtAttr(nl.IFLA_VF_INFO, nil)
+	vfmsg := nl.VfLinkState{
+		Vf:        uint32(vf),
+		LinkState: state,
+	}
+	info.AddRtAttr(nl.IFLA_VF_LINK_STATE, vfmsg.Serialize())
 	req.AddData(data)
 
 	_, err := req.Execute(unix.NETLINK_ROUTE, 0)
@@ -1119,8 +1186,8 @@ func (h *Handle) linkModify(link Link, flags int) error {
 		native.PutUint32(b, uint32(base.ParentIndex))
 		data := nl.NewRtAttr(unix.IFLA_LINK, b)
 		req.AddData(data)
-	} else if link.Type() == "ipvlan" {
-		return fmt.Errorf("Can't create ipvlan link without ParentIndex")
+	} else if link.Type() == "ipvlan" || link.Type() == "ipoib" {
+		return fmt.Errorf("Can't create %s link without ParentIndex", link.Type())
 	}
 
 	nameData := nl.NewRtAttr(unix.IFLA_IFNAME, nl.ZeroTerminated(base.Name))
@@ -1218,6 +1285,7 @@ func (h *Handle) linkModify(link Link, flags int) error {
 	case *IPVlan:
 		data := linkInfo.AddRtAttr(nl.IFLA_INFO_DATA, nil)
 		data.AddRtAttr(nl.IFLA_IPVLAN_MODE, nl.Uint16Attr(uint16(link.Mode)))
+		data.AddRtAttr(nl.IFLA_IPVLAN_FLAG, nl.Uint16Attr(uint16(link.Flag)))
 	case *Macvlan:
 		if link.Mode != MACVLAN_MODE_DEFAULT {
 			data := linkInfo.AddRtAttr(nl.IFLA_INFO_DATA, nil)
@@ -1246,6 +1314,8 @@ func (h *Handle) linkModify(link Link, flags int) error {
 		addGTPAttrs(link, linkInfo)
 	case *Xfrmi:
 		addXfrmiAttrs(link, linkInfo)
+	case *IPoIB:
+		addIPoIBAttrs(link, linkInfo)
 	}
 
 	req.AddData(linkInfo)
@@ -1442,10 +1512,12 @@ func LinkDeserialize(hdr *unix.NlMsghdr, m []byte) (Link, error) {
 		base.Promisc = 1
 	}
 	var (
-		link     Link
-		stats32  []byte
-		stats64  []byte
-		linkType string
+		link      Link
+		stats32   []byte
+		stats64   []byte
+		linkType  string
+		linkSlave LinkSlave
+		slaveType string
 	)
 	for _, attr := range attrs {
 		switch attr.Attr.Type {
@@ -1501,6 +1573,8 @@ func LinkDeserialize(hdr *unix.NlMsghdr, m []byte) (Link, error) {
 						link = &Xfrmi{}
 					case "tun":
 						link = &Tuntap{}
+					case "ipoib":
+						link = &IPoIB{}
 					default:
 						link = &GenericLink{LinkType: linkType}
 					}
@@ -1546,6 +1620,23 @@ func LinkDeserialize(hdr *unix.NlMsghdr, m []byte) (Link, error) {
 						parseXfrmiData(link, data)
 					case "tun":
 						parseTuntapData(link, data)
+					case "ipoib":
+						parseIPoIBData(link, data)
+					}
+				case nl.IFLA_INFO_SLAVE_KIND:
+					slaveType = string(info.Value[:len(info.Value)-1])
+					switch slaveType {
+					case "bond":
+						linkSlave = &BondSlave{}
+					}
+				case nl.IFLA_INFO_SLAVE_DATA:
+					switch slaveType {
+					case "bond":
+						data, err := nl.ParseRouteAttr(info.Value)
+						if err != nil {
+							return nil, err
+						}
+						parseBondSlaveData(linkSlave, data)
 					}
 				}
 			}
@@ -1629,6 +1720,7 @@ func LinkDeserialize(hdr *unix.NlMsghdr, m []byte) (Link, error) {
 		link = &Device{}
 	}
 	*link.Attrs() = base
+	link.Attrs().Slave = linkSlave
 
 	// If the tuntap attributes are not updated by netlink due to
 	// an older driver, use sysfs
@@ -2093,12 +2185,54 @@ func parseBondData(link Link, data []syscall.NetlinkRouteAttr) {
 	}
 }
 
+func addBondSlaveAttrs(bondSlave *BondSlave, linkInfo *nl.RtAttr) {
+	data := linkInfo.AddRtAttr(nl.IFLA_INFO_SLAVE_DATA, nil)
+
+	data.AddRtAttr(nl.IFLA_BOND_SLAVE_STATE, nl.Uint8Attr(uint8(bondSlave.State)))
+	data.AddRtAttr(nl.IFLA_BOND_SLAVE_MII_STATUS, nl.Uint8Attr(uint8(bondSlave.MiiStatus)))
+	data.AddRtAttr(nl.IFLA_BOND_SLAVE_LINK_FAILURE_COUNT, nl.Uint32Attr(bondSlave.LinkFailureCount))
+	data.AddRtAttr(nl.IFLA_BOND_SLAVE_QUEUE_ID, nl.Uint16Attr(bondSlave.QueueId))
+	data.AddRtAttr(nl.IFLA_BOND_SLAVE_AD_AGGREGATOR_ID, nl.Uint16Attr(bondSlave.AggregatorId))
+	data.AddRtAttr(nl.IFLA_BOND_SLAVE_AD_ACTOR_OPER_PORT_STATE, nl.Uint8Attr(bondSlave.AdActorOperPortState))
+	data.AddRtAttr(nl.IFLA_BOND_SLAVE_AD_PARTNER_OPER_PORT_STATE, nl.Uint16Attr(bondSlave.AdPartnerOperPortState))
+
+	if mac := bondSlave.PermHardwareAddr; mac != nil {
+		data.AddRtAttr(nl.IFLA_BOND_SLAVE_PERM_HWADDR, []byte(mac))
+	}
+}
+
+func parseBondSlaveData(slave LinkSlave, data []syscall.NetlinkRouteAttr) {
+	bondSlave := slave.(*BondSlave)
+	for i := range data {
+		switch data[i].Attr.Type {
+		case nl.IFLA_BOND_SLAVE_STATE:
+			bondSlave.State = BondSlaveState(data[i].Value[0])
+		case nl.IFLA_BOND_SLAVE_MII_STATUS:
+			bondSlave.MiiStatus = BondSlaveMiiStatus(data[i].Value[0])
+		case nl.IFLA_BOND_SLAVE_LINK_FAILURE_COUNT:
+			bondSlave.LinkFailureCount = native.Uint32(data[i].Value[0:4])
+		case nl.IFLA_BOND_SLAVE_PERM_HWADDR:
+			bondSlave.PermHardwareAddr = net.HardwareAddr(data[i].Value[0:6])
+		case nl.IFLA_BOND_SLAVE_QUEUE_ID:
+			bondSlave.QueueId = native.Uint16(data[i].Value[0:2])
+		case nl.IFLA_BOND_SLAVE_AD_AGGREGATOR_ID:
+			bondSlave.AggregatorId = native.Uint16(data[i].Value[0:2])
+		case nl.IFLA_BOND_SLAVE_AD_ACTOR_OPER_PORT_STATE:
+			bondSlave.AdActorOperPortState = uint8(data[i].Value[0])
+		case nl.IFLA_BOND_SLAVE_AD_PARTNER_OPER_PORT_STATE:
+			bondSlave.AdPartnerOperPortState = native.Uint16(data[i].Value[0:2])
+		}
+	}
+}
+
 func parseIPVlanData(link Link, data []syscall.NetlinkRouteAttr) {
 	ipv := link.(*IPVlan)
 	for _, datum := range data {
-		if datum.Attr.Type == nl.IFLA_IPVLAN_MODE {
+		switch datum.Attr.Type {
+		case nl.IFLA_IPVLAN_MODE:
 			ipv.Mode = IPVlanMode(native.Uint32(datum.Value[0:4]))
-			return
+		case nl.IFLA_IPVLAN_FLAG:
+			ipv.Flag = IPVlanFlag(native.Uint32(datum.Value[0:4]))
 		}
 	}
 }
@@ -2240,9 +2374,7 @@ func parseGretapData(link Link, data []syscall.NetlinkRouteAttr) {
 		case nl.IFLA_GRE_ENCAP_FLAGS:
 			gre.EncapFlags = native.Uint16(datum.Value[0:2])
 		case nl.IFLA_GRE_COLLECT_METADATA:
-			if len(datum.Value) > 0 {
-				gre.FlowBased = int8(datum.Value[0]) != 0
-			}
+			gre.FlowBased = true
 		}
 	}
 }
@@ -2642,6 +2774,10 @@ func parseVfInfo(data []syscall.NetlinkRouteAttr, id int) VfInfo {
 		case nl.IFLA_VF_LINK_STATE:
 			ls := nl.DeserializeVfLinkState(element.Value[:])
 			vf.LinkState = ls.LinkState
+		case nl.IFLA_VF_RATE:
+			vfr := nl.DeserializeVfRate(element.Value[:])
+			vf.MaxTxRate = vfr.MaxTxRate
+			vf.MinTxRate = vfr.MinTxRate
 		}
 	}
 	return vf
@@ -2681,6 +2817,30 @@ func LinkSetBondSlave(link Link, master *Bond) error {
 		return fmt.Errorf("Failed to enslave %q to %q, errno=%v", link.Attrs().Name, master.Attrs().Name, errno)
 	}
 	return nil
+}
+
+// LinkSetBondSlaveQueueId modify bond slave queue-id.
+func (h *Handle) LinkSetBondSlaveQueueId(link Link, queueId uint16) error {
+	base := link.Attrs()
+	h.ensureIndex(base)
+	req := h.newNetlinkRequest(unix.RTM_SETLINK, unix.NLM_F_ACK)
+
+	msg := nl.NewIfInfomsg(unix.AF_UNSPEC)
+	msg.Index = int32(base.Index)
+	req.AddData(msg)
+
+	linkInfo := nl.NewRtAttr(unix.IFLA_LINKINFO, nil)
+	data := linkInfo.AddRtAttr(nl.IFLA_INFO_SLAVE_DATA, nil)
+	data.AddRtAttr(nl.IFLA_BOND_SLAVE_QUEUE_ID, nl.Uint16Attr(queueId))
+
+	req.AddData(linkInfo)
+	_, err := req.Execute(unix.NETLINK_ROUTE, 0)
+	return err
+}
+
+// LinkSetBondSlaveQueueId modify bond slave queue-id.
+func LinkSetBondSlaveQueueId(link Link, queueId uint16) error {
+	return pkgHandle.LinkSetBondSlaveQueueId(link, queueId)
 }
 
 // VethPeerIndex get veth peer index.
@@ -2737,4 +2897,25 @@ func parseTuntapData(link Link, data []syscall.NetlinkRouteAttr) {
 			}
 		}
 	}
+}
+
+func parseIPoIBData(link Link, data []syscall.NetlinkRouteAttr) {
+	ipoib := link.(*IPoIB)
+	for _, datum := range data {
+		switch datum.Attr.Type {
+		case nl.IFLA_IPOIB_PKEY:
+			ipoib.Pkey = uint16(native.Uint16(datum.Value))
+		case nl.IFLA_IPOIB_MODE:
+			ipoib.Mode = IPoIBMode(native.Uint16(datum.Value))
+		case nl.IFLA_IPOIB_UMCAST:
+			ipoib.Umcast = uint16(native.Uint16(datum.Value))
+		}
+	}
+}
+
+func addIPoIBAttrs(ipoib *IPoIB, linkInfo *nl.RtAttr) {
+	data := linkInfo.AddRtAttr(nl.IFLA_INFO_DATA, nil)
+	data.AddRtAttr(nl.IFLA_IPOIB_PKEY, nl.Uint16Attr(uint16(ipoib.Pkey)))
+	data.AddRtAttr(nl.IFLA_IPOIB_MODE, nl.Uint16Attr(uint16(ipoib.Mode)))
+	data.AddRtAttr(nl.IFLA_IPOIB_UMCAST, nl.Uint16Attr(uint16(ipoib.Umcast)))
 }
