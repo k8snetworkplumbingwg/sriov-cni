@@ -60,6 +60,13 @@ func cmdAdd(args *skel.CmdArgs) error {
 		}
 	}
 
+	// RuntimeConfig takes preference than envArgs.
+	// This maintains compatibility of using envArgs
+	// for MAC config.
+	if netConf.RuntimeConfig.Mac != "" {
+		netConf.MAC = netConf.RuntimeConfig.Mac
+	}
+
 	netns, err := ns.GetNS(args.Netns)
 	if err != nil {
 		return fmt.Errorf("failed to open netns %q: %v", netns, err)
