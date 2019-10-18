@@ -145,9 +145,14 @@ echo 8 > /sys/class/net/enp2s0f0/device/sriov_numvfs
 * `spoofchk` (string, optional): turn packet spoof checking on or off for the VF
 * `trust` (string, optional): turn trust setting on or off for the VF
 * `link_state` (string, optional): enforce link state for the VF. Allowed values: auto, enable, disable. Note that driver support may differ for this feature. For example, `i40e` is known to work but `igb` doesn't.
+* `min_tx_rate` (int, optional): change the allowed minimum transmit bandwidth, in Mbps, for the VF. Setting this to 0 disables rate limiting. Note: Only supported on Mellanox NICs.
 * `max_tx_rate` (int, optional): change the allowed maximum transmit bandwidth, in Mbps, for the VF. 
 Setting this to 0 disables rate limiting.
 
+Note: min_tx_rate is only supported on Mellanox NICs. Setting the min_tx_rate on Intel NICs to any value other than 0 
+will prevent the Pod from being created with "Invalid Argument".
+
+The recommendation is to not configure min_tx_rate in the net-attach-defs for Intel NICs.
 
 ### Using DPDK drivers:
 If this plugin is used with a VF bound to a dpdk driver then the IPAM configuration will be ignored.
@@ -226,7 +231,8 @@ EOF
     "type": "sriov",
     "deviceID": "0000:03:02.0",
     "vlan": 1000,
-    "max_tx_rate": 100,
+    "min_tx_rate": 100,
+    "max_tx_rate": 200,
     "spoofchk": "off",
     "trust": "on"
     "link_state": "enable"
