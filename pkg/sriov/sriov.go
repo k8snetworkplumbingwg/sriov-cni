@@ -25,7 +25,7 @@ type NetlinkManager interface {
 	LinkSetDown(netlink.Link) error
 	LinkSetNsFd(netlink.Link, int) error
 	LinkSetName(netlink.Link, string) error
-	LinkSetVfTxRate(netlink.Link, int, int) error
+	LinkSetVfRate(netlink.Link, int, int, int) error
 	LinkSetVfSpoofchk(netlink.Link, int, bool) error
 	LinkSetVfTrust(netlink.Link, int, bool) error
 	LinkSetVfState(netlink.Link, int, uint32) error
@@ -81,9 +81,9 @@ func (n *MyNetlink) LinkSetName(link netlink.Link, name string) error {
 	return netlink.LinkSetName(link, name)
 }
 
-// LinkSetVfTxRate using NetlinkManager
-func (n *MyNetlink) LinkSetVfTxRate(link netlink.Link, vf int, rate int) error {
-	return netlink.LinkSetVfTxRate(link, vf, rate)
+// LinkSetVfRate using NetlinkManager
+func (n *MyNetlink) LinkSetVfRate(link netlink.Link, vf int, minRate int, maxRate int) error {
+	return netlink.LinkSetVfRate(link, vf, minRate, maxRate)
 }
 
 // LinkSetVfSpoofchk using NetlinkManager
@@ -311,10 +311,23 @@ func (s *sriovManager) ApplyVFConfig(conf *sriovtypes.NetConf) error {
 		}
 	}
 
-	// 3. Set link rate
+	// 3. Set min/max tx link rate. 0 means no rate limiting. Support depends on NICs and driver.
+	var minTxRate, maxTxRate int
+	rateConfigured := false
+	if conf.MinTxRate != nil {
+		minTxRate = *conf.MinTxRate
+		rateConfigured = true
+	}
+
 	if conf.MaxTxRate != nil {
-		if err = s.nLink.LinkSetVfTxRate(pfLink, conf.VFID, *conf.MaxTxRate); err != nil {
-			return fmt.Errorf("failed to set vf %d max_tx_rate to %d Mbps: %v", conf.VFID, conf.MaxTxRate, err)
+		maxTxRate = *conf.MaxTxRate
+		rateConfigured = true
+	}
+
+	if rateConfigured {
+		if err = s.nLink.LinkSetVfRate(pfLink, conf.VFID, minTxRate, maxTxRate); err != nil {
+			return fmt.Errorf("failed to set vf %d min_tx_rate to %d Mbps: max_tx_rate to %d Mbps: %v",
+				conf.VFID, minTxRate, maxTxRate, err)
 		}
 	}
 
@@ -403,7 +416,7 @@ func (s *sriovManager) ResetVFConfig(conf *sriovtypes.NetConf) error {
 	}
 
 	// Disable rate limiting
-	if err = s.nLink.LinkSetVfTxRate(pfLink, conf.VFID, 0); err != nil {
+	if err = s.nLink.LinkSetVfRate(pfLink, conf.VFID, 0, 0); err != nil {
 		return fmt.Errorf("failed to disable rate limiting for vf %d %v", conf.VFID, err)
 	}
 
