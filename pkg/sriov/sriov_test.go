@@ -153,13 +153,13 @@ func (_m *MockNetlinkManager) LinkSetName(_a0 netlink.Link, _a1 string) error {
 	return r0
 }
 
-// LinkSetVfTxRate provides a mock function with given fields: _a0, _a1, _a2
-func (_m *MockNetlinkManager) LinkSetVfTxRate(_a0 netlink.Link, _a1 int, _a2 int) error {
-	ret := _m.Called(_a0, _a1, _a2)
+// LinkSetVfRate provides a mock function with given fields: _a0, _a1, _a2, _a3
+func (_m *MockNetlinkManager) LinkSetVfRate(_a0 netlink.Link, _a1 int, _a2 int, _a3 int) error {
+	ret := _m.Called(_a0, _a1, _a2, _a3)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(netlink.Link, int, int) error); ok {
-		r0 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(0).(func(netlink.Link, int, int, int) error); ok {
+		r0 = rf(_a0, _a1, _a2, _a3)
 	} else {
 		r0 = ret.Error(0)
 	}
