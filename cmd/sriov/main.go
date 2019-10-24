@@ -152,6 +152,9 @@ func cmdAdd(args *skel.CmdArgs) error {
 	} else {
 		result.IPs = []*current.IPConfig{{}}
 		result.IPs[0].Address = *ipAddr
+		ip := ipAddr.IP.Mask(ipAddr.Mask)
+		ip[3]++
+		result.IPs[0].Gateway = ip
 		result.IPs[0].Interface = current.Int(0)
 		result.IPs[0].Version = "4"
 	}

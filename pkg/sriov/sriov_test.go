@@ -345,7 +345,7 @@ var _ = Describe("Sriov", func() {
 			mocked.On("LinkSetVfVlan", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int")).Return(nil)
 			mocked.On("LinkSetVfVlanQos", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("int")).Return(nil)
 			sm := sriovManager{nLink: mocked}
-			macAddr, err := sm.SetupVF(netconf, podifName, contID, targetNetNS)
+			_, macAddr, err := sm.SetupVF(netconf, podifName, contID, targetNetNS)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(macAddr).To(Equal("6e:16:06:0e:b7:e9"))
 		})
