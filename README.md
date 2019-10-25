@@ -147,12 +147,8 @@ echo 8 > /sys/class/net/enp2s0f0/device/sriov_numvfs
 * `link_state` (string, optional): enforce link state for the VF. Allowed values: auto, enable, disable. Note that driver support may differ for this feature. For example, `i40e` is known to work but `igb` doesn't.
 * `min_tx_rate` (int, optional): change the allowed minimum transmit bandwidth, in Mbps, for the VF. Setting this to 0 disables rate limiting. Note: Only supported on Mellanox NICs.
 * `max_tx_rate` (int, optional): change the allowed maximum transmit bandwidth, in Mbps, for the VF. 
-Setting this to 0 disables rate limiting.
+Setting this to 0 disables rate limiting. The min_tx_rate value should be <= max_tx_rate. Support of this feature depends on NICs and drivers.
 
-Note: min_tx_rate is only supported on Mellanox NICs. Setting the min_tx_rate on Intel NICs to any value other than 0 
-will prevent the Pod from being created with "Invalid Argument".
-
-The recommendation is to not configure min_tx_rate in the net-attach-defs for Intel NICs.
 
 ### Using DPDK drivers:
 If this plugin is used with a VF bound to a dpdk driver then the IPAM configuration will be ignored.

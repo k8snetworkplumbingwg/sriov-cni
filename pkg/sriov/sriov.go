@@ -311,7 +311,7 @@ func (s *sriovManager) ApplyVFConfig(conf *sriovtypes.NetConf) error {
 		}
 	}
 
-	// 3. Set min/max tx link rate. 0 means no rate limiting. min_tx_rate only supported on Mellanox NICs.
+	// 3. Set min/max tx link rate. 0 means no rate limiting. Support depends on NICs and driver.
 	var minTxRate, maxTxRate int
 	rateConfigured := false
 	if conf.MinTxRate != nil {
