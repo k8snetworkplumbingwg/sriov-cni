@@ -145,10 +145,10 @@ echo 8 > /sys/class/net/enp2s0f0/device/sriov_numvfs
 * `spoofchk` (string, optional): turn packet spoof checking on or off for the VF
 * `trust` (string, optional): turn trust setting on or off for the VF
 * `link_state` (string, optional): enforce link state for the VF. Allowed values: auto, enable, disable. Note that driver support may differ for this feature. For example, `i40e` is known to work but `igb` doesn't.
-* `min_tx_rate` (int, optional): change the allowed minimum transmit bandwidth, in Mbps, for the VF. Setting this to 0 disables rate limiting. Note: Only supported on Mellanox NICs.
-* `max_tx_rate` (int, optional): change the allowed maximum transmit bandwidth, in Mbps, for the VF. 
-Setting this to 0 disables rate limiting. The min_tx_rate value should be <= max_tx_rate. Support of this feature depends on NICs and drivers.
+* `min_tx_rate` (int, optional): change the allowed minimum transmit bandwidth, in Mbps, for the VF. Setting this to 0 disables rate limiting. The min_tx_rate value should be <= max_tx_rate. Support of this feature depends on NICs and drivers.
 
+* `max_tx_rate` (int, optional): change the allowed maximum transmit bandwidth, in Mbps, for the VF. 
+Setting this to 0 disables rate limiting. 
 
 ### Using DPDK drivers:
 If this plugin is used with a VF bound to a dpdk driver then the IPAM configuration will be ignored.
