@@ -18,8 +18,8 @@ type NetConf struct {
 	VFID          int
 	HostIFNames   string // VF netdevice name(s)
 	ContIFNames   string // VF names after in the container; used during deletion
-	MinTxRate     *int   `json:"min_tx_rate"`          // Mbps, 0 = disable rate limiting
-	MaxTxRate     *int   `json:"max_tx_rate"`          // Mbps, 0 = disable rate limiting
+	MinTxRate     *int   `json:"minTxRate"`            // Mbps, 0 = disable rate limiting
+	MaxTxRate     *int   `json:"maxTxRate"`            // Mbps, 0 = disable rate limiting
 	SpoofChk      string `json:"spoofchk,omitempty"`   // on|off
 	Trust         string `json:"trust,omitempty"`      // on|off
 	LinkState     string `json:"link_state,omitempty"` // auto|enable|disable
