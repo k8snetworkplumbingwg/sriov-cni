@@ -175,14 +175,14 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, cid s
 	if conf.MAC != "" {
 		hwaddr, err := net.ParseMAC(conf.MAC)
 		if err != nil {
-			return "", fmt.Errorf("failed to parse MAC address %s: %v", conf.MAC, err)
+			return nil, "", fmt.Errorf("failed to parse MAC address %s: %v", conf.MAC, err)
 		}
 
 		// Save the original effective MAC address before overriding it
 		conf.EffectiveMAC = linkObj.Attrs().HardwareAddr.String()
 
 		if err = s.nLink.LinkSetHardwareAddr(linkObj, hwaddr); err != nil {
-			return "", fmt.Errorf("failed to set netlink MAC address to %s: %v", hwaddr, err)
+			return nil, "", fmt.Errorf("failed to set netlink MAC address to %s: %v", hwaddr, err)
 		}
 	}
 

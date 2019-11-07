@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -164,13 +165,13 @@ func cmdAdd(args *skel.CmdArgs) error {
 		resultBytes, _ := json.Marshal(result)
 		rawPrevResult := make(map[string]interface{})
 		json.Unmarshal(resultBytes, &rawPrevResult)
-		netConf.RawPrevResult = &rawPrevResult
+		netConf.RawPrevResult = rawPrevResult
 		rawNetConf, err := json.Marshal(netConf)
 		if err != nil {
 			return fmt.Errorf("Error executing delegate. Could not marshal netConf with prevResult: %v", err)
 		}
 		for _, delegate := range netConf.Delegates {
-			r, err := invoke.DelegateAdd(delegate.Type, rawNetConf)
+			r, err := invoke.DelegateAdd(context.TODO(), delegate.Type, rawNetConf, nil)
 			if err != nil {
 				fmt.Errorf("error in executing delegate: %v. Result: %v. Netconf passed: (%v)", err, r, string(rawNetConf))
 			}

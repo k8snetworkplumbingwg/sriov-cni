@@ -2,7 +2,6 @@ package types
 
 import (
 	"github.com/containernetworking/cni/pkg/types"
-	"github.com/containernetworking/cni/pkg/types/current"
 )
 
 // NetConf extends types.NetConf for sriov-cni
