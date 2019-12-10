@@ -152,7 +152,7 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, cid s
 	}
 
 	// tempName used as intermediary name to avoid name conflicts
-	tempName := fmt.Sprintf("%s%d", linkName, linkObj.Attrs().Index)
+	tempName := fmt.Sprintf("%s%d", "temp_", linkObj.Attrs().Index)
 
 	// 1. Set link down
 	if err := s.nLink.LinkSetDown(linkObj); err != nil {
