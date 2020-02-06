@@ -43,6 +43,9 @@ func getEnvArgs(envArgsString string) (*envArgs, error) {
 
 func cmdAdd(args *skel.CmdArgs) error {
 	var macAddr string
+	// We could use err != nil, but it might not be dependable because
+	// of scope.
+	resetVF := false
 	netConf, err := config.LoadConf(args.StdinData)
 	if err != nil {
 		return fmt.Errorf("SRIOV-CNI failed to load netconf: %v", err)
@@ -78,6 +81,13 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return fmt.Errorf("SRIOV-CNI failed to configure VF %q", err)
 	}
 
+	// Don't leave stale configuration on the VF, on failure.
+	defer func() {
+		if resetVF {
+			sm.ResetVFConfig(netConf)
+		}
+	}()
+
 	result := &current.Result{}
 	result.Interfaces = []*current.Interface{{
 		Name:    args.IfName,
@@ -88,6 +98,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 	if netConf.DPDKMode {
 		// Cache NetConf for CmdDel
 		if err = utils.SaveNetConf(args.ContainerID, config.DefaultCNIDir, args.IfName, netConf); err != nil {
+			resetVF = true
 			return fmt.Errorf("error saving NetConf %q", err)
 		}
 		return result.Print()
@@ -106,6 +117,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 		}
 	}()
 	if err != nil {
+		resetVF = true
 		return fmt.Errorf("failed to set up pod interface %q from the device %q: %v", args.IfName, netConf.Master, err)
 	}
 
@@ -113,6 +125,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 	if netConf.IPAM.Type != "" {
 		r, err := ipam.ExecAdd(netConf.IPAM.Type, args.StdinData)
 		if err != nil {
+			resetVF = true
 			return fmt.Errorf("failed to set up IPAM plugin type %q from the device %q: %v", netConf.IPAM.Type, netConf.Master, err)
 		}
 
@@ -125,10 +138,12 @@ func cmdAdd(args *skel.CmdArgs) error {
 		// Convert the IPAM result into the current Result type
 		newResult, err := current.NewResultFromResult(r)
 		if err != nil {
+			resetVF = true
 			return err
 		}
 
 		if len(newResult.IPs) == 0 {
+			resetVF = true
 			return errors.New("IPAM plugin returned missing IP config")
 		}
 
@@ -144,6 +159,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 			return ipam.ConfigureIface(args.IfName, newResult)
 		})
 		if err != nil {
+			resetVF = true
 			return err
 		}
 		result = newResult
@@ -151,6 +167,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 	// Cache NetConf for CmdDel
 	if err = utils.SaveNetConf(args.ContainerID, config.DefaultCNIDir, args.IfName, netConf); err != nil {
+		resetVF = true
 		return fmt.Errorf("error saving NetConf %q", err)
 	}
 

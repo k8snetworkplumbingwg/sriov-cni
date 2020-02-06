@@ -277,6 +277,29 @@ func (s *sriovManager) ApplyVFConfig(conf *sriovtypes.NetConf) error {
 		return fmt.Errorf("failed to lookup master %q: %v", conf.Master, err)
 	}
 
+	// Start afresh so that we don't use any stale config on the vf
+	// We can ignore the resulting errors, but it might potentially
+	// mask some issues, so we can err on the side of caution.
+	// 1. Reset VLAN ID and QoS
+	if err = s.nLink.LinkSetVfVlanQos(pfLink, conf.VFID, 0, 0); err != nil {
+		return fmt.Errorf("failed to reset vlan on vf %d: %v", conf.VFID, err)
+	}
+	// 2. Disable rate limiting
+	if err = s.nLink.LinkSetVfRate(pfLink, conf.VFID, 0, 0); err != nil {
+		return fmt.Errorf("failed to reset rate on vf %d: %v", conf.VFID, err)
+	}
+	// 3. Turn on spoofcheck
+	if err = s.nLink.LinkSetVfSpoofchk(pfLink, conf.VFID, true); err != nil {
+		return fmt.Errorf("failed to reset spoofchk on vf %d: %v", conf.VFID, err)
+	}
+	// 4. Turn off trust
+	if err = s.nLink.LinkSetVfTrust(pfLink, conf.VFID, false); err != nil {
+		return fmt.Errorf("failed to reset trust flag on vf %d: %v", conf.VFID, err)
+	}
+	// 5. Set link state to 'auto'
+	// Some drivers might not support this, so ignore the failure.
+	s.nLink.LinkSetVfState(pfLink, conf.VFID, 0)
+
 	// 1. Set vlan
 	if conf.Vlan != 0 {
 		// set vlan qos if present in the config
