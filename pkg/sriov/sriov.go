@@ -1,6 +1,7 @@
 package sriov
 
 import (
+	"crypto/rand"
 	"fmt"
 	"net"
 
@@ -207,6 +208,19 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, cid s
 	return macAddress, nil
 }
 
+// Generate a random mac for interface
+// Avoid MAC address starting with reserved value 0xFE (https://github.com/kubevirt/kubevirt/issues/1494)
+// NOTE: this function is borrowed (nearly) verbatim from kubevirt/kubevirt github repo
+func generateRandomMac() (net.HardwareAddr, error) {
+	prefix := []byte{0x02, 0x00, 0x00} // local unicast prefix
+	suffix := make([]byte, 3)
+	_, err := rand.Read(suffix)
+	if err != nil {
+		return nil, err
+	}
+	return net.HardwareAddr(append(prefix, suffix...)), nil
+}
+
 // ReleaseVF reset a VF from Pod netns and return it to init netns
 func (s *sriovManager) ReleaseVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.NetNS) error {
 
@@ -245,8 +259,14 @@ func (s *sriovManager) ReleaseVF(conf *sriovtypes.NetConf, podifName string, cid
 				return fmt.Errorf("failed to parse original effective MAC address %s: %v", conf.EffectiveMAC, err)
 			}
 
-			if err = s.nLink.LinkSetHardwareAddr(linkObj, hwaddr); err != nil {
-				return fmt.Errorf("failed to restore original effective netlink MAC address %s: %v", hwaddr, err)
+			if originalErr := s.nLink.LinkSetHardwareAddr(linkObj, hwaddr); originalErr != nil {
+				randomMac, err := generateRandomMac()
+				if err != nil {
+					return fmt.Errorf("failed to generate random MAC address: %v: %v", err, originalErr)
+				}
+				if err = s.nLink.LinkSetHardwareAddr(linkObj, randomMac); err != nil {
+					return fmt.Errorf("failed to set effective netlink MAC address to %s: %v: %v", randomMac, err, originalErr)
+				}
 			}
 		}
 
