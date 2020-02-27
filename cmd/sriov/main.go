@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"runtime"
 
+	"github.com/containernetworking/cni/pkg/invoke"
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
 	"github.com/containernetworking/cni/pkg/types/current"
@@ -149,6 +152,24 @@ func cmdAdd(args *skel.CmdArgs) error {
 		result = newResult
 	}
 
+	// execute delegates if they exist
+	if len(netConf.Delegates) > 0 {
+		resultBytes, _ := json.Marshal(result)
+		rawPrevResult := make(map[string]interface{})
+		json.Unmarshal(resultBytes, &rawPrevResult)
+		netConf.RawPrevResult = rawPrevResult
+		rawNetConf, err := json.Marshal(netConf)
+		if err != nil {
+			return fmt.Errorf("Error executing delegate. Could not marshal netConf with prevResult: %v", err)
+		}
+		for _, delegate := range netConf.Delegates {
+			r, err := invoke.DelegateAdd(context.TODO(), delegate.Type, rawNetConf, nil)
+			if err != nil {
+				fmt.Errorf("error in executing delegate: %v. Result: %v. Netconf passed: (%v)", err, r, string(rawNetConf))
+			}
+		}
+	}
+
 	// Cache NetConf for CmdDel
 	if err = utils.SaveNetConf(args.ContainerID, config.DefaultCNIDir, args.IfName, netConf); err != nil {
 		return fmt.Errorf("error saving NetConf %q", err)
@@ -166,6 +187,20 @@ func cmdDel(args *skel.CmdArgs) error {
 	netConf, cRefPath, err := config.LoadConfFromCache(args)
 	if err != nil {
 		return err
+	}
+
+	// call any delegates that were registered
+	if len(netConf.Delegates) > 0 {
+		rawNetConf, err := json.Marshal(netConf)
+		if err != nil {
+			return fmt.Errorf("Error executing delegate. Could not marshal netConf from cache: %v", err)
+		}
+		for _, delegate := range netConf.Delegates {
+			err := invoke.DelegateDel(context.TODO(), delegate.Type, rawNetConf, nil)
+			if err != nil {
+				fmt.Errorf("error in executing delegate (%s): %v. Netconf passed: (%v)", delegate.Type, err, string(rawNetConf))
+			}
+		}
 	}
 
 	defer func() {
