@@ -230,7 +230,7 @@ EOF
     "min_tx_rate": 100,
     "max_tx_rate": 200,
     "spoofchk": "off",
-    "trust": "on"
+    "trust": "on",
     "link_state": "enable"
 }
 EOF
