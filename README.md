@@ -8,7 +8,6 @@
       * [Configuration reference](#configuration-reference)
          * [Main parameters](#main-parameters)
          * [Using DPDK drivers:](#using-dpdk-drivers)
-         * [DPDK parameters](#dpdk-parameters)
       * [Usage](#usage)
          * [Configuration with IPAM:](#configuration-with-ipam)
          * [Configuration with DPDK:](#configuration-with-dpdk)
