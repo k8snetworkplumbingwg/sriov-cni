@@ -62,14 +62,4 @@ var _ = Describe("Config", func() {
 			Expect(err).To(HaveOccurred())
 		})
 	})
-	Context("Checking getVfInfo function", func() {
-		It("Assuming existing PF", func() {
-			_, _, err := getVfInfo("0000:af:06.0")
-			Expect(err).NotTo(HaveOccurred())
-		})
-		It("Assuming not existing PF", func() {
-			_, _, err := getVfInfo("0000:af:07.0")
-			Expect(err).To(HaveOccurred())
-		})
-	})
 })
