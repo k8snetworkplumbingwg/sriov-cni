@@ -27,11 +27,17 @@ func LoadConf(bytes []byte) (*sriovtypes.NetConf, error) {
 	if n.DeviceID != "" {
 		// Get rest of the VF information
 		pfName, vfID, err := getVfInfo(n.DeviceID)
-		if err != nil {
-			return nil, fmt.Errorf("LoadConf(): failed to get VF information: %q", err)
+
+		// Check to see if there is a PF linked to the VF, if there isn't then this is a VF within a VM
+		// so continue without setting the master.
+		if pfName != "" {
+			if err != nil {
+				return nil, fmt.Errorf("LoadConf(): failed to get VF information: %q", err)
+			}
+
+			n.VFID = vfID
+			n.Master = pfName
 		}
-		n.VFID = vfID
-		n.Master = pfName
 	} else {
 		return nil, fmt.Errorf("LoadConf(): VF pci addr is required")
 	}
