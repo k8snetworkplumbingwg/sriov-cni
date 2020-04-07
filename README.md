@@ -132,6 +132,8 @@ echo 0 > /sys/class/net/enp2s0f0/device/sriov_numvfs
 echo 8 > /sys/class/net/enp2s0f0/device/sriov_numvfs
 ```
 
+Note: In case spoofchk is enabled for VF, a valid administrative MAC needs to be specified.
+
 ## Configuration reference
 ### Main parameters
 * `name` (string, required): the name of the network

@@ -144,7 +144,7 @@ func NewSriovManager() Manager {
 
 // SetupVF sets up a VF in Pod netns
 func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.NetNS) (string, error) {
-	linkName := conf.HostIFNames
+	linkName := conf.OrigVfState.HostIFName
 
 	linkObj, err := s.nLink.LinkByName(linkName)
 	if err != nil {
@@ -172,7 +172,7 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, cid s
 		}
 
 		// Save the original effective MAC address before overriding it
-		conf.EffectiveMAC = linkObj.Attrs().HardwareAddr.String()
+		conf.OrigVfState.EffectiveMAC = linkObj.Attrs().HardwareAddr.String()
 
 		if err = s.nLink.LinkSetHardwareAddr(linkObj, hwaddr); err != nil {
 			return "", fmt.Errorf("failed to set netlink MAC address to %s: %v", hwaddr, err)
@@ -215,8 +215,8 @@ func (s *sriovManager) ReleaseVF(conf *sriovtypes.NetConf, podifName string, cid
 		return fmt.Errorf("failed to get init netns: %v", err)
 	}
 
-	if len(conf.ContIFNames) < 1 && len(conf.ContIFNames) != len(conf.HostIFNames) {
-		return fmt.Errorf("number of interface names mismatch ContIFNames: %d HostIFNames: %d", len(conf.ContIFNames), len(conf.HostIFNames))
+	if len(conf.ContIFNames) < 1 && len(conf.ContIFNames) != len(conf.OrigVfState.HostIFName) {
+		return fmt.Errorf("number of interface names mismatch ContIFNames: %d HostIFNames: %d", len(conf.ContIFNames), len(conf.OrigVfState.HostIFName))
 	}
 
 	return netns.Do(func(_ ns.NetNS) error {
@@ -233,16 +233,16 @@ func (s *sriovManager) ReleaseVF(conf *sriovtypes.NetConf, podifName string, cid
 		}
 
 		// rename VF device
-		err = s.nLink.LinkSetName(linkObj, conf.HostIFNames)
+		err = s.nLink.LinkSetName(linkObj, conf.OrigVfState.HostIFName)
 		if err != nil {
-			return fmt.Errorf("failed to rename link %s to host name %s: %q", podifName, conf.HostIFNames, err)
+			return fmt.Errorf("failed to rename link %s to host name %s: %q", podifName, conf.OrigVfState.HostIFName, err)
 		}
 
 		// reset effective MAC address
 		if conf.MAC != "" {
-			hwaddr, err := net.ParseMAC(conf.EffectiveMAC)
+			hwaddr, err := net.ParseMAC(conf.OrigVfState.EffectiveMAC)
 			if err != nil {
-				return fmt.Errorf("failed to parse original effective MAC address %s: %v", conf.EffectiveMAC, err)
+				return fmt.Errorf("failed to parse original effective MAC address %s: %v", conf.OrigVfState.EffectiveMAC, err)
 			}
 
 			if err = s.nLink.LinkSetHardwareAddr(linkObj, hwaddr); err != nil {
@@ -252,7 +252,7 @@ func (s *sriovManager) ReleaseVF(conf *sriovtypes.NetConf, podifName string, cid
 
 		// move VF device to init netns
 		if err = s.nLink.LinkSetNsFd(linkObj, int(initns.Fd())); err != nil {
-			return fmt.Errorf("failed to move interface %s to init netns: %v", conf.HostIFNames, err)
+			return fmt.Errorf("failed to move interface %s to init netns: %v", conf.OrigVfState.HostIFName, err)
 		}
 
 		return nil
@@ -277,16 +277,23 @@ func (s *sriovManager) ApplyVFConfig(conf *sriovtypes.NetConf) error {
 		return fmt.Errorf("failed to lookup master %q: %v", conf.Master, err)
 	}
 
+	// Save current the VF state before modifying it
+	vfState := getVfInfo(pfLink, conf.VFID)
+	if vfState == nil {
+		return fmt.Errorf("failed to find vf %d", conf.VFID)
+	}
+	conf.OrigVfState.FillFromVfInfo(vfState)
+
 	// 1. Set vlan
-	if conf.Vlan != 0 {
+	if conf.Vlan != nil {
 		// set vlan qos if present in the config
-		if conf.VlanQoS != 0 {
-			if err = s.nLink.LinkSetVfVlanQos(pfLink, conf.VFID, conf.Vlan, conf.VlanQoS); err != nil {
+		if conf.VlanQoS != nil {
+			if err = s.nLink.LinkSetVfVlanQos(pfLink, conf.VFID, *conf.Vlan, *conf.VlanQoS); err != nil {
 				return fmt.Errorf("failed to set vf %d vlan configuration: %v", conf.VFID, err)
 			}
 		} else {
 			// set vlan id field only
-			if err = s.nLink.LinkSetVfVlan(pfLink, conf.VFID, conf.Vlan); err != nil {
+			if err = s.nLink.LinkSetVfVlan(pfLink, conf.VFID, *conf.Vlan); err != nil {
 				return fmt.Errorf("failed to set vf %d vlan: %v", conf.VFID, err)
 			}
 		}
@@ -298,13 +305,6 @@ func (s *sriovManager) ApplyVFConfig(conf *sriovtypes.NetConf) error {
 		if err != nil {
 			return fmt.Errorf("failed to parse MAC address %s: %v", conf.MAC, err)
 		}
-
-		// Save the original administrative MAC address before overriding it
-		vf := getVfInfo(pfLink, conf.VFID)
-		if vf == nil {
-			return fmt.Errorf("failed to find vf %d", conf.VFID)
-		}
-		conf.AdminMAC = vf.Mac.String()
 
 		if err = s.nLink.LinkSetVfHardwareAddr(pfLink, conf.VFID, hwaddr); err != nil {
 			return fmt.Errorf("failed to set MAC address to %s: %v", hwaddr, err)
@@ -375,7 +375,7 @@ func (s *sriovManager) ApplyVFConfig(conf *sriovtypes.NetConf) error {
 	return nil
 }
 
-// ResetVFConfig reset a VF with default values
+// ResetVFConfig reset a VF to its original state
 func (s *sriovManager) ResetVFConfig(conf *sriovtypes.NetConf) error {
 
 	pfLink, err := s.nLink.LinkByName(conf.Master)
@@ -383,49 +383,56 @@ func (s *sriovManager) ResetVFConfig(conf *sriovtypes.NetConf) error {
 		return fmt.Errorf("failed to lookup master %q: %v", conf.Master, err)
 	}
 
-	// Set vlan to 0
-	if conf.Vlan != 0 {
-		if conf.VlanQoS != 0 {
-			if err = s.nLink.LinkSetVfVlanQos(pfLink, conf.VFID, 0, 0); err != nil {
-				return fmt.Errorf("failed to set vf %d vlan: %v", conf.VFID, err)
+	// Restore VLAN
+	if conf.Vlan != nil {
+		if conf.VlanQoS != nil {
+			if err = s.nLink.LinkSetVfVlanQos(pfLink, conf.VFID, conf.OrigVfState.Vlan, conf.OrigVfState.VlanQoS); err != nil {
+				return fmt.Errorf("failed to restore vf %d vlan: %v", conf.VFID, err)
 			}
-		} else if err = s.nLink.LinkSetVfVlan(pfLink, conf.VFID, 0); err != nil {
-			return fmt.Errorf("failed to set vf %d vlan: %v", conf.VFID, err)
+		} else if err = s.nLink.LinkSetVfVlan(pfLink, conf.VFID, conf.OrigVfState.Vlan); err != nil {
+			return fmt.Errorf("failed to restore vf %d vlan: %v", conf.VFID, err)
+		}
+	}
+
+	// Restore spoofchk
+	if conf.SpoofChk != "" {
+		if err = s.nLink.LinkSetVfSpoofchk(pfLink, conf.VFID, conf.OrigVfState.SpoofChk); err != nil {
+			return fmt.Errorf("failed to restore spoofchk for vf %d: %v", conf.VFID, err)
 		}
 	}
 
 	// Restore the original administrative MAC address
 	if conf.MAC != "" {
-		hwaddr, err := net.ParseMAC(conf.AdminMAC)
+		hwaddr, err := net.ParseMAC(conf.OrigVfState.AdminMAC)
 		if err != nil {
-			return fmt.Errorf("failed to parse original administrative MAC address %s: %v", conf.AdminMAC, err)
+			return fmt.Errorf("failed to parse original administrative MAC address %s: %v", conf.OrigVfState.AdminMAC, err)
 		}
 		if err = s.nLink.LinkSetVfHardwareAddr(pfLink, conf.VFID, hwaddr); err != nil {
 			return fmt.Errorf("failed to restore original administrative MAC address %s: %v", hwaddr, err)
 		}
 	}
 
-	// Set spoofchk to on
-	if err = s.nLink.LinkSetVfSpoofchk(pfLink, conf.VFID, true); err != nil {
-		return fmt.Errorf("failed to enable spoof checking for vf %d: %v", conf.VFID, err)
+	// Restore VF trust
+	if conf.Trust != "" {
+		// TODO: netlink go implementation does not support getting VF trust, need to add support there first
+		// for now, just set VF trust to off if it was specified by the user in netconf
+		if err = s.nLink.LinkSetVfTrust(pfLink, conf.VFID, false); err != nil {
+			return fmt.Errorf("failed to disable trust for vf %d: %v", conf.VFID, err)
+		}
 	}
 
-	// Set trust to off
-	if err = s.nLink.LinkSetVfTrust(pfLink, conf.VFID, false); err != nil {
-		return fmt.Errorf("failed to disable trust for vf %d: %v", conf.VFID, err)
+	// Restore rate limiting
+	if conf.MinTxRate != nil || conf.MaxTxRate != nil {
+		if err = s.nLink.LinkSetVfRate(pfLink, conf.VFID, conf.OrigVfState.MinTxRate, conf.OrigVfState.MaxTxRate); err != nil {
+			return fmt.Errorf("failed to disable rate limiting for vf %d %v", conf.VFID, err)
+		}
 	}
 
-	// Disable rate limiting
-	if err = s.nLink.LinkSetVfRate(pfLink, conf.VFID, 0, 0); err != nil {
-		return fmt.Errorf("failed to disable rate limiting for vf %d %v", conf.VFID, err)
-	}
-
-	// Reset link state to `auto`
+	// Restore link state to `auto`
 	if conf.LinkState != "" {
-		// While resetting to `auto` can be a reasonable thing to do regardless of whether it was explicitly
-		// specified in the network definition, reset only when link_state was explicitly specified, to
-		// accommodate for drivers / NICs that don't support the netlink command (e.g. igb driver)
-		if err = s.nLink.LinkSetVfState(pfLink, conf.VFID, 0); err != nil {
+		// Reset only when link_state was explicitly specified, to  accommodate for drivers / NICs
+		// that don't support the netlink command (e.g. igb driver)
+		if err = s.nLink.LinkSetVfState(pfLink, conf.VFID, conf.OrigVfState.LinkState); err != nil {
 			return fmt.Errorf("failed to set link state to auto for vf %d: %v", conf.VFID, err)
 		}
 	}

@@ -297,6 +297,12 @@ func (l *FakeLink) Type() string {
 }
 
 var _ = Describe("Sriov", func() {
+	var (
+		t GinkgoTInterface
+	)
+	BeforeEach(func() {
+		t = GinkgoT()
+	})
 
 	Context("Checking SetupVF function", func() {
 		var (
@@ -312,9 +318,12 @@ var _ = Describe("Sriov", func() {
 				Master:      "enp175s0f1",
 				DeviceID:    "0000:af:06.0",
 				VFID:        0,
-				HostIFNames: "enp175s6",
 				ContIFNames: "net1",
+				OrigVfState: sriovtypes.VfState{
+					HostIFName: "enp175s6",
+				},
 			}
+			t = GinkgoT()
 		})
 
 		It("Assuming existing interface", func() {
@@ -349,46 +358,180 @@ var _ = Describe("Sriov", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(macAddr).To(Equal("6e:16:06:0e:b7:e9"))
 		})
-		Context("Checking ReleaseVF function", func() {
-			var (
-				podifName string
-				contID    string
-				netconf   *sriovtypes.NetConf
-			)
+	})
 
-			BeforeEach(func() {
-				podifName = "net1"
-				contID = "dummycid"
-				netconf = &sriovtypes.NetConf{
-					Master:      "enp175s0f1",
-					DeviceID:    "0000:af:06.0",
-					VFID:        0,
-					HostIFNames: "enp175s6",
-					ContIFNames: "net1",
+	Context("Checking ReleaseVF function", func() {
+		var (
+			podifName string
+			contID    string
+			netconf   *sriovtypes.NetConf
+		)
+
+		BeforeEach(func() {
+			podifName = "net1"
+			contID = "dummycid"
+			netconf = &sriovtypes.NetConf{
+				Master:      "enp175s0f1",
+				DeviceID:    "0000:af:06.0",
+				VFID:        0,
+				ContIFNames: "net1",
+				OrigVfState: sriovtypes.VfState{
+					HostIFName: "enp175s6",
+				},
+			}
+		})
+		It("Assuming existing interface", func() {
+			var targetNetNS ns.NetNS
+			targetNetNS, err := testutils.NewNS()
+			defer func() {
+				if targetNetNS != nil {
+					targetNetNS.Close()
 				}
-			})
-			It("Assuming existing interface", func() {
-				var targetNetNS ns.NetNS
-				targetNetNS, err := testutils.NewNS()
-				defer func() {
-					if targetNetNS != nil {
-						targetNetNS.Close()
-					}
-				}()
-				Expect(err).NotTo(HaveOccurred())
-				mocked := &MockNetlinkManager{}
-				fakeLink := &FakeLink{netlink.LinkAttrs{Index: 1000, Name: "dummylink"}}
+			}()
+			Expect(err).NotTo(HaveOccurred())
+			mocked := &MockNetlinkManager{}
+			fakeLink := &FakeLink{netlink.LinkAttrs{Index: 1000, Name: "dummylink"}}
 
-				mocked.On("LinkByName", mock.AnythingOfType("string")).Return(fakeLink, nil)
-				mocked.On("LinkSetDown", fakeLink).Return(nil)
-				mocked.On("LinkSetName", fakeLink, mock.Anything).Return(nil)
-				mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
-				mocked.On("LinkSetUp", fakeLink).Return(nil)
-				mocked.On("LinkSetVfVlan", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int")).Return(nil)
-				sm := sriovManager{nLink: mocked}
-				err = sm.ReleaseVF(netconf, podifName, contID, targetNetNS)
-				Expect(err).NotTo(HaveOccurred())
-			})
+			mocked.On("LinkByName", netconf.ContIFNames).Return(fakeLink, nil)
+			mocked.On("LinkSetDown", fakeLink).Return(nil)
+			mocked.On("LinkSetName", fakeLink, netconf.OrigVfState.HostIFName).Return(nil)
+			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
+			sm := sriovManager{nLink: mocked}
+			err = sm.ReleaseVF(netconf, podifName, contID, targetNetNS)
+			Expect(err).NotTo(HaveOccurred())
+			mocked.AssertExpectations(t)
+		})
+	})
+	Context("Checking ReleaseVF function - restore config", func() {
+		var (
+			podifName string
+			contID    string
+			netconf   *sriovtypes.NetConf
+		)
+
+		BeforeEach(func() {
+			podifName = "net1"
+			contID = "dummycid"
+			netconf = &sriovtypes.NetConf{
+				Master:      "enp175s0f1",
+				DeviceID:    "0000:af:06.0",
+				VFID:        0,
+				MAC:         "aa:f3:8d:65:1b:d4",
+				ContIFNames: "net1",
+				OrigVfState: sriovtypes.VfState{
+					HostIFName:   "enp175s6",
+					EffectiveMAC: "c6:c8:7f:1f:21:90",
+				},
+			}
+		})
+		It("Restores Effective MAC address when provided in netconf", func() {
+			var targetNetNS ns.NetNS
+			targetNetNS, err := testutils.NewNS()
+			defer func() {
+				if targetNetNS != nil {
+					targetNetNS.Close()
+				}
+			}()
+			Expect(err).NotTo(HaveOccurred())
+			mocked := &MockNetlinkManager{}
+			fakeLink := &FakeLink{netlink.LinkAttrs{Index: 1000, Name: "dummylink"}}
+
+			mocked.On("LinkByName", netconf.ContIFNames).Return(fakeLink, nil)
+			mocked.On("LinkSetDown", fakeLink).Return(nil)
+			mocked.On("LinkSetName", fakeLink, netconf.OrigVfState.HostIFName).Return(nil)
+			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
+			origEffMac, err := net.ParseMAC(netconf.OrigVfState.EffectiveMAC)
+			Expect(err).NotTo(HaveOccurred())
+			mocked.On("LinkSetHardwareAddr", fakeLink, origEffMac).Return(nil)
+			sm := sriovManager{nLink: mocked}
+			err = sm.ReleaseVF(netconf, podifName, contID, targetNetNS)
+			Expect(err).NotTo(HaveOccurred())
+			mocked.AssertExpectations(t)
+		})
+	})
+	Context("Checking ResetVFConfig function - restore config no user params", func() {
+		var (
+			netconf *sriovtypes.NetConf
+		)
+
+		BeforeEach(func() {
+			netconf = &sriovtypes.NetConf{
+				Master:      "enp175s0f1",
+				DeviceID:    "0000:af:06.0",
+				VFID:        0,
+				ContIFNames: "net1",
+				OrigVfState: sriovtypes.VfState{
+					HostIFName: "enp175s6",
+				},
+			}
+		})
+		It("Does not change VF config if it wasnt requested to be changed in netconf", func() {
+			mocked := &MockNetlinkManager{}
+			fakeLink := &FakeLink{netlink.LinkAttrs{Index: 1000, Name: "dummylink"}}
+
+			mocked.On("LinkByName", netconf.Master).Return(fakeLink, nil)
+			sm := sriovManager{nLink: mocked}
+			err := sm.ResetVFConfig(netconf)
+			Expect(err).NotTo(HaveOccurred())
+			mocked.AssertExpectations(t)
+		})
+	})
+
+	Context("Checking ResetVFConfig function - restore config with user params", func() {
+		var (
+			netconf *sriovtypes.NetConf
+		)
+
+		BeforeEach(func() {
+			vlan := 6
+			vlanQos := 3
+			maxTxRate := 4000
+			minTxRate := 1000
+
+			netconf = &sriovtypes.NetConf{
+				Master:      "enp175s0f1",
+				DeviceID:    "0000:af:06.0",
+				VFID:        3,
+				ContIFNames: "net1",
+				MAC:         "d2:fc:22:a7:0d:e8",
+				Vlan:        &vlan,
+				VlanQoS:     &vlanQos,
+				SpoofChk:    "on",
+				MaxTxRate:   &maxTxRate,
+				MinTxRate:   &minTxRate,
+				Trust:       "on",
+				LinkState:   "enable",
+				OrigVfState: sriovtypes.VfState{
+					HostIFName:   "enp175s6",
+					SpoofChk:     false,
+					AdminMAC:     "aa:f3:8d:65:1b:d4",
+					EffectiveMAC: "aa:f3:8d:65:1b:d4",
+					Vlan:         1,
+					VlanQoS:      1,
+					MinTxRate:    0,
+					MaxTxRate:    0,
+					LinkState:    2, // disable
+				},
+			}
+		})
+		It("Restores original VF configurations", func() {
+			mocked := &MockNetlinkManager{}
+			fakeLink := &FakeLink{netlink.LinkAttrs{Index: 1000, Name: "dummylink"}}
+
+			mocked.On("LinkByName", netconf.Master).Return(fakeLink, nil)
+			mocked.On("LinkSetVfVlanQos", fakeLink, netconf.VFID, netconf.OrigVfState.Vlan, netconf.OrigVfState.VlanQoS).Return(nil)
+			mocked.On("LinkSetVfSpoofchk", fakeLink, netconf.VFID, netconf.OrigVfState.SpoofChk).Return(nil)
+			origMac, err := net.ParseMAC(netconf.OrigVfState.AdminMAC)
+			Expect(err).NotTo(HaveOccurred())
+			mocked.On("LinkSetVfHardwareAddr", fakeLink, netconf.VFID, origMac).Return(nil)
+			mocked.On("LinkSetVfTrust", fakeLink, netconf.VFID, false).Return(nil)
+			mocked.On("LinkSetVfRate", fakeLink, netconf.VFID, netconf.OrigVfState.MinTxRate, netconf.OrigVfState.MaxTxRate).Return(nil)
+			mocked.On("LinkSetVfState", fakeLink, netconf.VFID, netconf.OrigVfState.LinkState).Return(nil)
+
+			sm := sriovManager{nLink: mocked}
+			err = sm.ResetVFConfig(netconf)
+			Expect(err).NotTo(HaveOccurred())
+			mocked.AssertExpectations(t)
 		})
 	})
 })
