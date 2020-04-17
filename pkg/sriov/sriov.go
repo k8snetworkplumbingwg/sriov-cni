@@ -372,6 +372,13 @@ func (s *sriovManager) ApplyVFConfig(conf *sriovtypes.NetConf) error {
 		}
 	}
 
+	// 7. Set vlan trunk
+	if conf.Vlan == nil && conf.VlanTrunk != "" {
+		if err := utils.AddVlanTrunk(conf.Master, conf.VFID, conf.VlanTrunk); err != nil {
+			return fmt.Errorf("failed to set vlan trunk values %s for vf %d: %v", conf.VlanTrunk, conf.VFID, err)
+		}
+	}
+
 	return nil
 }
 
@@ -434,6 +441,13 @@ func (s *sriovManager) ResetVFConfig(conf *sriovtypes.NetConf) error {
 		// that don't support the netlink command (e.g. igb driver)
 		if err = s.nLink.LinkSetVfState(pfLink, conf.VFID, conf.OrigVfState.LinkState); err != nil {
 			return fmt.Errorf("failed to set link state to auto for vf %d: %v", conf.VFID, err)
+		}
+	}
+
+	// 7. Set vlan trunk
+	if conf.Vlan == nil && conf.VlanTrunk != "" {
+		if err := utils.RemoveVlanTrunk(conf.Master, conf.VFID, conf.VlanTrunk); err != nil {
+			return fmt.Errorf("failed to remove vlan trunk values %s for vf %d: %v", conf.VlanTrunk, conf.VFID, err)
 		}
 	}
 
