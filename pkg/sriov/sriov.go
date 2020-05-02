@@ -23,6 +23,7 @@ type NetlinkManager interface {
 	LinkSetHardwareAddr(netlink.Link, net.HardwareAddr) error
 	LinkSetUp(netlink.Link) error
 	LinkSetDown(netlink.Link) error
+	LinkSetMTU(netlink.Link, int) error
 	LinkSetNsFd(netlink.Link, int) error
 	LinkSetName(netlink.Link, string) error
 	LinkSetVfRate(netlink.Link, int, int, int) error
@@ -69,6 +70,11 @@ func (n *MyNetlink) LinkSetUp(link netlink.Link) error {
 // LinkSetDown using NetlinkManager
 func (n *MyNetlink) LinkSetDown(link netlink.Link) error {
 	return netlink.LinkSetDown(link)
+}
+
+// LinkSetMTU using NetlinkManager
+func (n *MyNetlink) LinkSetMTU(link netlink.Link, mtu int) error {
+	return netlink.LinkSetMTU(link, mtu)
 }
 
 // LinkSetNsFd using NetlinkManager
@@ -179,7 +185,16 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, cid s
 		}
 	}
 
-	// 4. Change netns
+	// 4. Set MTU
+	if conf.Mtu != nil {
+		// Save the original MTU before overriding it
+		conf.OrigVfState.Mtu = linkObj.Attrs().MTU
+		if err = s.nLink.LinkSetMTU(linkObj, *conf.Mtu); err != nil {
+			return "", fmt.Errorf("failed to set netlink MTU to %d: %v", *conf.Mtu, err)
+		}
+	}
+
+	// 5. Change netns
 	if err := s.nLink.LinkSetNsFd(linkObj, int(netns.Fd())); err != nil {
 		return "", fmt.Errorf("failed to move IF %s to netns: %q", tempName, err)
 	}
@@ -247,6 +262,13 @@ func (s *sriovManager) ReleaseVF(conf *sriovtypes.NetConf, podifName string, cid
 
 			if err = s.nLink.LinkSetHardwareAddr(linkObj, hwaddr); err != nil {
 				return fmt.Errorf("failed to restore original effective netlink MAC address %s: %v", hwaddr, err)
+			}
+		}
+
+		// reset MTU
+		if conf.Mtu != nil {
+			if err = s.nLink.LinkSetMTU(linkObj, conf.OrigVfState.Mtu); err != nil {
+				return fmt.Errorf("failed to restore MTU back to %d: %v", conf.OrigVfState.Mtu, err)
 			}
 		}
 

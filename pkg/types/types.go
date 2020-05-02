@@ -15,6 +15,7 @@ type VfState struct {
 	VlanQoS      int
 	MinTxRate    int
 	MaxTxRate    int
+	Mtu          int
 	LinkState    uint32
 }
 
@@ -37,6 +38,7 @@ type NetConf struct {
 	Master        string
 	MAC           string
 	Vlan          *int   `json:"vlan"`
+	Mtu           *int   `json:"mtu"`
 	VlanQoS       *int   `json:"vlanQoS"`
 	DeviceID      string `json:"deviceID"` // PCI address of a VF in valid sysfs format
 	VFID          int
