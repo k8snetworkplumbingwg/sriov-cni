@@ -125,6 +125,20 @@ func (_m *MockNetlinkManager) LinkSetDown(_a0 netlink.Link) error {
 	return r0
 }
 
+// LinkSetMTU provides a mock function with given fields: _a0, _a1
+func (_m *MockNetlinkManager) LinkSetMTU(_a0 netlink.Link, _a1 int) error {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(netlink.Link, int) error); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // LinkSetNsFd provides a mock function with given fields: _a0, _a1
 func (_m *MockNetlinkManager) LinkSetNsFd(_a0 netlink.Link, _a1 int) error {
 	ret := _m.Called(_a0, _a1)
@@ -309,18 +323,22 @@ var _ = Describe("Sriov", func() {
 			podifName string
 			contID    string
 			netconf   *sriovtypes.NetConf
+			mtu       int
 		)
 
 		BeforeEach(func() {
 			podifName = "net1"
 			contID = "dummycid"
+			mtu = 9000
 			netconf = &sriovtypes.NetConf{
 				Master:      "enp175s0f1",
 				DeviceID:    "0000:af:06.0",
 				VFID:        0,
+				Mtu:         &mtu,
 				ContIFNames: "net1",
 				OrigVfState: sriovtypes.VfState{
 					HostIFName: "enp175s6",
+					Mtu:        1500,
 				},
 			}
 			t = GinkgoT()
@@ -351,6 +369,7 @@ var _ = Describe("Sriov", func() {
 			mocked.On("LinkSetName", fakeLink, mock.Anything).Return(nil)
 			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
 			mocked.On("LinkSetUp", fakeLink).Return(nil)
+			mocked.On("LinkSetMTU", fakeLink, mock.AnythingOfType("int")).Return(nil)
 			mocked.On("LinkSetVfVlan", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int")).Return(nil)
 			mocked.On("LinkSetVfVlanQos", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("int")).Return(nil)
 			sm := sriovManager{nLink: mocked}
@@ -365,18 +384,22 @@ var _ = Describe("Sriov", func() {
 			podifName string
 			contID    string
 			netconf   *sriovtypes.NetConf
+			mtu       int
 		)
 
 		BeforeEach(func() {
 			podifName = "net1"
 			contID = "dummycid"
+			mtu = 9000
 			netconf = &sriovtypes.NetConf{
 				Master:      "enp175s0f1",
 				DeviceID:    "0000:af:06.0",
 				VFID:        0,
+				Mtu:         &mtu,
 				ContIFNames: "net1",
 				OrigVfState: sriovtypes.VfState{
 					HostIFName: "enp175s6",
+					Mtu:        1500,
 				},
 			}
 		})
@@ -396,6 +419,7 @@ var _ = Describe("Sriov", func() {
 			mocked.On("LinkSetDown", fakeLink).Return(nil)
 			mocked.On("LinkSetName", fakeLink, netconf.OrigVfState.HostIFName).Return(nil)
 			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
+			mocked.On("LinkSetMTU", fakeLink, mock.AnythingOfType("int")).Return(nil)
 			sm := sriovManager{nLink: mocked}
 			err = sm.ReleaseVF(netconf, podifName, contID, targetNetNS)
 			Expect(err).NotTo(HaveOccurred())
@@ -407,20 +431,24 @@ var _ = Describe("Sriov", func() {
 			podifName string
 			contID    string
 			netconf   *sriovtypes.NetConf
+			mtu       int
 		)
 
 		BeforeEach(func() {
 			podifName = "net1"
 			contID = "dummycid"
+			mtu = 9000
 			netconf = &sriovtypes.NetConf{
 				Master:      "enp175s0f1",
 				DeviceID:    "0000:af:06.0",
 				VFID:        0,
+				Mtu:         &mtu,
 				MAC:         "aa:f3:8d:65:1b:d4",
 				ContIFNames: "net1",
 				OrigVfState: sriovtypes.VfState{
 					HostIFName:   "enp175s6",
 					EffectiveMAC: "c6:c8:7f:1f:21:90",
+					Mtu:          1500,
 				},
 			}
 		})
@@ -440,6 +468,7 @@ var _ = Describe("Sriov", func() {
 			mocked.On("LinkSetDown", fakeLink).Return(nil)
 			mocked.On("LinkSetName", fakeLink, netconf.OrigVfState.HostIFName).Return(nil)
 			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
+			mocked.On("LinkSetMTU", fakeLink, mock.AnythingOfType("int")).Return(nil)
 			origEffMac, err := net.ParseMAC(netconf.OrigVfState.EffectiveMAC)
 			Expect(err).NotTo(HaveOccurred())
 			mocked.On("LinkSetHardwareAddr", fakeLink, origEffMac).Return(nil)
