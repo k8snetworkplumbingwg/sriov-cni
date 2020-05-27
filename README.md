@@ -2,243 +2,146 @@
 
    * [SR-IOV CNI plugin](#sr-iov-cni-plugin)
       * [Build](#build)
-      * [Enable SR-IOV](#enable-sr-iov)
-         * [Intel Cards](#intel-cards)
-         * [Mellanox Cards](#mellanox-cards)
-      * [Configuration reference](#configuration-reference)
-         * [Main parameters](#main-parameters)
-         * [Using DPDK drivers:](#using-dpdk-drivers)
+      * [Kubernetes Quick Start](#kubernetes-quick-start)
       * [Usage](#usage)
-         * [Configuration with IPAM:](#configuration-with-ipam)
-         * [Configuration with DPDK:](#configuration-with-dpdk)
-      * [Contacts](#contacts)
+         * [Basic configuration parameters](#basic-configuration-parameters)
+         * [Example configurations](#example-configurations)
+            * [Kernel driver config](#kernel-driver-config)
+            * [Advanced kernel driver config](#advanced-kernel-driver-config)
+            * [DPDK userspace driver config](#dpdk-userspace-driver-config)
+         * [Advanced configuration](#advanced-configuration)
+      * [Contributing](#contributing)
 
 # SR-IOV CNI plugin
-NIC with [SR-IOV](http://blog.scottlowe.org/2009/12/02/what-is-sr-iov/) capabilities work by introducing the idea of physical functions (PFs) and virtual functions (VFs). 
+This plugin enables the configuration and usage of SR-IOV VF networks in containers and orchestrators like Kubernetes. 
 
-A PF is used by host and VF configurations are applied through the PF. Each VF can be treated as a separate physical NIC and assigned to one container, and configured with it's own MAC, VLAN and IP, etc.
+Network Interface Cards (NICs) with [SR-IOV](http://blog.scottlowe.org/2009/12/02/what-is-sr-iov/) capabilities are managed through physical functions (PFs) and virtual functions (VFs). A PF is used by the host and usually represents a single NIC port. VF configurations are applied through the PF. With SR-IOV CNI each VF can be treated as a separate network interface, assigned to a container, and configured with it's own MAC, VLAN IP and more.
 
-SR-IOV CNI plugin works with [SR-IOV device plugin](https://github.com/intel/sriov-network-device-plugin) for VF allocation for a container. A metaplugin such as [Multus](https://github.com/intel/multus-cni) gets the allocated VF's `deviceID`(PCI address) and responsible to invoke SR-IOV cni plugin with that `deviceID`.
+SR-IOV CNI plugin works with [SR-IOV device plugin](https://github.com/intel/sriov-network-device-plugin) for VF allocation in Kubernetes. A metaplugin such as [Multus](https://github.com/intel/multus-cni) gets the allocated VF's `deviceID`(PCI address) and is responsible for invoking the SR-IOV CNI plugin with that `deviceID`.
 
 ## Build
 
-This plugin requires Go 1.5+ to build.
-
-Go 1.5 users will need to set `GO15VENDOREXPERIMENT=1` to get vendored dependencies. This flag is set by default in 1.6.
+This plugin uses Go modules for dependency management and requires Go 1.12+ to build.
 
 To build the plugin binary:
 
-```
-# make
-```
+``
+make
+``
 
 Upon successful build the plugin binary will be available in `build/sriov`.
 
-## Enable SR-IOV
-### Intel cards
-Given Intel ixgbe NIC on CentOS, Fedora or RHEL:
+## Kubernetes Quick Start
+A full guide on orchestrating SR-IOV virtual functions in Kubernetes can be found at the [SR-IOV Device Plugin project.](https://github.com/intel/sriov-network-device-plugin#quick-start)
 
-```
-# vi /etc/modprobe.conf
-options ixgbe max_vfs=8,8
-```
-### Mellanox cards
-SRIOV-CNI support Mellanox ConnectX®-4 Lx and ConnectX®-5 adapter cards.
-To enable SR-IOV functionality the following steps are required:
+Creating VFs is outside the scope of the SR-IOV CNI plugin. [More information about allocating VFs on different NICs can be found here](docs/vf-setup.md)
 
-1- Enable SR-IOV in the NIC's Firmware.
+To deploy SR-IOV CNI by itself on a Kubernetes 1.16+ cluster:
 
-> Installing Mellanox Management Tools (MFT) or mstflint is a pre-requisite, MFT can be downloaded from [here](http://www.mellanox.com/page/management_tools), mstflint package available in the various distros and can be downloaded from [here](https://github.com/Mellanox/mstflint).
+`kubectl apply -f images/k8s-v1.16/sriov-cni-daemonset.yaml`
 
-Use Mellanox Firmware Tools package to enable and configure SR-IOV in firmware
+**Note** The above deployment is not sufficient to manage and configure SR-IOV virtual functions. [See the full orchestration guide for more information.](https://github.com/intel/sriov-network-device-plugin#sr-iov-network-device-plugin)
 
-```
-# mst start
-Starting MST (Mellanox Software Tools) driver set
-Loading MST PCI module - Success
-Loading MST PCI configuration module - Success
-Create devices
-```
-
-Locate the HCA device on the desired PCI slot
-
-```
-# mst status
-MST modules:
-------------
-    MST PCI module loaded
-    MST PCI configuration module loaded
-MST devices:
-------------
-/dev/mst/mt4115_pciconf0         - PCI configuration cycles access.
-...
-```
-
-Enable SR-IOV
-
-```
-# mlxconfig -d /dev/mst/mt4115_pciconf0 q set SRIOV_EN=1 NUM_OF_VFS=8
-...
-Apply new Configuration? ? (y/n) [n] : y
-Applying... Done!
--I- Please reboot machine to load new configurations.
-```
-
-Reboot the machine
-```
-# reboot
-```
-
-2- Enable SR-IOV in the NIC's Driver.
-
-```
-# ibdev2netdev
-mlx5_0 port 1 ==> enp2s0f0 (Up)
-mlx5_1 port 1 ==> enp2s0f1 (Up)
-
-# echo 4 > /sys/class/net/enp2s0f0/device/sriov_numvfs
-# ibdev2netdev -v
-0000:02:00.0 mlx5_0 (MT4115 - MT1523X04353) CX456A - ConnectX-4 QSFP fw 12.23.1020 port 1 (ACTIVE) ==> enp2s0f0 (Up)
-0000:02:00.1 mlx5_1 (MT4115 - MT1523X04353) CX456A - ConnectX-4 QSFP fw 12.23.1020 port 1 (ACTIVE) ==> enp2s0f1 (Up)
-0000:02:00.5 mlx5_2 (MT4116 - NA)  fw 12.23.1020 port 1 (DOWN  ) ==> enp2s0f2 (Down)
-0000:02:00.6 mlx5_3 (MT4116 - NA)  fw 12.23.1020 port 1 (DOWN  ) ==> enp2s0f3 (Down)
-0000:02:00.7 mlx5_4 (MT4116 - NA)  fw 12.23.1020 port 1 (DOWN  ) ==> enp2s0f4 (Down)
-0000:02:00.2 mlx5_5 (MT4116 - NA)  fw 12.23.1020 port 1 (DOWN  ) ==> enp2s0f5 (Down)
-
-# lspci | grep Mellanox
-02:00.0 Ethernet controller: Mellanox Technologies MT27700 Family [ConnectX-4]
-02:00.1 Ethernet controller: Mellanox Technologies MT27700 Family [ConnectX-4]
-02:00.2 Ethernet controller: Mellanox Technologies MT27700 Family [ConnectX-4 Virtual Function]
-02:00.3 Ethernet controller: Mellanox Technologies MT27700 Family [ConnectX-4 Virtual Function]
-02:00.4 Ethernet controller: Mellanox Technologies MT27700 Family [ConnectX-4 Virtual Function]
-02:00.5 Ethernet controller: Mellanox Technologies MT27700 Family [ConnectX-4 Virtual Function]
-
-# ip link show
-...
-enp2s0f2: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN mode DEFAULT group default qlen 1000
-    link/ether c6:6d:7d:dd:2a:d5 brd ff:ff:ff:ff:ff:ff
-enp2s0f3: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN mode DEFAULT group default qlen 1000
-    link/ether 42:3e:07:68:da:fb brd ff:ff:ff:ff:ff:ff
-enp2s0f4: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN mode DEFAULT group default qlen 1000
-    link/ether 42:68:f2:aa:c2:27 brd ff:ff:ff:ff:ff:ff
-enp2s0f5: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN mode DEFAULT group default qlen 1000
-...
-```
-
-To change the number of VFs reset the number to 0 then set the needed number
-
-```
-echo 0 > /sys/class/net/enp2s0f0/device/sriov_numvfs
-echo 8 > /sys/class/net/enp2s0f0/device/sriov_numvfs
-```
-
-Note: In case spoofchk is enabled for VF, a valid administrative MAC needs to be specified.
-
-## Configuration reference
-### Main parameters
-* `name` (string, required): the name of the network
-* `type` (string, required): "sriov"
-* `deviceID` (string, required): A valid pci address of an SRIOV NIC's VF. e.g. "0000:03:02.3"
-* `vlan` (int, optional): VLAN ID to assign for the VF. Value must be in the range 0-4094 (0 for disabled, 1-4094 for valid VLAN IDs).
-* `vlanQoS` (int, optional): VLAN QoS to assign for the VF. Value must be in the range 0-7. This option requires `vlan` field to be set to a non-zero value. Otherwise, the error will be returned.
-* `mac` (string, optional): MAC address to assign for the VF
-* `ipam` (dictionary, optional): IPAM configuration to be used for this network.
-* `spoofchk` (string, optional): turn packet spoof checking on or off for the VF
-* `trust` (string, optional): turn trust setting on or off for the VF
-* `link_state` (string, optional): enforce link state for the VF. Allowed values: auto, enable, disable. Note that driver support may differ for this feature. For example, `i40e` is known to work but `igb` doesn't.
-* `min_tx_rate` (int, optional): change the allowed minimum transmit bandwidth, in Mbps, for the VF. Setting this to 0 disables rate limiting. The min_tx_rate value should be <= max_tx_rate. Support of this feature depends on NICs and drivers.
-
-* `max_tx_rate` (int, optional): change the allowed maximum transmit bandwidth, in Mbps, for the VF. 
-Setting this to 0 disables rate limiting. 
-
-### Using DPDK drivers:
-If this plugin is used with a VF bound to a dpdk driver then the IPAM configuration will be ignored.
 
 ## Usage
+SR-IOV CNI networks are commonly configured using Multus and SR-IOV Device Plugin using Network Attachment Definitions. More information about configuring Kubernetes networks using this pattern can be found in the [Multus configuration reference document.](https://intel.github.io/multus-cni/doc/configuration.html)
 
-### Configuration with IPAM:
+A Network Attachment Definition for SR-IOV CNI takes the form:
 
 ```
-# cat > /etc/cni/net.d/10-mynet.conf <<EOF
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: sriov-net1
+  annotations:
+    k8s.v1.cni.cncf.io/resourceName: intel.com/intel_sriov_netdevice
+spec:
+  config: '{
+  "type": "sriov",
+  "cniVersion": "0.3.1",
+  "name": "sriov-network",
+  "ipam": {
+    "type": "host-local",
+    "subnet": "10.56.217.0/24",
+    "routes": [{
+      "dst": "0.0.0.0/0"
+    }],
+    "gateway": "10.56.217.1"
+  }
+}'
+```
+
+The `.spec.config` field contains the configuration information used by the SR-IOV CNI.
+
+### Basic configuration parameters 
+
+The following parameters are generally outside the scope of SR-IOV CNI configuration, though (with the exception of ipam) they need to be included in the config.
+
+* `cniVersion` : the version of the CNI spec used.
+* `type` : CNI plugin used. "sriov" corresponds to SR-IOV CNI.
+* `name` : the name of the network created.
+* `ipam` (optional) : the configuration of the IP Address Management plugin. Required to designate an IP for a kernel interface.
+
+### Example configurations
+The following examples show the config needed to set up basic SR-IOV networking in a container. Each of the json config objects below can be placed in the `.spec.config` field of a Network Attachment Definition to integrate with Multus.
+
+#### Kernel driver config
+This is the minimum configuration for a working kernel driver interface using an SR-IOV Virtual Function. It applies an IP address using the host-local IPAM plugin in the range of the subnet provided. 
+
+```json
 {
-    "cniVersion": "0.3.1",
-    "name": "sriov-net",
-    "type": "sriov",
-        "deviceID": "0000:03:02.0",
-        "vlan": 2222,
-        "ipam": {
-                "type": "host-local",
-                "subnet": "10.56.217.0/24",
-                "rangeStart": "10.56.217.171",
-                "rangeEnd": "10.56.217.181",
-                "routes": [
-                        { "dst": "0.0.0.0/0" }
-                ],
-                "gateway": "10.56.217.1"
-        }
+  "type": "sriov",
+  "cniVersion": "0.3.1",
+  "name": "sriov-network",
+  "ipam": {
+    "type": "host-local",
+    "subnet": "10.56.217.0/24",
+    "routes": [{
+      "dst": "0.0.0.0/0"
+    }],
+    "gateway": "10.56.217.1"
+  }
 }
-
-EOF
 ```
 
+#### Extended kernel driver config
+This configuration sets a number of extra parameters that may be key for SR-IOV networks including a vlan tag, disabled spoof checking and enabled trust mode. These parameters are commonly set in more advanced SR-IOV VF based networks.
+
+```json
+{
+  "cniVersion": "0.3.1",
+  "name": "sriov-advanced",
+  "type": "sriov",
+  "vlan": 1000,
+  "spoofchk": "off",
+  "trust": "on",
+  "ipam": {
+    "type": "host-local",
+    "subnet": "10.56.217.0/24",
+    "routes": [{
+      "dst": "0.0.0.0/0"
+    }],
+    "gateway": "10.56.217.1"
+  }
+}
 ```
-eth0      Link encap:Ethernet  HWaddr 66:D8:02:77:AA:AA  
-          inet addr:10.55.206.46  Bcast:0.0.0.0  Mask:255.255.255.192
-          inet6 addr: fe80::64d8:2ff:fe77:aaaa/64 Scope:Link
-          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
-          RX packets:7 errors:0 dropped:0 overruns:0 frame:0
-          TX packets:14 errors:0 dropped:0 overruns:0 carrier:0
-          collisions:0 txqueuelen:1000 
-          RX bytes:530 (530.0 b)  TX bytes:988 (988.0 b)
 
-lo        Link encap:Local Loopback  
-          inet addr:127.0.0.1  Mask:255.0.0.0
-          inet6 addr: ::1/128 Scope:Host
-          UP LOOPBACK RUNNING  MTU:65536  Metric:1
-          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
-          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
-          collisions:0 txqueuelen:0 
-          RX bytes:0 (0.0 b)  TX bytes:0 (0.0 b)
-```
+#### DPDK userspace driver config
 
-### Configuration with DPDK:
+The below config will configure a VF using a userspace driver (uio/vfio) for use in a container. If this plugin is used with a VF bound to a dpdk driver then the IPAM configuration will be ignored. Other config parameters should be applicable but implementation may be driver specific. 
 
-> Note: In dpdk mode IPAM configuration is ignored.
-
-```
-# cat > /etc/cni/net.d/20-mynet-dpdk.conf <<EOF
+```json
 {
     "cniVersion": "0.3.1",
     "name": "sriov-dpdk",
     "type": "sriov",
-    "deviceID": "0000:03:02.0",
     "vlan": 1000
 }
-EOF
 ```
 
-### Configuration with VF Flags:
+### Advanced Configuration 
 
+SR-IOV CNI allows the setting of other SR-IOV options such as link-state and quality of service parameters. To learn more about how these parameters are set consult the [SR-IOV CNI configuration reference guide](docs/configuration-reference.md)  
 
-```
-# cat > /etc/cni/net.d/20-mynet-dpdk.conf <<EOF
-{
-    "cniVersion": "0.3.1",
-    "name": "sriov-dpdk",
-    "type": "sriov",
-    "deviceID": "0000:03:02.0",
-    "vlan": 1000,
-    "min_tx_rate": 100,
-    "max_tx_rate": 200,
-    "spoofchk": "off",
-    "trust": "on",
-    "link_state": "enable"
-}
-EOF
-```
-
-
-[More info](https://github.com/containernetworking/cni/pull/259).
-
-## Contacts
-For any questions about Multus CNI, please reach out on github issue or feel free to contact the developers @kural OR @ahalim in our [Intel-Corp Slack](https://intel-corp.herokuapp.com/)
+## Contributing
+To report a bug or request a feature, open an issue on this repo using one of the available templates.
