@@ -34,7 +34,7 @@ Upon successful build the plugin binary will be available in `build/sriov`.
 ## Kubernetes Quick Start
 A full guide on orchestrating SR-IOV virtual functions in Kubernetes can be found at the [SR-IOV Device Plugin project.](https://github.com/intel/sriov-network-device-plugin#quick-start)
 
-Creating VFs is outside the scope of the SR-IOV CNI plugin. [More information about allocating VFs on different NICs can be found here](docs/vf-setup.md)
+Creating VFs is outside the scope of the SR-IOV CNI plugin. [More information about allocating VFs on different NICs can be found here](https://github.com/intel/sriov-network-device-plugin/blob/master/docs/vf-setup.md)
 
 To deploy SR-IOV CNI by itself on a Kubernetes 1.16+ cluster:
 
@@ -75,7 +75,7 @@ The `.spec.config` field contains the configuration information used by the SR-I
 
 ### Basic configuration parameters 
 
-The following parameters are generally outside the scope of SR-IOV CNI configuration, though (with the exception of ipam) they need to be included in the config.
+The following parameters are generic parameters which are not specific to the SR-IOV CNI configuration, though (with the exception of ipam) they need to be included in the config.
 
 * `cniVersion` : the version of the CNI spec used.
 * `type` : CNI plugin used. "sriov" corresponds to SR-IOV CNI.

@@ -40,7 +40,7 @@ An SR-IOV CNI config with each field filled out looks like:
 
 ### Runtime Configuration
 
-The SR-IOV CNI accepts a MAC address when passed as a runtime configuration - that is as part of a Kubernetes Pod spec. And example runtime configuration is:
+The SR-IOV CNI accepts a MAC address when passed as a runtime configuration - that is as part of a Kubernetes Pod spec. An example pod with a runtime configuration is:
 
 ```
 apiVersion: v1
@@ -62,6 +62,6 @@ spec:
 
 ```
 
-The above config will configure a VF of type set up with the "sriov-net" configuration. Where the MAC address supplied is invalid the container may be created with an unexpected address.
+The above config will configure a VF of type "sriov-net" with the MAC address configured as the value supplied under the 'k8s.v1.cni.cncf.io/networks'. Where the MAC address supplied is invalid the container may be created with an unexpected address.
 
-To avoid this it's key to ensure the supplied MAC valid for the specified interface. On some systems setting a Multicast MAC address (Where the least significant bit of the first octet is '1' ) results in failure to set the MAC address.
+To avoid this it's key to ensure the supplied MAC is valid for the specified interface. On some systems setting a Multicast MAC address (Where the least significant bit of the first octet is '1') results in failure to set the MAC address.
