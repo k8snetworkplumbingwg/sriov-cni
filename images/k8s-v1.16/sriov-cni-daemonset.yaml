@@ -28,7 +28,7 @@ spec:
       containers:
       - name: kube-sriov-cni
         image: nfvpe/sriov-cni
-        imagePullPolicy: Never
+        imagePullPolicy: IfNotPresent
         securityContext:
           privileged: true
         resources:
