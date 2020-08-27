@@ -3,7 +3,10 @@ package main
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"runtime"
+	"strconv"
+	"strings"
 
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
@@ -12,6 +15,7 @@ import (
 	"github.com/containernetworking/plugins/pkg/ipam"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/intel/sriov-cni/pkg/config"
+	"github.com/intel/sriov-cni/pkg/providers"
 	"github.com/intel/sriov-cni/pkg/sriov"
 	"github.com/intel/sriov-cni/pkg/utils"
 	"github.com/vishvananda/netlink"
@@ -39,6 +43,60 @@ func getEnvArgs(envArgsString string) (*envArgs, error) {
 		return &e, nil
 	}
 	return nil, nil
+}
+
+func getVlanTrunkRange(vlanTrunkString string) (providers.VlanTrunkRangeArray, error) {
+	re := regexp.MustCompile("^[0-9]+([,\\-][0-9]+)*$")
+	if re.MatchString(vlanTrunkString) {
+
+		var vlanRange = []providers.VlanTrunkRange{}
+		trunkingRanges := strings.Split(vlanTrunkString, ",")
+		fmt.Println("Vlan trunking ranges: ", trunkingRanges)
+
+		for _, r := range trunkingRanges {
+
+			values := strings.Split(r, "-")
+			v1, errconv1 := strconv.Atoi(values[0])
+			v2, errconv2 := strconv.Atoi(values[len(values)-1])
+
+			if errconv1 != nil || errconv2 != nil {
+				return providers.VlanTrunkRangeArray{}, fmt.Errorf("Trunk range error: invalid values")
+			}
+
+			v := providers.VlanTrunkRange{
+				Start: uint(v1),
+				End:   uint(v2),
+			}
+
+			vlanRange = append(vlanRange, v)
+		}
+		if err := validateVlanTrunkRange(vlanRange); err != nil {
+			return providers.VlanTrunkRangeArray{}, err
+		}
+
+		vlanRanges := providers.VlanTrunkRangeArray{
+			VlanTrunkRanges: vlanRange,
+		}
+		return vlanRanges, nil
+	}
+
+	return providers.VlanTrunkRangeArray{}, fmt.Errorf("No VLAN trunk ranges specified")
+}
+
+func validateVlanTrunkRange(vlanRanges []providers.VlanTrunkRange) error {
+
+	for i, r1 := range vlanRanges {
+		if r1.Start > r1.End {
+			return fmt.Errorf("Invalid VlanTrunk range values")
+		}
+		for j, r2 := range vlanRanges {
+			if r1.End > r2.Start && i < j {
+				return fmt.Errorf("Invalid VlanTrunk range values")
+			}
+		}
+
+	}
+	return nil
 }
 
 func cmdAdd(args *skel.CmdArgs) error {
@@ -147,6 +205,15 @@ func cmdAdd(args *skel.CmdArgs) error {
 			return err
 		}
 		result = newResult
+	}
+
+	if netConf.VlanTrunk != "" {
+		if vlanTrunkRange, err := getVlanTrunkRange(netConf.VlanTrunk); err == nil {
+			vlanTrunkProviderConfig := providers.GetProviderConfig(netConf.DeviceID)
+			vlanTrunkProviderConfig.InitConfig(&vlanTrunkRange)
+		} else {
+			fmt.Errorf("Unable to get vlanTrunkRange")
+		}
 	}
 
 	// Cache NetConf for CmdDel

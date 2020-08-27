@@ -46,6 +46,7 @@ type NetConf struct {
 	SpoofChk      string `json:"spoofchk,omitempty"`   // on|off
 	Trust         string `json:"trust,omitempty"`      // on|off
 	LinkState     string `json:"link_state,omitempty"` // auto|enable|disable
+	VlanTrunk     string `json:"vlan_trunk,omitempty"` // vlan trunking
 	RuntimeConfig struct {
 		Mac string `json:"mac,omitempty"`
 	} `json:"runtimeConfig,omitempty"`
