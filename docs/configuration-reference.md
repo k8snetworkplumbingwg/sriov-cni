@@ -17,7 +17,7 @@ The SR-IOV CNI configures networks through a CNI spec configuration object. In a
 * `min_tx_rate` (int, optional): change the allowed minimum transmit bandwidth, in Mbps, for the VF. Setting this to 0 disables rate limiting. The min_tx_rate value should be <= max_tx_rate. Support of this feature depends on NICs and drivers.
 * `max_tx_rate` (int, optional): change the allowed maximum transmit bandwidth, in Mbps, for the VF.
 Setting this to 0 disables rate limiting.
-
+* `vlan_trunk` (string, optional): apply multpile VLAN tags for filtering on a selected VF. This feature only works for OOT i40e driver version 2.7.11 and up, you can get it here https://downloadcenter.intel.com/download/24411/Intel-Network-Adapter-Driver-for-PCIe-40-Gigabit-Ethernet-Network-Connections-Under-Linux-.
 
 An SR-IOV CNI config with each field filled out looks like: 
 
@@ -34,7 +34,8 @@ An SR-IOV CNI config with each field filled out looks like:
     "max_tx_rate": 200,
     "spoofchk": "off",
     "trust": "on",
-    "link_state": "enable"
+    "link_state": "enable",
+    "vlan_trunk": "10,12,20-30,1100"
 }
 ```
 
