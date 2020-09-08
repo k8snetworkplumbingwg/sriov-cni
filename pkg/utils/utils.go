@@ -8,12 +8,18 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/intel/sriov-cni/pkg/types"
 )
 
 var (
 	sriovConfigured = "/sriov_numvfs"
 	// NetDirectory sysfs net directory
 	NetDirectory = "/sys/class/net"
+	// DevSubDirectory device subdirectory
+	DevSubDirectory = "/device/driver"
+	// VendorSubDirectory vendor subdirectory
+	VendorSubDirectory = "/device/vendor"
 	// SysBusPci is sysfs pci device directory
 	SysBusPci = "/sys/bus/pci/devices"
 	// UserspaceDrivers is a list of driver names that don't have netlink representation for their devices
@@ -257,4 +263,110 @@ func CleanCachedNetConf(cRefPath string) error {
 		return fmt.Errorf("error removing NetConf file %s: %q", cRefPath, err)
 	}
 	return nil
+}
+
+//GetVlanTrunkRange creates VlanTrunkRangeData from vlanTrunkString
+func GetVlanTrunkRange(vlanTrunkString string) (types.VlanTrunkRangeData, error) {
+
+	var vlanRange = []types.VlanTrunkRange{}
+	trunkingRanges := strings.Split(vlanTrunkString, ",")
+	fmt.Println("Vlan trunking ranges: ", trunkingRanges)
+	for _, r := range trunkingRanges {
+		values := strings.Split(r, "-")
+		v1, errconv1 := strconv.Atoi(values[0])
+		v2, errconv2 := strconv.Atoi(values[len(values)-1])
+
+		if errconv1 != nil || errconv2 != nil {
+			return types.VlanTrunkRangeData{}, fmt.Errorf("Trunk range error: invalid values")
+		}
+
+		v := types.VlanTrunkRange{
+			Start: uint(v1),
+			End:   uint(v2),
+		}
+
+		vlanRange = append(vlanRange, v)
+	}
+	if err := validateVlanTrunkRange(vlanRange); err != nil {
+		return types.VlanTrunkRangeData{}, err
+	}
+
+	vlanRanges := types.VlanTrunkRangeData{
+		VlanTrunkRanges: vlanRange,
+	}
+	return vlanRanges, nil
+
+}
+
+//validateVlanTrunkRange checks if given vlan trunking ranges are of correct form
+func validateVlanTrunkRange(vlanRanges []types.VlanTrunkRange) error {
+
+	for i, r1 := range vlanRanges {
+		if r1.Start > r1.End {
+			return fmt.Errorf("Invalid VlanTrunk range values")
+		}
+
+		if r1.Start < 1 || r1.End > 4094 {
+			return fmt.Errorf("Invalid VlanTrunk range values")
+		}
+
+		for j, r2 := range vlanRanges {
+			if r1.End > r2.Start && i < j {
+				return fmt.Errorf("Invalid VlanTrunk range values")
+			}
+		}
+
+	}
+	return nil
+}
+
+//GetVendorID returns ID of installed vendor
+func GetVendorID(deviceID string) (string, error) {
+
+	device, err := GetDeviceFromPCIAddress(deviceID)
+	if err != nil {
+		return "", err
+	}
+
+	vendor, err := ReadVendorFile(device + VendorSubDirectory)
+	if err != nil {
+		return "", err
+	}
+	return string(vendor), nil
+}
+
+//GetDeviceFromPCIAddress provides vendor ID of device with given PCI address
+func GetDeviceFromPCIAddress(deviceID string) (string, error) {
+	if devices, err := ioutil.ReadDir(NetDirectory); err == nil {
+
+		for _, iface := range devices {
+			if driver, err := ioutil.ReadDir(NetDirectory + "/" + iface.Name() + DevSubDirectory); err == nil {
+
+				for _, devID := range driver {
+					if devID.Name() == deviceID {
+						return NetDirectory + iface.Name(), nil
+					}
+				}
+			}
+		}
+	}
+	return "", fmt.Errorf("Device not found")
+}
+
+//ReadVendorFile reads vendor ID
+func ReadVendorFile(path string) ([]byte, error) {
+	if f, err := os.Open(path); err == nil {
+		defer f.Close()
+
+		var buff [6]byte
+		_, errread := f.Read(buff[:])
+		if errread != nil {
+			return nil, fmt.Errorf("Error reading vendor file")
+		}
+
+		return buff[:], nil
+
+	}
+
+	return nil, fmt.Errorf("Error opening vendor file")
 }

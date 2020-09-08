@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/containernetworking/cni/pkg/skel"
@@ -82,6 +83,11 @@ func LoadConf(bytes []byte) (*sriovtypes.NetConf, error) {
 	// validate that link state is one of supported values
 	if n.LinkState != "" && n.LinkState != "auto" && n.LinkState != "enable" && n.LinkState != "disable" {
 		return nil, fmt.Errorf("LoadConf(): invalid link_state value: %s", n.LinkState)
+	}
+
+	validTrunkString := regexp.MustCompile("^[0-9]+([,\\-][0-9]+)*$")
+	if !validTrunkString.MatchString(n.VlanTrunk) {
+		return nil, fmt.Errorf("LoadConf(): invalid vlan_trunk value: %s", n.VlanTrunk)
 	}
 
 	return n, nil

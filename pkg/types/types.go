@@ -51,3 +51,21 @@ type NetConf struct {
 		Mac string `json:"mac,omitempty"`
 	} `json:"runtimeConfig,omitempty"`
 }
+
+// VlanTrunkProviderConfig provdes methods for provider configuration
+type VlanTrunkProviderConfig interface {
+	InitConfig(vlanRanges *VlanTrunkRangeData)
+	ApplyConfig(conf *NetConf) error
+	RemoveConfig(conf *NetConf) error
+}
+
+//VlanTrunkRange strores trunking range
+type VlanTrunkRange struct {
+	Start uint
+	End   uint
+}
+
+//VlanTrunkRangeData stores an array of VlanTrunkRange
+type VlanTrunkRangeData struct {
+	VlanTrunkRanges []VlanTrunkRange
+}
