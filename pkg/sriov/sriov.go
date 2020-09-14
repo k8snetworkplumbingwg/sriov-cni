@@ -148,7 +148,7 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, cid s
 
 	linkObj, err := s.nLink.LinkByName(linkName)
 	if err != nil {
-		fmt.Errorf("error getting VF netdevice with name %s", linkName)
+		return "", fmt.Errorf("error getting VF netdevice with name %s", linkName)
 	}
 
 	// tempName used as intermediary name to avoid name conflicts
