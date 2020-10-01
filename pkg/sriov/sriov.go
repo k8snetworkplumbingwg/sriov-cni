@@ -6,6 +6,7 @@ import (
 
 	"github.com/containernetworking/plugins/pkg/ns"
 
+	"github.com/intel/sriov-cni/pkg/factory"
 	sriovtypes "github.com/intel/sriov-cni/pkg/types"
 	"github.com/intel/sriov-cni/pkg/utils"
 	"github.com/vishvananda/netlink"
@@ -372,6 +373,25 @@ func (s *sriovManager) ApplyVFConfig(conf *sriovtypes.NetConf) error {
 		}
 	}
 
+	if conf.VlanTrunk != "" {
+		vlanTrunkRange, err := utils.GetVlanTrunkRange(conf.VlanTrunk)
+		if err != nil {
+			return fmt.Errorf("GetVlanTrunkRange Error: %q", err)
+		}
+
+		vlanTrunkProviderConfig, err := factory.GetProviderConfig(conf.DeviceID)
+		if err != nil {
+			return fmt.Errorf("GetProviderConfig Error: %q", err)
+		}
+
+		vlanTrunkProviderConfig.InitConfig(&vlanTrunkRange)
+
+		if err := vlanTrunkProviderConfig.ApplyConfig(conf); err != nil {
+			return fmt.Errorf("ApplyConfig Error: %q", err)
+		}
+
+	}
+
 	return nil
 }
 
@@ -434,6 +454,23 @@ func (s *sriovManager) ResetVFConfig(conf *sriovtypes.NetConf) error {
 		// that don't support the netlink command (e.g. igb driver)
 		if err = s.nLink.LinkSetVfState(pfLink, conf.VFID, conf.OrigVfState.LinkState); err != nil {
 			return fmt.Errorf("failed to set link state to auto for vf %d: %v", conf.VFID, err)
+		}
+	}
+
+	if conf.VlanTrunk != "" {
+		vlanTrunkRange, err := utils.GetVlanTrunkRange(conf.VlanTrunk)
+		if err != nil {
+			return fmt.Errorf("GetVlanTrunkRange Error: %q", err)
+		}
+
+		vlanTrunkProviderConfig, err := factory.GetProviderConfig(conf.DeviceID)
+		if err != nil {
+			return fmt.Errorf("GetProviderConfig Error: %q", err)
+		}
+
+		vlanTrunkProviderConfig.GetVlanData(&vlanTrunkRange)
+		if err := vlanTrunkProviderConfig.RemoveConfig(conf); err != nil {
+			return fmt.Errorf("RemoveConfig Error: %q", err)
 		}
 	}
 

@@ -57,6 +57,7 @@ type VlanTrunkProviderConfig interface {
 	InitConfig(vlanRanges *VlanTrunkRangeData)
 	ApplyConfig(conf *NetConf) error
 	RemoveConfig(conf *NetConf) error
+	GetVlanData(vlanRanges *VlanTrunkRangeData)
 }
 
 //VlanTrunkRange strores trunking range

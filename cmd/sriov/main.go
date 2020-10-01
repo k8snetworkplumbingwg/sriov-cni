@@ -12,7 +12,6 @@ import (
 	"github.com/containernetworking/plugins/pkg/ipam"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/intel/sriov-cni/pkg/config"
-	"github.com/intel/sriov-cni/pkg/factory"
 	"github.com/intel/sriov-cni/pkg/sriov"
 	"github.com/intel/sriov-cni/pkg/utils"
 	"github.com/vishvananda/netlink"
@@ -148,25 +147,6 @@ func cmdAdd(args *skel.CmdArgs) error {
 			return err
 		}
 		result = newResult
-	}
-
-	if netConf.VlanTrunk != "" {
-		vlanTrunkRange, err := utils.GetVlanTrunkRange(netConf.VlanTrunk)
-		if err != nil {
-			return fmt.Errorf("GetVlanTrunkRange Error: %q", err)
-		}
-
-		vlanTrunkProviderConfig, err := factory.GetProviderConfig(netConf.DeviceID)
-		if err != nil {
-			return fmt.Errorf("GetProviderConfig Error: %q", err)
-		}
-
-		vlanTrunkProviderConfig.InitConfig(&vlanTrunkRange)
-
-		if err := vlanTrunkProviderConfig.ApplyConfig(netConf); err != nil {
-			return fmt.Errorf("ApplyConfig Error: %q", err)
-		}
-
 	}
 
 	// Cache NetConf for CmdDel

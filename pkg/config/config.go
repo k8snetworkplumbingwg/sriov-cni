@@ -85,9 +85,15 @@ func LoadConf(bytes []byte) (*sriovtypes.NetConf, error) {
 		return nil, fmt.Errorf("LoadConf(): invalid link_state value: %s", n.LinkState)
 	}
 
-	validTrunkString := regexp.MustCompile("^[0-9]+([,\\-][0-9]+)*$")
-	if !validTrunkString.MatchString(n.VlanTrunk) {
-		return nil, fmt.Errorf("LoadConf(): invalid vlan_trunk value: %s", n.VlanTrunk)
+	if n.VlanTrunk != "" {
+		if trunkingSupported := utils.CheckTrunkSupport(); trunkingSupported == false {
+			return nil, fmt.Errorf("Vlan trunking supported only by i40e version 2.7.11 and higher, please upgrade your driver")
+		}
+
+		validTrunkString := regexp.MustCompile("^[0-9]+([,\\-][0-9]+)*$")
+		if !validTrunkString.MatchString(n.VlanTrunk) {
+			return nil, fmt.Errorf("LoadConf(): invalid vlan_trunk value: %s", n.VlanTrunk)
+		}
 	}
 
 	return n, nil

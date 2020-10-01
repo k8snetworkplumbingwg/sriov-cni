@@ -28,7 +28,7 @@ func NewIntelTrunkProviderConfig() sriovtypes.VlanTrunkProviderConfig {
 
 //InitConfig initializes provider configuration for given trunking ranges
 func (p *IntelTrunkProviderConfig) InitConfig(vlanRanges *sriovtypes.VlanTrunkRangeData) {
-	p.VlanData = GetVlanDataString(vlanRanges)
+	p.GetVlanData(vlanRanges)
 	return
 }
 
@@ -50,8 +50,8 @@ func (p *IntelTrunkProviderConfig) RemoveConfig(conf *sriovtypes.NetConf) error 
 	return nil
 }
 
-//GetVlanDataString converts vlanRanges.VlanTrunkRanges into string
-func GetVlanDataString(vlanRanges *sriovtypes.VlanTrunkRangeData) string {
+//GetVlanData converts vlanRanges.VlanTrunkRanges into string
+func (p *IntelTrunkProviderConfig) GetVlanData(vlanRanges *sriovtypes.VlanTrunkRangeData) {
 	vlanData := ""
 	var start, end string
 
@@ -69,15 +69,14 @@ func GetVlanDataString(vlanRanges *sriovtypes.VlanTrunkRangeData) string {
 		}
 
 	}
-
-	return vlanData
+	p.VlanData = vlanData
+	return
 }
 
 //AddVlanFiltering writes "add [trunking ranges]" to trunk file
 func AddVlanFiltering(vlanData, pfName string, vfid int) error {
 	addTrunk := "add " + vlanData
-	trunkFile := fmt.Sprintf(TrunkFileDirectory, pfName, strconv.Itoa(vfid))
-
+	trunkFile := fmt.Sprintf(TrunkFileDirectory, pfName, vfid)
 	f, err := os.OpenFile(trunkFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return fmt.Errorf("os.OpenFile: %q", err)
@@ -89,8 +88,8 @@ func AddVlanFiltering(vlanData, pfName string, vfid int) error {
 		return fmt.Errorf("f.Write: %q", errwrite)
 	}
 
-	if ret != 1 {
-		return fmt.Errorf("Failed to write to %q", trunkFile)
+	if ret != len(addTrunk) {
+		return fmt.Errorf("Failed to write %q, to %q", []byte(addTrunk), trunkFile)
 	}
 
 	return nil

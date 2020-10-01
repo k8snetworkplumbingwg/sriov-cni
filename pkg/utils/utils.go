@@ -1,14 +1,17 @@
 package utils
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/hashicorp/go-version"
 	"github.com/intel/sriov-cni/pkg/types"
 )
 
@@ -265,12 +268,39 @@ func CleanCachedNetConf(cRefPath string) error {
 	return nil
 }
 
+// CheckTrunkSupport checks installed driver version; trunking is supported for version 2.7.11 and higher
+func CheckTrunkSupport() bool {
+	var stdout bytes.Buffer
+	modinfoCmd := "modinfo -F version i40e"
+	cmd := exec.Command("sh", "-c", modinfoCmd)
+	cmd.Stdout = &stdout
+
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("modinfo returned error: %v %s", err, stdout.String())
+		return false
+	}
+
+	driverVersion := strings.Split(stdout.String(), "\n")
+	v1, _ := version.NewVersion("2.7.11")
+	v2, err := version.NewVersion(driverVersion[0])
+	if err != nil {
+		fmt.Printf("invalid version error: %v %s", err, driverVersion)
+		return false
+	}
+
+	if v2.LessThan(v1) {
+		return false
+	}
+
+	return true
+}
+
 //GetVlanTrunkRange creates VlanTrunkRangeData from vlanTrunkString
 func GetVlanTrunkRange(vlanTrunkString string) (types.VlanTrunkRangeData, error) {
 
 	var vlanRange = []types.VlanTrunkRange{}
 	trunkingRanges := strings.Split(vlanTrunkString, ",")
-	fmt.Println("Vlan trunking ranges: ", trunkingRanges)
+
 	for _, r := range trunkingRanges {
 		values := strings.Split(r, "-")
 		v1, errconv1 := strconv.Atoi(values[0])
@@ -323,34 +353,16 @@ func validateVlanTrunkRange(vlanRanges []types.VlanTrunkRange) error {
 //GetVendorID returns ID of installed vendor
 func GetVendorID(deviceID string) (string, error) {
 
-	device, err := GetDeviceFromPCIAddress(deviceID)
+	device, err := GetPfName(deviceID)
 	if err != nil {
 		return "", err
 	}
-
-	vendor, err := ReadVendorFile(device + VendorSubDirectory)
+	path := filepath.Join(NetDirectory, device, VendorSubDirectory)
+	vendor, err := ReadVendorFile(path)
 	if err != nil {
 		return "", err
 	}
 	return string(vendor), nil
-}
-
-//GetDeviceFromPCIAddress provides vendor ID of device with given PCI address
-func GetDeviceFromPCIAddress(deviceID string) (string, error) {
-	if devices, err := ioutil.ReadDir(NetDirectory); err == nil {
-
-		for _, iface := range devices {
-			if driver, err := ioutil.ReadDir(NetDirectory + "/" + iface.Name() + DevSubDirectory); err == nil {
-
-				for _, devID := range driver {
-					if devID.Name() == deviceID {
-						return NetDirectory + iface.Name(), nil
-					}
-				}
-			}
-		}
-	}
-	return "", fmt.Errorf("Device not found")
 }
 
 //ReadVendorFile reads vendor ID
@@ -361,7 +373,7 @@ func ReadVendorFile(path string) ([]byte, error) {
 		var buff [6]byte
 		_, errread := f.Read(buff[:])
 		if errread != nil {
-			return nil, fmt.Errorf("Error reading vendor file")
+			return nil, fmt.Errorf("Error reading vendor file, %q", path)
 		}
 
 		return buff[:], nil
