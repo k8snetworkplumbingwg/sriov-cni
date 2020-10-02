@@ -2,15 +2,11 @@ package providers
 
 import (
 	"fmt"
-	"os"
+	"io/ioutil"
 	"strconv"
 
 	sriovtypes "github.com/intel/sriov-cni/pkg/types"
-)
-
-var (
-	// TrunkFileDirectory trunk file directoy
-	TrunkFileDirectory = "/sys/class/net/%s/device/sriov/%d/trunk"
+	"github.com/intel/sriov-cni/pkg/utils"
 )
 
 //IntelTrunkProviderConfig stores name of the provider
@@ -76,20 +72,11 @@ func (p *IntelTrunkProviderConfig) GetVlanData(vlanRanges *sriovtypes.VlanTrunkR
 //AddVlanFiltering writes "add [trunking ranges]" to trunk file
 func AddVlanFiltering(vlanData, pfName string, vfid int) error {
 	addTrunk := "add " + vlanData
-	trunkFile := fmt.Sprintf(TrunkFileDirectory, pfName, vfid)
-	f, err := os.OpenFile(trunkFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
-	if err != nil {
-		return fmt.Errorf("os.OpenFile: %q", err)
-	}
-	defer f.Close()
+	trunkFile := fmt.Sprintf(utils.TrunkFileDirectory, pfName, vfid)
 
-	ret, errwrite := f.Write([]byte(addTrunk))
+	errwrite := ioutil.WriteFile(trunkFile, []byte(addTrunk), 0644)
 	if errwrite != nil {
 		return fmt.Errorf("f.Write: %q", errwrite)
-	}
-
-	if ret != len(addTrunk) {
-		return fmt.Errorf("Failed to write %q, to %q", []byte(addTrunk), trunkFile)
 	}
 
 	return nil
@@ -98,21 +85,11 @@ func AddVlanFiltering(vlanData, pfName string, vfid int) error {
 //RemoveVlanFiltering writes "rem [trunking ranges]"  to trunk file
 func RemoveVlanFiltering(vlanData, pfName string, vfid int) error {
 	removeTrunk := "rem " + vlanData
-	trunkFile := fmt.Sprintf(TrunkFileDirectory, pfName, strconv.Itoa(vfid))
+	trunkFile := fmt.Sprintf(utils.TrunkFileDirectory, pfName, strconv.Itoa(vfid))
 
-	f, err := os.OpenFile(trunkFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
-	if err != nil {
-		return fmt.Errorf("os.OpenFile: %q", err)
-	}
-	defer f.Close()
-
-	ret, errwrite := f.Write([]byte(removeTrunk))
+	errwrite := ioutil.WriteFile(trunkFile, []byte(removeTrunk), 0644)
 	if errwrite != nil {
 		return fmt.Errorf("f.Write: %q", errwrite)
-	}
-
-	if ret != 1 {
-		return fmt.Errorf("Failed to write to %q", trunkFile)
 	}
 
 	return nil

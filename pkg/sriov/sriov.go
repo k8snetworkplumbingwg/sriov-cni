@@ -373,6 +373,7 @@ func (s *sriovManager) ApplyVFConfig(conf *sriovtypes.NetConf) error {
 		}
 	}
 
+	// 7. Set vlan trunking
 	if conf.VlanTrunk != "" {
 		vlanTrunkRange, err := utils.GetVlanTrunkRange(conf.VlanTrunk)
 		if err != nil {

@@ -21,12 +21,14 @@ func GetProviderConfig(deviceID string) (types.VlanTrunkProviderConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("GetProviderConfig Error: %q", err)
 	}
-	if vendor == IntelProviderID {
+
+	switch vendor {
+	case IntelProviderID:
 		return providers.NewIntelTrunkProviderConfig(), nil
-	} else if vendor == MellanoxProviderID {
-		// return NewMellanoxTrunkProviderConfig()
+	case MellanoxProviderID:
 		return nil, fmt.Errorf("Mellanox is not supported")
+	default:
+		return nil, fmt.Errorf("Not supported vendor: %q", vendor)
 	}
 
-	return nil, fmt.Errorf("No supported vendor")
 }

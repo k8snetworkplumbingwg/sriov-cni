@@ -21,12 +21,14 @@ var (
 	NetDirectory = "/sys/class/net"
 	// DevSubDirectory device subdirectory
 	DevSubDirectory = "/device/driver"
-	// VendorSubDirectory vendor subdirectory
-	VendorSubDirectory = "/device/vendor"
 	// SysBusPci is sysfs pci device directory
 	SysBusPci = "/sys/bus/pci/devices"
 	// UserspaceDrivers is a list of driver names that don't have netlink representation for their devices
 	UserspaceDrivers = []string{"vfio-pci", "uio_pci_generic", "igb_uio"}
+	//ExecCommand used for os.exec
+	execCommand = exec.Command
+	// TrunkFileDirectory trunk file directoy
+	TrunkFileDirectory = "/sys/class/net/%s/device/sriov/%d/trunk"
 )
 
 // GetSriovNumVfs takes in a PF name(ifName) as string and returns number of VF configured as int
@@ -272,11 +274,11 @@ func CleanCachedNetConf(cRefPath string) error {
 func CheckTrunkSupport() bool {
 	var stdout bytes.Buffer
 	modinfoCmd := "modinfo -F version i40e"
-	cmd := exec.Command("sh", "-c", modinfoCmd)
+	cmd := execCommand("sh", "-c", modinfoCmd)
 	cmd.Stdout = &stdout
 
 	if err := cmd.Run(); err != nil {
-		fmt.Printf("modinfo returned error: %v %s", err, stdout.String())
+		fmt.Printf("modinfo returned an error: %v %s", err, stdout.String())
 		return false
 	}
 
@@ -317,7 +319,7 @@ func GetVlanTrunkRange(vlanTrunkString string) (types.VlanTrunkRangeData, error)
 
 		vlanRange = append(vlanRange, v)
 	}
-	if err := validateVlanTrunkRange(vlanRange); err != nil {
+	if err := ValidateVlanTrunkRange(vlanRange); err != nil {
 		return types.VlanTrunkRangeData{}, err
 	}
 
@@ -328,8 +330,8 @@ func GetVlanTrunkRange(vlanTrunkString string) (types.VlanTrunkRangeData, error)
 
 }
 
-//validateVlanTrunkRange checks if given vlan trunking ranges are of correct form
-func validateVlanTrunkRange(vlanRanges []types.VlanTrunkRange) error {
+//ValidateVlanTrunkRange checks if given vlan trunking ranges are of correct form
+func ValidateVlanTrunkRange(vlanRanges []types.VlanTrunkRange) error {
 
 	for i, r1 := range vlanRanges {
 		if r1.Start > r1.End {
@@ -352,33 +354,14 @@ func validateVlanTrunkRange(vlanRanges []types.VlanTrunkRange) error {
 
 //GetVendorID returns ID of installed vendor
 func GetVendorID(deviceID string) (string, error) {
+	path := filepath.Join(SysBusPci, deviceID, "vendor")
 
-	device, err := GetPfName(deviceID)
+	readVendor, err := ioutil.ReadFile(path)
 	if err != nil {
-		return "", err
-	}
-	path := filepath.Join(NetDirectory, device, VendorSubDirectory)
-	vendor, err := ReadVendorFile(path)
-	if err != nil {
-		return "", err
-	}
-	return string(vendor), nil
-}
-
-//ReadVendorFile reads vendor ID
-func ReadVendorFile(path string) ([]byte, error) {
-	if f, err := os.Open(path); err == nil {
-		defer f.Close()
-
-		var buff [6]byte
-		_, errread := f.Read(buff[:])
-		if errread != nil {
-			return nil, fmt.Errorf("Error reading vendor file, %q", path)
-		}
-
-		return buff[:], nil
-
+		return "", fmt.Errorf("Error reading vendor file %q, %q", path, err)
 	}
 
-	return nil, fmt.Errorf("Error opening vendor file")
+	vendorCode := strings.Split(string(readVendor), "\n")[0]
+
+	return vendorCode, nil
 }

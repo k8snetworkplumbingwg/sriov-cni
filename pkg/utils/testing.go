@@ -36,17 +36,25 @@ var ts = tmpSysFs{
 		"sys/devices/pci0000:ae/0000:ae:00.0/0000:af:00.1/net/enp175s0f1",
 		"sys/devices/pci0000:ae/0000:ae:00.0/0000:af:06.0/net/enp175s6",
 		"sys/devices/pci0000:ae/0000:ae:00.0/0000:af:06.1/net/enp175s7",
+		"sys/devices/pci0000:ae/0000:ae:00.0/0000:cf:00.1/net/enp185s0f1",
+		"sys/devices/pci0000:ae/0000:ae:00.0/0000:cf:06.0/net/enp185s6",
 		"sys/devices/pci0000:00/0000:00:02.0/0000:05:00.0/net/ens1",
 		"sys/devices/pci0000:00/0000:00:02.0/0000:05:00.0/net/ens1d1",
 	},
 	fileList: map[string][]byte{
 		"sys/devices/pci0000:ae/0000:ae:00.0/0000:af:00.1/sriov_numvfs": []byte("2"),
+		"sys/devices/pci0000:ae/0000:ae:00.0/0000:cf:00.1/sriov_numvfs": []byte("1"),
 		"sys/devices/pci0000:00/0000:00:02.0/0000:05:00.0/sriov_numvfs": []byte("0"),
+		"sys/devices/pci0000:ae/0000:ae:00.0/0000:af:06.1/vendor":       []byte("0x8086"),
+		"sys/devices/pci0000:ae/0000:ae:00.0/0000:cf:06.0/vendor":       []byte("0x15b3"),
+		"sys/devices/pci0000:ae/0000:ae:00.0/0000:af:00.1/trunk":        []byte("1000"),
 	},
 	netSymlinks: map[string]string{
 		"sys/class/net/enp175s0f1": "sys/devices/pci0000:ae/0000:ae:00.0/0000:af:00.1/net/enp175s0f1",
 		"sys/class/net/enp175s6":   "sys/devices/pci0000:ae/0000:ae:00.0/0000:af:06.0/net/enp175s6",
 		"sys/class/net/enp175s7":   "sys/devices/pci0000:ae/0000:ae:00.0/0000:af:06.1/net/enp175s7",
+		"sys/class/net/enp185s0f1": "sys/devices/pci0000:ae/0000:ae:00.0/0000:cf:00.1/net/enp185s0f1",
+		"sys/class/net/enp185s6":   "sys/devices/pci0000:ae/0000:ae:00.0/0000:cf:06.0/net/enp185s6",
 		"sys/class/net/ens1":       "sys/devices/pci0000:00/0000:00:02.0/0000:05:00.0/net/ens1",
 		"sys/class/net/ens1d1":     "sys/devices/pci0000:00/0000:00:02.0/0000:05:00.0/net/ens1d1",
 	},
@@ -54,12 +62,16 @@ var ts = tmpSysFs{
 		"sys/class/net/enp175s0f1/device": "sys/devices/pci0000:ae/0000:ae:00.0/0000:af:00.1",
 		"sys/class/net/enp175s6/device":   "sys/devices/pci0000:ae/0000:ae:00.0/0000:af:06.0",
 		"sys/class/net/enp175s7/device":   "sys/devices/pci0000:ae/0000:ae:00.0/0000:af:06.1",
+		"sys/class/net/enp185s0f1/device": "sys/devices/pci0000:ae/0000:ae:00.0/0000:cf:00.1",
+		"sys/class/net/enp185s6/device":   "sys/devices/pci0000:ae/0000:ae:00.0/0000:cf:06.0",
 		"sys/class/net/ens1/device":       "sys/devices/pci0000:00/0000:00:02.0/0000:05:00.0",
 		"sys/class/net/ens1d1/device":     "sys/devices/pci0000:00/0000:00:02.0/0000:05:00.0",
 
 		"sys/bus/pci/devices/0000:af:00.1": "sys/devices/pci0000:ae/0000:ae:00.0/0000:af:00.1",
 		"sys/bus/pci/devices/0000:af:06.0": "sys/devices/pci0000:ae/0000:ae:00.0/0000:af:06.0",
 		"sys/bus/pci/devices/0000:af:06.1": "sys/devices/pci0000:ae/0000:ae:00.0/0000:af:06.1",
+		"sys/bus/pci/devices/0000:cf:00.1": "sys/devices/pci0000:ae/0000:ae:00.0/0000:cf:00.1",
+		"sys/bus/pci/devices/0000:cf:06.0": "sys/devices/pci0000:ae/0000:ae:00.0/0000:cf:06.0",
 		"sys/bus/pci/devices/0000:05:00.0": "sys/devices/pci0000:00/0000:00:02.0/0000:05:00.0",
 	},
 	vfSymlinks: map[string]string{
@@ -68,6 +80,9 @@ var ts = tmpSysFs{
 
 		"sys/devices/pci0000:ae/0000:ae:00.0/0000:af:00.1/virtfn1": "sys/devices/pci0000:ae/0000:ae:00.0/0000:af:06.1",
 		"sys/devices/pci0000:ae/0000:ae:00.0/0000:af:06.1/physfn":  "sys/devices/pci0000:ae/0000:ae:00.0/0000:af:00.1",
+
+		"sys/devices/pci0000:ae/0000:ae:00.0/0000:cf:00.1/virtfn1": "sys/devices/pci0000:ae/0000:ae:00.0/0000:cf:06.0",
+		"sys/devices/pci0000:ae/0000:ae:00.0/0000:cf:06.0/physfn":  "sys/devices/pci0000:ae/0000:ae:00.0/0000:cf:00.1",
 	},
 }
 
@@ -116,6 +131,7 @@ func CreateTmpSysFs() error {
 
 	SysBusPci = filepath.Join(ts.dirRoot, SysBusPci)
 	NetDirectory = filepath.Join(ts.dirRoot, NetDirectory)
+	TrunkFileDirectory = filepath.Join(ts.dirRoot, "sys/class/net/enp175s0f1/device/trunk")
 	return nil
 }
 
