@@ -128,7 +128,7 @@ This configuration sets a number of extra parameters that may be key for SR-IOV 
 
 #### DPDK userspace driver config
 
-The below config will configure a VF using a userspace driver (uio/vfio) for use in a container. If this plugin is used with a VF bound to a dpdk driver then the IPAM configuration will be ignored. Other config parameters should be applicable but implementation may be driver specific. 
+The below config will configure a VF using a userspace driver (uio/vfio) for use in a container. If this plugin is used with a VF bound to a dpdk driver then the IPAM configuration will still be respected, but it will only allocate IP address(es) using the specified IPAM plugin, not apply the IP address(es) to container interface. Other config parameters should be applicable but implementation may be driver specific.
 
 ```json
 {
@@ -138,6 +138,8 @@ The below config will configure a VF using a userspace driver (uio/vfio) for use
     "vlan": 1000
 }
 ```
+
+**Note** [DHCP](https://github.com/containernetworking/plugins/tree/master/plugins/ipam/dhcp) IPAM plugin can not be used for VF bound to a dpdk driver (uio/vfio).
 
 ### Advanced Configuration 
 

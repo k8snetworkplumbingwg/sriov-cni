@@ -84,29 +84,22 @@ func cmdAdd(args *skel.CmdArgs) error {
 		Sandbox: netns.Path(),
 	}}
 
-	// skip the IPAM allocation for the DPDK
-	if netConf.DPDKMode {
-		// Cache NetConf for CmdDel
-		if err = utils.SaveNetConf(args.ContainerID, config.DefaultCNIDir, args.IfName, netConf); err != nil {
-			return fmt.Errorf("error saving NetConf %q", err)
-		}
-		return result.Print()
-	}
-
-	macAddr, err = sm.SetupVF(netConf, args.IfName, args.ContainerID, netns)
-	defer func() {
-		if err != nil {
-			err := netns.Do(func(_ ns.NetNS) error {
-				_, err := netlink.LinkByName(args.IfName)
-				return err
-			})
-			if err == nil {
-				sm.ReleaseVF(netConf, args.IfName, args.ContainerID, netns)
+	if !netConf.DPDKMode {
+		macAddr, err = sm.SetupVF(netConf, args.IfName, args.ContainerID, netns)
+		defer func() {
+			if err != nil {
+				err := netns.Do(func(_ ns.NetNS) error {
+					_, err := netlink.LinkByName(args.IfName)
+					return err
+				})
+				if err == nil {
+					sm.ReleaseVF(netConf, args.IfName, args.ContainerID, netns)
+				}
 			}
+		}()
+		if err != nil {
+			return fmt.Errorf("failed to set up pod interface %q from the device %q: %v", args.IfName, netConf.Master, err)
 		}
-	}()
-	if err != nil {
-		return fmt.Errorf("failed to set up pod interface %q from the device %q: %v", args.IfName, netConf.Master, err)
 	}
 
 	// run the IPAM plugin
@@ -140,11 +133,13 @@ func cmdAdd(args *skel.CmdArgs) error {
 			ipc.Interface = current.Int(0)
 		}
 
-		err = netns.Do(func(_ ns.NetNS) error {
-			return ipam.ConfigureIface(args.IfName, newResult)
-		})
-		if err != nil {
-			return err
+		if !netConf.DPDKMode {
+			err = netns.Do(func(_ ns.NetNS) error {
+				return ipam.ConfigureIface(args.IfName, newResult)
+			})
+			if err != nil {
+				return err
+			}
 		}
 		result = newResult
 	}
@@ -176,14 +171,14 @@ func cmdDel(args *skel.CmdArgs) error {
 
 	sm := sriov.NewSriovManager()
 
-	if !netConf.DPDKMode {
-		if netConf.IPAM.Type != "" {
-			err = ipam.ExecDel(netConf.IPAM.Type, args.StdinData)
-			if err != nil {
-				return err
-			}
+	if netConf.IPAM.Type != "" {
+		err = ipam.ExecDel(netConf.IPAM.Type, args.StdinData)
+		if err != nil {
+			return err
 		}
+	}
 
+	if !netConf.DPDKMode {
 		netns, err := ns.GetNS(args.Netns)
 		if err != nil {
 			// according to:
