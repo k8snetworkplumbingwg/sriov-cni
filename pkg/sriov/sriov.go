@@ -164,6 +164,7 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, cid s
 		return "", fmt.Errorf("error setting temp IF name %s for %s", tempName, linkName)
 	}
 
+	macAddress := linkObj.Attrs().HardwareAddr.String()
 	// 3. Set MAC address
 	if conf.MAC != "" {
 		hwaddr, err := net.ParseMAC(conf.MAC)
@@ -177,14 +178,13 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, cid s
 		if err = s.nLink.LinkSetHardwareAddr(linkObj, hwaddr); err != nil {
 			return "", fmt.Errorf("failed to set netlink MAC address to %s: %v", hwaddr, err)
 		}
+		macAddress = conf.MAC
 	}
 
 	// 4. Change netns
 	if err := s.nLink.LinkSetNsFd(linkObj, int(netns.Fd())); err != nil {
 		return "", fmt.Errorf("failed to move IF %s to netns: %q", tempName, err)
 	}
-
-	var macAddress string
 
 	if err := netns.Do(func(_ ns.NetNS) error {
 		// 5. Set Pod IF name
@@ -197,7 +197,6 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, cid s
 			return fmt.Errorf("error bringing interface up in container ns: %q", err)
 		}
 
-		macAddress = linkObj.Attrs().HardwareAddr.String()
 		return nil
 	}); err != nil {
 		return "", fmt.Errorf("error setting up interface in container namespace: %q", err)
