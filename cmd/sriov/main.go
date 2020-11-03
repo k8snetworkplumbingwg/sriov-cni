@@ -11,9 +11,9 @@ import (
 	"github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ipam"
 	"github.com/containernetworking/plugins/pkg/ns"
-	"github.com/intel/sriov-cni/pkg/config"
-	"github.com/intel/sriov-cni/pkg/sriov"
-	"github.com/intel/sriov-cni/pkg/utils"
+	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/config"
+	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/sriov"
+	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/utils"
 	"github.com/vishvananda/netlink"
 )
 

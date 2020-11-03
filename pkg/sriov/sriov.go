@@ -6,8 +6,8 @@ import (
 
 	"github.com/containernetworking/plugins/pkg/ns"
 
-	sriovtypes "github.com/intel/sriov-cni/pkg/types"
-	"github.com/intel/sriov-cni/pkg/utils"
+	sriovtypes "github.com/k8snetworkplumbingwg/sriov-cni/pkg/types"
+	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/utils"
 	"github.com/vishvananda/netlink"
 )
 

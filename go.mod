@@ -1,4 +1,4 @@
-module github.com/intel/sriov-cni
+module github.com/k8snetworkplumbingwg/sriov-cni
 
 go 1.13
 
