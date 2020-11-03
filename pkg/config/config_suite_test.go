@@ -3,7 +3,7 @@ package config
 import (
 	"testing"
 
-	"github.com/intel/sriov-cni/pkg/utils"
+	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/utils"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

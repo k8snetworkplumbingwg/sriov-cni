@@ -5,7 +5,7 @@ import (
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/testutils"
-	sriovtypes "github.com/intel/sriov-cni/pkg/types"
+	sriovtypes "github.com/k8snetworkplumbingwg/sriov-cni/pkg/types"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/mock"
