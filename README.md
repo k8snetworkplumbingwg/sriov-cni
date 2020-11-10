@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/k8snetworkplumbingwg/sriov-cni.svg?branch=master)](https://travis-ci.org/k8snetworkplumbingwg/sriov-cni) [![Go Report Card](https://goreportcard.com/badge/github.com/k8snetworkplumbingwg/sriov-cni)](https://goreportcard.com/report/github.com/k8snetworkplumbingwg/sriov-cni)
+[![Build Status](https://travis-ci.org/k8snetworkplumbingwg/sriov-cni.svg?branch=master)](https://travis-ci.org/k8snetworkplumbingwg/sriov-cni) [![Go Report Card](https://goreportcard.com/badge/github.com/k8snetworkplumbingwg/sriov-cni)](https://goreportcard.com/report/github.com/k8snetworkplumbingwg/sriov-cni) [![Weekly minutes](https://img.shields.io/badge/Weekly%20Meeting%20Minutes-Mon%203pm%20GMT-blue.svg?style=plastic)](https://docs.google.com/document/d/1sJQMHbxZdeYJPgAWK1aSt6yzZ4K_8es7woVIrwinVwI)
 
    * [SR-IOV CNI plugin](#sr-iov-cni-plugin)
       * [Build](#build)
