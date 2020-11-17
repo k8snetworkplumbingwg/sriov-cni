@@ -2,16 +2,17 @@ language: go
 sudo: required
 
 go:
-  - "1.12"
+  - "1.13"
 env:
   global:
   - PATH=$GOROOT/bin:$GOPATH/bin:$PATH
 
 script:
   - make lint
-  - sudo -E env "PATH=$PATH" make test && sudo make clean
+  - sudo -E env "PATH=$PATH" make test && sudo make -E env "PATH=$PATH" clean
+  - make test && make clean
   - make build
-  - sudo -E env "PATH=$PATH" make clean 
+  - make clean
   - make image
 
 before_deploy:
