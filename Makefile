@@ -141,11 +141,12 @@ image: | $(BASE) ; $(info Building Docker image...)
 # Misc
 
 .PHONY: clean
-clean: | $(BASE) ; $(info  Cleaning...)	@ ## Cleanup everything
-	@cd $(BASE) && $(GO) clean --modcache
+clean: | $(BASE) ; $(info  Cleaning...) @ ## Cleanup everything
+	@cd $(BASE) && $(GO) clean --modcache --cache --testcache
 	@rm -rf $(GOPATH)
-	@rm -rf $(BUILDDIR)/$(BINARY_NAME)
-	@rm -rf test/tests.* test/coverage.*
+	@rm -rf $(BUILDDIR)
+	@rm -rf $(GOBIN)
+	@rm -rf test/
 
 .PHONY: help
 help:
