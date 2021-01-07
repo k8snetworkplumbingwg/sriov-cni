@@ -153,11 +153,6 @@ func cmdAdd(args *skel.CmdArgs) error {
 }
 
 func cmdDel(args *skel.CmdArgs) error {
-	// https://github.com/kubernetes/kubernetes/pull/35240
-	if args.Netns == "" {
-		return nil
-	}
-
 	netConf, cRefPath, err := config.LoadConfFromCache(args)
 	if err != nil {
 		return err
@@ -169,14 +164,19 @@ func cmdDel(args *skel.CmdArgs) error {
 		}
 	}()
 
-	sm := sriov.NewSriovManager()
-
 	if netConf.IPAM.Type != "" {
 		err = ipam.ExecDel(netConf.IPAM.Type, args.StdinData)
 		if err != nil {
 			return err
 		}
 	}
+
+	// https://github.com/kubernetes/kubernetes/pull/35240
+	if args.Netns == "" {
+		return nil
+	}
+
+	sm := sriov.NewSriovManager()
 
 	if !netConf.DPDKMode {
 		netns, err := ns.GetNS(args.Netns)
