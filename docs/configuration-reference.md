@@ -34,7 +34,8 @@ An SR-IOV CNI config with each field filled out looks like:
     "max_tx_rate": 200,
     "spoofchk": "off",
     "trust": "on",
-    "link_state": "enable"
+    "link_state": "enable",
+    "vlan_trunk": "10,12,20-30,1100"
 }
 ```
 

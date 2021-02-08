@@ -84,6 +84,12 @@ func LoadConf(bytes []byte) (*sriovtypes.NetConf, error) {
 		return nil, fmt.Errorf("LoadConf(): invalid link_state value: %s", n.LinkState)
 	}
 
+	if n.VlanTrunk != "" {
+		if err := utils.ValidateVlanTrunkValue(n.VlanTrunk); err != nil {
+			return nil, fmt.Errorf("LoadConf(): invalid vlan_trunk value: %s", n.VlanTrunk)
+		}
+	}
+
 	return n, nil
 }
 
