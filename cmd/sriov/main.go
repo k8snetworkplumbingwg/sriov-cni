@@ -100,6 +100,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 		if err != nil {
 			return fmt.Errorf("failed to set up pod interface %q from the device %q: %v", args.IfName, netConf.Master, err)
 		}
+		result.Interfaces[0].Mac = macAddr
 	}
 
 	// run the IPAM plugin
@@ -126,7 +127,6 @@ func cmdAdd(args *skel.CmdArgs) error {
 		}
 
 		newResult.Interfaces = result.Interfaces
-		newResult.Interfaces[0].Mac = macAddr
 
 		for _, ipc := range newResult.IPs {
 			// All addresses apply to the container interface (move from host)
