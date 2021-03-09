@@ -5,6 +5,8 @@ github.com/alexflint/go-filemutex v0.0.0-20171022225611-72bdc8eae2ae/go.mod h1:C
 github.com/buger/jsonparser v0.0.0-20180808090653-f4dd9f5a6b44/go.mod h1:bbYlZJ7hK1yFx9hf58LP0zeX7UjIGs20ufpu3evjr+s=
 github.com/containernetworking/cni v0.8.0 h1:BT9lpgGoH4jw3lFC7Odz2prU5ruiYKcgAjMCbgybcKI=
 github.com/containernetworking/cni v0.8.0/go.mod h1:LGwApLUm2FpoOfxTDEeq8T9ipbpZ61X79hmU3w8FmsY=
+github.com/containernetworking/cni v0.8.1 h1:7zpDnQ3T3s4ucOuJ/ZCLrYBxzkg0AELFfII3Epo9TmI=
+github.com/containernetworking/cni v0.8.1/go.mod h1:LGwApLUm2FpoOfxTDEeq8T9ipbpZ61X79hmU3w8FmsY=
 github.com/containernetworking/plugins v0.8.7 h1:bU7QieuAp+sACI2vCzESJ3FoT860urYP+lThyZkb/2M=
 github.com/containernetworking/plugins v0.8.7/go.mod h1:R7lXeZaBzpfqapcAbHRW8/CYwm0dHzbz0XEjofx0uB0=
 github.com/coreos/go-iptables v0.4.5 h1:DpHb9vJrZQEFMcVLFKAAGMUVX0XoRC0ptCthinRYm38=
