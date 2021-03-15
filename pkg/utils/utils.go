@@ -8,8 +8,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-
-	"github.com/redhat-virtio-net/govdpa/pkg/kvdpa"
 )
 
 var (
@@ -206,15 +204,6 @@ func HasDpdkDriver(pciAddr string) (bool, error) {
 			return true, nil
 		}
 	}
-
-	/* If there is a vdpa device associated with the device and it is bound to
-	vhost-vdpa driver, it shall be treated as a dpdk device
-	*/
-	if vdpaDev, err := kvdpa.GetVdpaDeviceByPci(pciAddr); err != nil &&
-		vdpaDev.GetDriver() == kvdpa.VhostVdpaDriver {
-		return true, nil
-	}
-
 	return false, nil
 }
 
