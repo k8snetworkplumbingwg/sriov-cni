@@ -14,7 +14,6 @@ spec:
         tier: node
         app: sriov-cni
     spec:
-      hostNetwork: true
       nodeSelector:
         beta.kubernetes.io/arch: amd64
       tolerations:
@@ -26,7 +25,12 @@ spec:
         image: nfvpe/sriov-cni:v2.3
         imagePullPolicy: IfNotPresent
         securityContext:
-          privileged: true
+          allowPrivilegeEscalation: false
+          privileged: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
         resources:
           requests:
             cpu: "100m"
