@@ -58,7 +58,8 @@ done
 cp -f "$SRIOV_BIN_FILE" "$CNI_BIN_DIR"
 
 echo "Entering sleep... (success)"
+trap : TERM INT
 
 # Sleep forever. 
 # sleep infinity is not available in alpine; instead lets go sleep for ~68 years. Hopefully that's enough sleep
-sleep 2147483647
+sleep 2147483647 & wait
