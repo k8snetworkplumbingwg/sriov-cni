@@ -1,0 +1,31 @@
+name: Go-static-analysis
+on: [push, pull_request]
+jobs:
+  golangci:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v2
+        with:
+          # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
+          version: v1.29
+          # Adding additional linters beside the default set - See https://golangci-lint.run/usage/linters
+          args: --enable=golint,bodyclose,gosec,whitespace
+  shellcheck:
+    name: Shellcheck
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Run ShellCheck
+      uses: ludeeus/action-shellcheck@master
+  hadolint:
+    runs-on: ubuntu-latest
+    name: Hadolint
+    steps:
+    - uses: actions/checkout@v2
+    - uses: brpaz/hadolint-action@v1.2.1
+      name: Run Hadolint
+      with:
+       dockerfile: Dockerfile
