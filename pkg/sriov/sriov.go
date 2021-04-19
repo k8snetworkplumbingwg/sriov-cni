@@ -284,17 +284,20 @@ func (s *sriovManager) ApplyVFConfig(conf *sriovtypes.NetConf) error {
 	conf.OrigVfState.FillFromVfInfo(vfState)
 
 	// 1. Set vlan
-	if conf.Vlan != nil {
-		// set vlan qos if present in the config
-		if conf.VlanQoS != nil {
-			if err = s.nLink.LinkSetVfVlanQos(pfLink, conf.VFID, *conf.Vlan, *conf.VlanQoS); err != nil {
-				return fmt.Errorf("failed to set vf %d vlan configuration: %v", conf.VFID, err)
-			}
-		} else {
-			// set vlan id field only
-			if err = s.nLink.LinkSetVfVlan(pfLink, conf.VFID, *conf.Vlan); err != nil {
-				return fmt.Errorf("failed to set vf %d vlan: %v", conf.VFID, err)
-			}
+	if conf.Vlan == nil {
+		vlan := new(int)
+		*vlan = 0
+		conf.Vlan = vlan
+	}
+	// set vlan qos if present in the config
+	if conf.VlanQoS != nil {
+		if err = s.nLink.LinkSetVfVlanQos(pfLink, conf.VFID, *conf.Vlan, *conf.VlanQoS); err != nil {
+			return fmt.Errorf("failed to set vf %d vlan configuration: %v", conf.VFID, err)
+		}
+	} else {
+		// set vlan id field only
+		if err = s.nLink.LinkSetVfVlan(pfLink, conf.VFID, *conf.Vlan); err != nil {
+			return fmt.Errorf("failed to set vf %d vlan: %v", conf.VFID, err)
 		}
 	}
 
