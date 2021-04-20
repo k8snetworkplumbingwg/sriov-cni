@@ -141,6 +141,10 @@ The below config will configure a VF using a userspace driver (uio/vfio) for use
 
 **Note** [DHCP](https://github.com/containernetworking/plugins/tree/master/plugins/ipam/dhcp) IPAM plugin can not be used for VF bound to a dpdk driver (uio/vfio).
 
+**Note** When VLAN is not specified in the Network-Attachment-Definition, or when it is given a value of 0,
+VFs connected to this network will have no vlan tag.
+
+
 ### Advanced Configuration 
 
 SR-IOV CNI allows the setting of other SR-IOV options such as link-state and quality of service parameters. To learn more about how these parameters are set consult the [SR-IOV CNI configuration reference guide](docs/configuration-reference.md)  
