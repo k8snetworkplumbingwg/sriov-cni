@@ -155,7 +155,14 @@ func cmdAdd(args *skel.CmdArgs) error {
 func cmdDel(args *skel.CmdArgs) error {
 	netConf, cRefPath, err := config.LoadConfFromCache(args)
 	if err != nil {
-		return err
+		// If cmdDel() fails, cached netconf is cleaned up by
+		// the followed defer call. However, subsequence calls
+		// of cmdDel() from kubelet fail in a dead loop due to
+		// cached netconf doesn't exist.
+		// Return nil when LoadConfFromCache fails since the rest
+		// of cmdDel() code relies on netconf as input argument
+		// and there is no meaning to continue.
+		return nil
 	}
 
 	defer func() {
