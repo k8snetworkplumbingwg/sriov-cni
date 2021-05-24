@@ -9,5 +9,5 @@ require (
 	github.com/onsi/gomega v0.0.0-20151007035656-2152b45fa28a
 	github.com/stretchr/testify v1.4.0
 	github.com/vishvananda/netlink v1.0.1-0.20190924205540-07ace697bea4
-	golang.org/x/sys v0.0.0-20190712062909-fae7ac547cb7 // indirect
+	golang.org/x/sys v0.0.0-20210510120138-977fb7262007 // indirect
 )
