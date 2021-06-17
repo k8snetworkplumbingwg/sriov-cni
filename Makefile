@@ -21,7 +21,7 @@ export GO111MODULE=on
 # Docker
 IMAGEDIR=$(BASE)/images
 DOCKERFILE=$(CURDIR)/Dockerfile
-TAG=nfvpe/sriov-cni
+TAG=ghcr.io/k8snetworkplumbingwg/sriov-cni
 # Accept proxy settings for docker 
 DOCKERARGS=
 ifdef HTTP_PROXY
