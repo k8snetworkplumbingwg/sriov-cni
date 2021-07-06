@@ -19,7 +19,6 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
-	var err error
-	err = RemoveTmpSysFs()
+	err := RemoveTmpSysFs()
 	check(err)
 })
