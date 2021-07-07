@@ -88,7 +88,6 @@ func LoadConf(bytes []byte) (*sriovtypes.NetConf, error) {
 }
 
 func getVfInfo(vfPci string) (string, int, error) {
-
 	var vfID int
 
 	pf, err := utils.GetPfName(vfPci)

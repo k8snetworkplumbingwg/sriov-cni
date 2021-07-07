@@ -127,9 +127,9 @@ func GetSharedPF(ifName string) (string, error) {
 		return pfName, fmt.Errorf("No symbolic link for dir of the device %q", ifName)
 	}
 
-	fullpath, err := filepath.EvalSymlinks(pfDir)
+	fullpath, _ := filepath.EvalSymlinks(pfDir)
 	parentDir := fullpath[:len(fullpath)-len(ifName)]
-	dirList, err := ioutil.ReadDir(parentDir)
+	dirList, _ := ioutil.ReadDir(parentDir)
 
 	for _, file := range dirList {
 		if file.Name() != ifName {
