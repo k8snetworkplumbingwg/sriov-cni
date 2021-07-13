@@ -93,7 +93,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 					return err
 				})
 				if err == nil {
-					sm.ReleaseVF(netConf, args.IfName, args.ContainerID, netns)
+					_ = sm.ReleaseVF(netConf, args.IfName, args.ContainerID, netns)
 				}
 			}
 		}()
@@ -112,7 +112,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 		defer func() {
 			if err != nil {
-				ipam.ExecDel(netConf.IPAM.Type, args.StdinData)
+				_ = ipam.ExecDel(netConf.IPAM.Type, args.StdinData)
 			}
 		}()
 
@@ -167,7 +167,7 @@ func cmdDel(args *skel.CmdArgs) error {
 
 	defer func() {
 		if err == nil && cRefPath != "" {
-			utils.CleanCachedNetConf(cRefPath)
+			_ = utils.CleanCachedNetConf(cRefPath)
 		}
 	}()
 
