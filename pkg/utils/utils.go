@@ -54,7 +54,7 @@ func GetVfid(addr string, pfName string) (int, error) {
 	if err != nil {
 		return id, err
 	}
-	for vf := 0; vf <= vfTotal; vf++ {
+	for vf := 0; vf < vfTotal; vf++ {
 		vfDir := filepath.Join(NetDirectory, pfName, "device", fmt.Sprintf("virtfn%d", vf))
 		_, err := os.Lstat(vfDir)
 		if err != nil {
