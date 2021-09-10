@@ -13,9 +13,9 @@
       * [Contributing](#contributing)
 
 # SR-IOV CNI plugin
-This plugin enables the configuration and usage of SR-IOV VF networks in containers and orchestrators like Kubernetes. 
+This plugin enables the configuration and usage of SR-IOV VF networks in containers and orchestrators like Kubernetes.
 
-Network Interface Cards (NICs) with [SR-IOV](http://blog.scottlowe.org/2009/12/02/what-is-sr-iov/) capabilities are managed through physical functions (PFs) and virtual functions (VFs). A PF is used by the host and usually represents a single NIC port. VF configurations are applied through the PF. With SR-IOV CNI each VF can be treated as a separate network interface, assigned to a container, and configured with it's own MAC, VLAN IP and more.
+Network Interface Cards (NICs) with [SR-IOV](http://blog.scottlowe.org/2009/12/02/what-is-sr-iov/) capabilities are managed through physical functions (PFs) and virtual functions (VFs). A PF is used by the host and usually represents a single NIC port. VF configurations are applied through the PF. With SR-IOV CNI each VF can be treated as a separate network interface, assigned to a container, and configured with it's own MAC, VLAN, IP and more.
 
 SR-IOV CNI plugin works with [SR-IOV device plugin](https://github.com/k8snetworkplumbingwg/sriov-network-device-plugin) for VF allocation in Kubernetes. A metaplugin such as [Multus](https://github.com/intel/multus-cni) gets the allocated VF's `deviceID`(PCI address) and is responsible for invoking the SR-IOV CNI plugin with that `deviceID`.
 
@@ -73,7 +73,7 @@ spec:
 
 The `.spec.config` field contains the configuration information used by the SR-IOV CNI.
 
-### Basic configuration parameters 
+### Basic configuration parameters
 
 The following parameters are generic parameters which are not specific to the SR-IOV CNI configuration, though (with the exception of ipam) they need to be included in the config.
 
@@ -86,7 +86,7 @@ The following parameters are generic parameters which are not specific to the SR
 The following examples show the config needed to set up basic SR-IOV networking in a container. Each of the json config objects below can be placed in the `.spec.config` field of a Network Attachment Definition to integrate with Multus.
 
 #### Kernel driver config
-This is the minimum configuration for a working kernel driver interface using an SR-IOV Virtual Function. It applies an IP address using the host-local IPAM plugin in the range of the subnet provided. 
+This is the minimum configuration for a working kernel driver interface using an SR-IOV Virtual Function. It applies an IP address using the host-local IPAM plugin in the range of the subnet provided.
 
 ```json
 {
@@ -145,9 +145,9 @@ The below config will configure a VF using a userspace driver (uio/vfio) for use
 VFs connected to this network will have no vlan tag.
 
 
-### Advanced Configuration 
+### Advanced Configuration
 
-SR-IOV CNI allows the setting of other SR-IOV options such as link-state and quality of service parameters. To learn more about how these parameters are set consult the [SR-IOV CNI configuration reference guide](docs/configuration-reference.md)  
+SR-IOV CNI allows the setting of other SR-IOV options such as link-state and quality of service parameters. To learn more about how these parameters are set consult the [SR-IOV CNI configuration reference guide](docs/configuration-reference.md)
 
 ## Contributing
 To report a bug or request a feature, open an issue on this repo using one of the available templates.
