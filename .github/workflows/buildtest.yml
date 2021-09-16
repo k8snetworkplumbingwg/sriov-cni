@@ -31,9 +31,10 @@ jobs:
           GOOS: ${{ matrix.goos }}
         run: GOARCH="${TARGET}" go build ./cmd/sriov/...
 
+      # Exclude E2E tests - requires self hosted server with hardware to be executed correctly
       - name: Go test
         if: ${{ matrix.goarch }} == "amd64"
-        run: sudo go test ./... # sudo needed for netns change in test
+        run: sudo go test ./pkg/... # sudo needed for netns change in test
 
   coverage:
     runs-on: ubuntu-latest
