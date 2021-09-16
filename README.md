@@ -10,6 +10,9 @@
             * [Advanced kernel driver config](#advanced-kernel-driver-config)
             * [DPDK userspace driver config](#dpdk-userspace-driver-config)
          * [Advanced configuration](#advanced-configuration)
+      * [Test](#test)
+         * [Unit tests](#unit-tests)
+         * [E2E tests using Kubernetes in Docker (KinD)](#e2e-tests-using-kubernetes-in-docker-kind)
       * [Contributing](#contributing)
 
 # SR-IOV CNI plugin
@@ -148,6 +151,17 @@ VFs connected to this network will have no vlan tag.
 ### Advanced Configuration
 
 SR-IOV CNI allows the setting of other SR-IOV options such as link-state and quality of service parameters. To learn more about how these parameters are set consult the [SR-IOV CNI configuration reference guide](docs/configuration-reference.md)
+
+## Test
+### Unit tests
+
+```
+$ make test
+```
+
+### E2E tests using Kubernetes in Docker (KinD)
+
+Description on how to deploy KinD and run tests is available at [readme](test/README.MD)
 
 ## Contributing
 To report a bug or request a feature, open an issue on this repo using one of the available templates.
