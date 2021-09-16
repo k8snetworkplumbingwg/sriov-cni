@@ -28,7 +28,7 @@ retry() {
     fi
     echo "Exit code: '$status'. Sleeping '$delay' seconds before retrying"
     sleep $delay
-    let retries--
+    (( retries-- )) || true
   done
   return $status
 }
