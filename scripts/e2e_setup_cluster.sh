@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-set -eo pipefail
 
 here="$(dirname "$(readlink --canonicalize "${BASH_SOURCE[0]}")")"
 root="$(readlink --canonicalize "$here/..")"
