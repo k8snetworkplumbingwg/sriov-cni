@@ -7,7 +7,7 @@ import (
 	"github.com/vishvananda/netlink"
 	corev1 "k8s.io/api/core/v1"
 
-	images "github.com/k8snetworkplumbingwg/sriov-cni/test/util/images"
+	"github.com/k8snetworkplumbingwg/sriov-cni/test/util"
 	net "github.com/k8snetworkplumbingwg/sriov-cni/test/util/net"
 	pod "github.com/k8snetworkplumbingwg/sriov-cni/test/util/pod"
 
@@ -31,11 +31,9 @@ var _ = Describe("SR-IOV CNI test", func() {
 			hostLinksBefore, err = net.GetHostLinkList()
 			Expect(err).To(BeNil())
 
-			err = net.SetVfsMAC(testPfName, containerNsPath)
+			err, netnsErr := net.SetVfsMAC(testPfName, containerNsPath)
 			Expect(err).Should(BeNil())
-
-			images.SetImageRegistry("praqma")
-			images.SetTestImageName("network-multitool:alpine-extra")
+			Expect(netnsErr).Should(BeNil())
 		})
 
 		AfterEach(func() {
@@ -53,7 +51,7 @@ var _ = Describe("SR-IOV CNI test", func() {
 				defer deleteNAD(testNetworkName, nadObj)
 
 				By("Create POD")
-				podObj, err = pod.CreateRunningPodWithNad(cs.CoreV1Interface, "test-pod-vf-go", *testNs, testNetworkName, testNetworkResName)
+				podObj, err = pod.TryToCreateRunningPod(cs.CoreV1Interface, "test-pod-vf-go", *testNs, testNetworkName, testNetworkResName, util.Timeout)
 				defer deletePod(podObj)
 				Expect(err).To(BeNil())
 
@@ -90,7 +88,7 @@ var _ = Describe("SR-IOV CNI test", func() {
 				Expect(err).To(BeNil())
 
 				By("Try to create another POD, should fail - no more interfaces")
-				podLast, err := pod.TryToCreateRunningPod(cs.CoreV1Interface, "test-pod-last", *testNs, testNetworkName, testNetworkResName)
+				podLast, err := pod.TryToCreateRunningPod(cs.CoreV1Interface, "test-pod-last", *testNs, testNetworkName, testNetworkResName, util.ShortTimeout)
 				defer deletePod(podLast)
 				Expect(err).ToNot(BeNil())
 
@@ -150,11 +148,11 @@ var _ = Describe("SR-IOV CNI test", func() {
 				Expect(err).To(BeNil())
 
 				By("Create PODs")
-				podObj, err = pod.CreateRunningPodWithNad(cs.CoreV1Interface, "test-pod-smoke-1", *testNs, testNetworkName, testNetworkResName)
+				podObj, err = pod.TryToCreateRunningPod(cs.CoreV1Interface, "test-pod-smoke-1", *testNs, testNetworkName, testNetworkResName, util.Timeout)
 				defer deletePod(podObj)
 				Expect(err).To(BeNil())
 
-				podObj2, err = pod.CreateRunningPodWithNad(cs.CoreV1Interface, "test-pod-smoke-2", *testNs, fmt.Sprintf("%s-2", testNetworkName), testNetworkResName)
+				podObj2, err = pod.TryToCreateRunningPod(cs.CoreV1Interface, "test-pod-smoke-2", *testNs, fmt.Sprintf("%s-2", testNetworkName), testNetworkResName, util.Timeout)
 				defer deletePod(podObj2)
 				Expect(err).To(BeNil())
 

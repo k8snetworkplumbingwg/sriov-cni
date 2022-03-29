@@ -20,7 +20,6 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 
 	util "github.com/k8snetworkplumbingwg/sriov-cni/test/util"
-	images "github.com/k8snetworkplumbingwg/sriov-cni/test/util/images"
 )
 
 // CreateRunningPod create a pod and wait until it is running
@@ -38,22 +37,12 @@ func CreateRunningPod(ci coreclient.CoreV1Interface, pod *corev1.Pod, timeout, i
 	return nil
 }
 
-// CreateRunningPodWithNad - creates running POD - expect success
-func CreateRunningPodWithNad(core coreclient.CoreV1Interface, podName, namespace, networkName, networkResourceName string) (*corev1.Pod, error) {
+// TryToCreateRunningPod - try to create running POD - expect failure or success depening on timeout // util.ShortTimeout
+func TryToCreateRunningPod(core coreclient.CoreV1Interface, podName, namespace, networkName, networkResourceName string, timeout time.Duration) (*corev1.Pod, error) {
 	podObj := GetPodDefinition(podName, namespace)
 	podObj = AddPodNetworkAnnotation(podObj, "k8s.v1.cni.cncf.io/networks", networkName)
 	podObj = AddPodNetworkResourcesAndLimits(podObj, 0, 1, 1, networkResourceName)
-	err := CreateRunningPod(core, podObj, util.Timeout, util.RetryInterval)
-
-	return podObj, err
-}
-
-// TryToCreateRunningPod - try to create running POD - expect failure
-func TryToCreateRunningPod(core coreclient.CoreV1Interface, podName, namespace, networkName, networkResourceName string) (*corev1.Pod, error) {
-	podObj := GetPodDefinition(podName, namespace)
-	podObj = AddPodNetworkAnnotation(podObj, "k8s.v1.cni.cncf.io/networks", networkName)
-	podObj = AddPodNetworkResourcesAndLimits(podObj, 0, 1, 1, networkResourceName)
-	err := CreateRunningPod(core, podObj, util.ShortTimeout, util.RetryInterval)
+	err := CreateRunningPod(core, podObj, timeout, util.RetryInterval)
 
 	return podObj, err
 }
@@ -64,7 +53,7 @@ func CreateListOfPods(core coreclient.CoreV1Interface, number int, namePrefix, n
 	var err error
 
 	for index := 0; index < number; index++ {
-		podLoop, err := CreateRunningPodWithNad(core, fmt.Sprintf("%s-%s", namePrefix, strconv.Itoa(index)), namespace, networkName, networkResourceName)
+		podLoop, err := TryToCreateRunningPod(core, fmt.Sprintf("%s-%s", namePrefix, strconv.Itoa(index)), namespace, networkName, networkResourceName, util.Timeout)
 		podList = append(podList, podLoop)
 		if err != nil {
 			return podList, err
@@ -146,7 +135,7 @@ func GetPodDefinition(podName, ns string) *corev1.Pod {
 			Containers: []corev1.Container{
 				{
 					Name:    "test",
-					Image:   images.GetPodTestImage(),
+					Image:   "praqma/network-multitool:alpine-extra",
 					Command: []string{"/bin/sh", "-c", "sleep INF"},
 				},
 			},

@@ -82,11 +82,11 @@ func SetAllVfOnLinkState(pfName, containerNs string, state uint32) error {
 
 // SetVfsMAC set MACs on VFs to defined state starting from 4a:ea:39:09:4e:XX
 // NOTE: Loop will generate only last two positions
-func SetVfsMAC(pfName, containerNs string) error {
+func SetVfsMAC(pfName, containerNs string) (err, netnsErr error) {
 	// Get container network namespace from path
 	ns, err := netns.GetFromPath(containerNs)
 	if nil != err {
-		return err
+		return err, nil
 	}
 	defer ns.Close()
 
@@ -95,16 +95,16 @@ func SetVfsMAC(pfName, containerNs string) error {
 
 	hostNetNs, err := netns.Get() // host network namespace
 	if err != nil {
-		return err
+		return err, nil
 	}
 	err = netns.Set(ns) // switch netns to container namespace
 	if err != nil {
-		return err
+		return err, nil
 	}
 
 	link, err := netlink.LinkByName(pfName)
 	if nil != err {
-		return err
+		return err, nil
 	}
 
 	var baseMac string = "4a:ea:39:09:4e:"
@@ -118,22 +118,21 @@ func SetVfsMAC(pfName, containerNs string) error {
 
 		hwMac, err := net.ParseMAC(mac)
 		if err != nil {
-			return err
+			return err, nil
 		}
 
 		err = netlink.LinkSetVfHardwareAddr(link, index, hwMac)
 		if nil != err {
-			return err
+			return err, nil
 		}
 	}
 
 	// Return to the host network namespace
-	err = netns.Set(hostNetNs)
-	if nil != err {
-		return err
-	}
+	defer func() {
+		netnsErr = netns.Set(hostNetNs)
+	}()
 
-	return nil
+	return nil, netnsErr
 }
 
 // GetVfsLinksInfoList - returns list with VfInfo structure
