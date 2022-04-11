@@ -13,12 +13,6 @@ import (
 	"syscall"
 )
 
-func check(e error) {
-	if e != nil {
-		panic(e)
-	}
-}
-
 type tmpSysFs struct {
 	dirRoot      string
 	dirList      []string
