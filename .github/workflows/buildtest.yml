@@ -29,3 +29,25 @@ jobs:
 
       - name: Go test
         run: sudo go test ./... # sudo needed for netns change in test
+
+  coverage:
+    runs-on: ubuntu-latest
+    needs: build
+    name: coverage
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.18.x
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+
+      - name: Go test with coverage
+        run: sudo make test-coverage # sudo needed for netns change in test
+      
+      - name: Coveralls
+        uses: coverallsapp/github-action@1.1.3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path-to-lcov: test/coverage/lcov.info
