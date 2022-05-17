@@ -66,24 +66,24 @@ $(GOLANGCILINT): | $(BASE) ; $(info  Installing golangci-lint...)
 	$Q go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45
 
 GOCOVMERGE = $(GOBIN)/gocovmerge
-$(GOBIN)/gocovmerge: | $(BASE) ; $(info  Installing gocovmerge...)
-	$Q go install github.com/wadey/gocovmerge
+$(GOCOVMERGE): | $(BASE) ; $(info  Building gocovmerge...)
+	$Q go install github.com/wadey/gocovmerge@latest
 
 GOCOV = $(GOBIN)/gocov
-$(GOBIN)/gocov: | $(BASE) ; $(info  Installing gocov...)
-	$Q go install github.com/axw/gocov/...
+$(GOCOV): | $(BASE) ; $(info  Building gocov...)
+	$Q go install github.com/axw/gocov/gocov@v1.1.0
 
 GOCOVXML = $(GOBIN)/gocov-xml
-$(GOBIN)/gocov-xml: | $(BASE) ; $(info  Installing gocov-xml...)
-	$Q go install github.com/AlekSi/gocov-xml
+$(GOCOVXML): | $(BASE) ; $(info  Building gocov-xml...)
+	$Q go install github.com/AlekSi/gocov-xml@latest
 
 GCOV2LCOV = $(GOBIN)/gcov2lcov
 $(GCOV2LCOV): | $(BASE) ; $(info  building gcov2lcov...)
-	$Q go get github.com/jandelgado/gcov2lcov
+	$Q go install github.com/jandelgado/gcov2lcov@latest
 
 GO2XUNIT = $(GOBIN)/go2xunit
-$(GOBIN)/go2xunit: | $(BASE) ; $(info  Installing go2xunit...)
-	$Q go install github.com/tebeka/go2xunit
+$(GO2XUNIT): | $(BASE) ; $(info  Building go2xunit...)
+	$Q go install github.com/tebeka/go2xunit@latest
 
 
 # Tests
