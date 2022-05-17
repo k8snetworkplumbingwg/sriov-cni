@@ -10,7 +10,7 @@ jobs:
         uses: golangci/golangci-lint-action@v2
         with:
           # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
-          version: v1.29
+          version: v1.45
           # Adding additional linters beside the default set - See https://golangci-lint.run/usage/linters
           args: --enable=golint,bodyclose,gosec,whitespace
   shellcheck:

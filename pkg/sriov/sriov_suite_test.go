@@ -8,11 +8,6 @@ import (
 	"testing"
 )
 
-func check(e error) {
-	if e != nil {
-		panic(e)
-	}
-}
 func TestConfig(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Sriov Suite")
@@ -21,10 +16,10 @@ func TestConfig(t *testing.T) {
 var _ = BeforeSuite(func() {
 	// create test sys tree
 	err := utils.CreateTmpSysFs()
-	check(err)
+	Expect(err).Should(Succeed())
 })
 
 var _ = AfterSuite(func() {
 	err := utils.RemoveTmpSysFs()
-	check(err)
+	Expect(err).Should(Succeed())
 })

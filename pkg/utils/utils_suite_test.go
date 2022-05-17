@@ -15,10 +15,10 @@ func TestUtils(t *testing.T) {
 var _ = BeforeSuite(func() {
 	// create test sys tree
 	err := CreateTmpSysFs()
-	check(err)
+	Expect(err).Should(Succeed())
 })
 
 var _ = AfterSuite(func() {
 	err := RemoveTmpSysFs()
-	check(err)
+	Expect(err).Should(Succeed())
 })
