@@ -62,24 +62,24 @@ $(BUILDDIR)/$(BINARY_NAME): $(GOFILES) | $(BUILDDIR)
 # Tools
 
 GOLINT = $(GOBIN)/golint
-$(GOBIN)/golint: | $(BASE) ; $(info  Building golint...)
-	$Q go get -u golang.org/x/lint/golint
+$(GOBIN)/golint: | $(BASE) ; $(info  Installing golint...)
+	$Q go install golang.org/x/lint/golint
 
 GOCOVMERGE = $(GOBIN)/gocovmerge
-$(GOBIN)/gocovmerge: | $(BASE) ; $(info  Building gocovmerge...)
-	$Q go get github.com/wadey/gocovmerge
+$(GOBIN)/gocovmerge: | $(BASE) ; $(info  Installing gocovmerge...)
+	$Q go install github.com/wadey/gocovmerge
 
 GOCOV = $(GOBIN)/gocov
-$(GOBIN)/gocov: | $(BASE) ; $(info  Building gocov...)
-	$Q go get github.com/axw/gocov/...
+$(GOBIN)/gocov: | $(BASE) ; $(info  Installing gocov...)
+	$Q go install github.com/axw/gocov/...
 
 GOCOVXML = $(GOBIN)/gocov-xml
-$(GOBIN)/gocov-xml: | $(BASE) ; $(info  Building gocov-xml...)
-	$Q go get github.com/AlekSi/gocov-xml
+$(GOBIN)/gocov-xml: | $(BASE) ; $(info  Installing gocov-xml...)
+	$Q go install github.com/AlekSi/gocov-xml
 
 GO2XUNIT = $(GOBIN)/go2xunit
-$(GOBIN)/go2xunit: | $(BASE) ; $(info  Building go2xunit...)
-	$Q go get github.com/tebeka/go2xunit
+$(GOBIN)/go2xunit: | $(BASE) ; $(info  Installing go2xunit...)
+	$Q go install github.com/tebeka/go2xunit
 
 
 # Tests
@@ -139,6 +139,10 @@ image: | $(BASE) ; $(info Building Docker image...) @ ## Build SR-IOV CNI docker
 	@docker build -t $(TAG) -f $(DOCKERFILE)  $(CURDIR) $(DOCKERARGS)
 
 # Misc
+
+.PHONY: deps-update
+deps-update: ; $(info  Updating dependencies...) @ ## Update dependencies
+	@go mod tidy && go mod vendor
 
 .PHONY: clean
 clean: | $(BASE) ; $(info  Cleaning...) @ ## Cleanup everything
