@@ -8,9 +8,13 @@
 * [Tools](#Tools)
 
 ## Meetings
-Join us for project discussios at _K8s Network & Resource management_ meetings
+Join us for project discussios at _K8s Network & Resource management_ meetings.
+The meetings take place on a weekly basis on Monday and Tuesday in alternating weeks:
 
-Time: 15:00 - 16:00 GMT / 10:00-11:00 ET /  07:00-08:00 PST  every other Monday
+* Time: 15:00 - 16:00 GMT / 10:00-11:00 ET /  07:00-08:00 PST  every other Monday
+* Time: 14:00 - 15:00 GMT / 09:00-10:00 ET / 06:00-07:00 PST on every other Tuesday
+
+
 * [Meeting notes and agenda](https://docs.google.com/document/d/1sJQMHbxZdeYJPgAWK1aSt6yzZ4K_8es7woVIrwinVwI/edit?usp=sharing)
 * [Zoom channel](https://zoom.us/j/2392609689?pwd=K1R4ZEQyWWJVSGV3V1pmVThLMlhqQT09)
 
