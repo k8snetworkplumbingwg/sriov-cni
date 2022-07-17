@@ -1,0 +1,6 @@
+linters:
+  enable:
+    - revive
+    - bodyclose
+    - gosec
+    - whitespace

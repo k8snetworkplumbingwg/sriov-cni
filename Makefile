@@ -36,7 +36,7 @@ GO      = go
 GODOC   = godoc
 GOFMT   = gofmt
 TIMEOUT = 15
-V = 0
+V ?= 0
 Q = $(if $(filter 1,$V),,@)
 
 .PHONY: all
@@ -61,9 +61,9 @@ $(BUILDDIR)/$(BINARY_NAME): $(GOFILES) | $(BUILDDIR)
 
 # Tools
 
-GOLINT = $(GOBIN)/golint
-$(GOBIN)/golint: | $(BASE) ; $(info  Installing golint...)
-	$Q go install golang.org/x/lint/golint
+GOLANGCILINT = $(GOBIN)/golangci-lint
+$(GOLANGCILINT): | $(BASE) ; $(info  Installing golangci-lint...)
+	$Q go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45
 
 GOCOVMERGE = $(GOBIN)/gocovmerge
 $(GOBIN)/gocovmerge: | $(BASE) ; $(info  Installing gocovmerge...)
@@ -121,10 +121,8 @@ test-coverage: fmt lint test-coverage-tools | $(BASE) ; $(info  Running coverage
 	$Q $(GOCOV) convert $(COVERAGE_PROFILE) | $(GOCOVXML) > $(COVERAGE_XML)
 
 .PHONY: lint
-lint: | $(BASE) $(GOLINT) ; $(info  Running golint...) @ ## Run golint on all source files
-	$Q cd $(BASE) && ret=0 && for pkg in $(PKGS); do \
-		test -z "$$($(GOLINT) $$pkg | tee /dev/stderr)" || ret=1 ; \
-	 done ; exit $$ret
+lint: | $(BASE) $(GOLANGCILINT) ; $(info  Running golangci-lint...) @ ## Run golint on all source files
+	$Q $(GOLANGCILINT) run ./...
 
 .PHONY: fmt
 fmt: ; $(info  Running gofmt...) @ ## Run gofmt on all source files
