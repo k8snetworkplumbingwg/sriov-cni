@@ -1,6 +1,7 @@
 /.gopath/*
 /build/*
 /bin/*
+/test/coverage*
 
 # Created by https://www.toptal.com/developers/gitignore/api/go,macos,linux,windows,visualstudiocode
 # Edit at https://www.toptal.com/developers/gitignore?templates=go,macos,linux,windows,visualstudiocode

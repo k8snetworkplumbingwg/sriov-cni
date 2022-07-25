@@ -66,20 +66,24 @@ $(GOLANGCILINT): | $(BASE) ; $(info  Installing golangci-lint...)
 	$Q go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45
 
 GOCOVMERGE = $(GOBIN)/gocovmerge
-$(GOBIN)/gocovmerge: | $(BASE) ; $(info  Installing gocovmerge...)
-	$Q go install github.com/wadey/gocovmerge
+$(GOCOVMERGE): | $(BASE) ; $(info  Building gocovmerge...)
+	$Q go install github.com/wadey/gocovmerge@latest
 
 GOCOV = $(GOBIN)/gocov
-$(GOBIN)/gocov: | $(BASE) ; $(info  Installing gocov...)
-	$Q go install github.com/axw/gocov/...
+$(GOCOV): | $(BASE) ; $(info  Building gocov...)
+	$Q go install github.com/axw/gocov/gocov@v1.1.0
 
 GOCOVXML = $(GOBIN)/gocov-xml
-$(GOBIN)/gocov-xml: | $(BASE) ; $(info  Installing gocov-xml...)
-	$Q go install github.com/AlekSi/gocov-xml
+$(GOCOVXML): | $(BASE) ; $(info  Building gocov-xml...)
+	$Q go install github.com/AlekSi/gocov-xml@latest
+
+GCOV2LCOV = $(GOBIN)/gcov2lcov
+$(GCOV2LCOV): | $(BASE) ; $(info  building gcov2lcov...)
+	$Q go install github.com/jandelgado/gcov2lcov@latest
 
 GO2XUNIT = $(GOBIN)/go2xunit
-$(GOBIN)/go2xunit: | $(BASE) ; $(info  Installing go2xunit...)
-	$Q go install github.com/tebeka/go2xunit
+$(GO2XUNIT): | $(BASE) ; $(info  Building go2xunit...)
+	$Q go install github.com/tebeka/go2xunit@latest
 
 
 # Tests
@@ -99,26 +103,25 @@ test-xml: fmt lint | $(BASE) $(GO2XUNIT) ; $(info  Running $(NAME:%=% )tests...)
 	$Q cd $(BASE) && 2>&1 $(GO) test -timeout 20s -v $(TESTPKGS) | tee test/tests.output
 	$(GO2XUNIT) -fail -input test/tests.output -output test/tests.xml
 
+COVERAGE_DIR = $(CURDIR)/test/coverage
 COVERAGE_MODE = atomic
 COVERAGE_PROFILE = $(COVERAGE_DIR)/profile.out
 COVERAGE_XML = $(COVERAGE_DIR)/coverage.xml
 COVERAGE_HTML = $(COVERAGE_DIR)/index.html
 .PHONY: test-coverage test-coverage-tools
-test-coverage-tools: | $(GOCOVMERGE) $(GOCOV) $(GOCOVXML)
-test-coverage: COVERAGE_DIR := $(CURDIR)/test/coverage.$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
-test-coverage: fmt lint test-coverage-tools | $(BASE) ; $(info  Running coverage tests...) @ ## Run coverage tests
-	$Q mkdir -p $(COVERAGE_DIR)/coverage
+test-coverage-tools: | $(GOCOVMERGE) $(GOCOV) $(GOCOVXML) $(GCOV2LCOV)
+test-coverage: fmt test-coverage-tools | $(BASE) ; $(info  Running coverage tests...) @ ## Run coverage tests
+	$Q mkdir -p $(COVERAGE_DIR)/pkgs
 	$Q cd $(BASE) && for pkg in $(TESTPKGS); do \
 		$(GO) test \
-			-coverpkg=$$($(GO) list -f '{{ join .Deps "\n" }}' $$pkg | \
-					grep '^$(PACKAGE)/' | grep -v '^$(PACKAGE)/vendor/' | \
-					tr '\n' ',')$$pkg \
+			-coverpkg=$(REPO_PATH)/... \
 			-covermode=$(COVERAGE_MODE) \
-			-coverprofile="$(COVERAGE_DIR)/coverage/`echo $$pkg | tr "/" "-"`.cover" $$pkg ;\
-	 done
-	$Q $(GOCOVMERGE) $(COVERAGE_DIR)/coverage/*.cover > $(COVERAGE_PROFILE)
+			-coverprofile="$(COVERAGE_DIR)/pkgs/`echo $$pkg | tr "/" "-"`.cover" $$pkg ;\
+	done
+	$Q $(GOCOVMERGE) $(COVERAGE_DIR)/pkgs/*.cover > $(COVERAGE_PROFILE)
 	$Q $(GO) tool cover -html=$(COVERAGE_PROFILE) -o $(COVERAGE_HTML)
 	$Q $(GOCOV) convert $(COVERAGE_PROFILE) | $(GOCOVXML) > $(COVERAGE_XML)
+	$Q $(GCOV2LCOV) -infile $(COVERAGE_PROFILE) -outfile $(COVERAGE_DIR)/lcov.info
 
 .PHONY: lint
 lint: | $(BASE) $(GOLANGCILINT) ; $(info  Running golangci-lint...) @ ## Run golint on all source files
