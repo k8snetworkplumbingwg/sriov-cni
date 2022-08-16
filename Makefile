@@ -15,13 +15,22 @@ GOFILES = $(shell find . -name *.go | grep -vE "(\/vendor\/)|(_test.go)")
 PKGS     = $(or $(PKG),$(shell cd $(BASE) && env GOPATH=$(GOPATH) $(GO) list ./... | grep -v "^$(PACKAGE)/vendor/"))
 TESTPKGS = $(shell env GOPATH=$(GOPATH) $(GO) list -f '{{ if or .TestGoFiles .XTestGoFiles }}{{ .ImportPath }}{{ end }}' $(PKGS))
 
+
+UPSTREAM_VERSION=$(shell git describe --tags HEAD)
+
+registry_url ?= 514845858982.dkr.ecr.us-west-1.amazonaws.com
+#registry_url ?= docker.io
+
+image_name = ${registry_url}/platform9/sriov-cni
+image_tag = $(UPSTREAM_VERSION)-pmk-$(TEAMCITY_BUILD_ID)
+TAG=$(image_name):${image_tag}
+
 export GOPATH
 export GOBIN
 export GO111MODULE=on
 # Docker
 IMAGEDIR=$(BASE)/images
 DOCKERFILE=$(CURDIR)/Dockerfile
-TAG=ghcr.io/k8snetworkplumbingwg/sriov-cni
 # Accept proxy settings for docker 
 DOCKERARGS=
 ifdef HTTP_PROXY
@@ -136,8 +145,16 @@ fmt: ; $(info  Running gofmt...) @ ## Run gofmt on all source files
 # To pass proxy for Docker invoke it as 'make image HTTP_POXY=http://192.168.0.1:8080'
 .PHONY: image
 image: | $(BASE) ; $(info Building Docker image...) @ ## Build SR-IOV CNI docker image
+	@echo $(TAG)
 	@docker build -t $(TAG) -f $(DOCKERFILE)  $(CURDIR) $(DOCKERARGS)
 
+push: image
+	docker push $(TAG) \
+	&& docker rmi $(TAG)
+	(docker push $(TAG}  || \
+		(aws ecr get-login --region=us-west-1 --no-include-email | sh && \
+		docker push $(TAG))) && \
+		docker rmi $(TAG)
 # Misc
 
 .PHONY: clean
