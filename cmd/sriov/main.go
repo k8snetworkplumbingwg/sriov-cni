@@ -74,6 +74,23 @@ func cmdAdd(args *skel.CmdArgs) error {
 	defer netns.Close()
 
 	sm := sriov.NewSriovManager()
+	err = sm.FillOriginalVfInfo(netConf)
+	if err != nil {
+		return fmt.Errorf("failed to get original vf information: %v", err)
+	}
+	defer func() {
+		if err != nil {
+			err := netns.Do(func(_ ns.NetNS) error {
+				_, err := netlink.LinkByName(args.IfName)
+				return err
+			})
+			if err == nil {
+				_ = sm.ReleaseVF(netConf, args.IfName, args.ContainerID, netns)
+			}
+			// Reset the VF if failure occurs before the netconf is cached
+			_ = sm.ResetVFConfig(netConf)
+		}
+	}()
 	if err := sm.ApplyVFConfig(netConf); err != nil {
 		return fmt.Errorf("SRIOV-CNI failed to configure VF %q", err)
 	}
@@ -86,17 +103,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 	if !netConf.DPDKMode {
 		macAddr, err = sm.SetupVF(netConf, args.IfName, args.ContainerID, netns)
-		defer func() {
-			if err != nil {
-				err := netns.Do(func(_ ns.NetNS) error {
-					_, err := netlink.LinkByName(args.IfName)
-					return err
-				})
-				if err == nil {
-					_ = sm.ReleaseVF(netConf, args.IfName, args.ContainerID, netns)
-				}
-			}
-		}()
+
 		if err != nil {
 			return fmt.Errorf("failed to set up pod interface %q from the device %q: %v", args.IfName, netConf.Master, err)
 		}
@@ -105,7 +112,8 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 	// run the IPAM plugin
 	if netConf.IPAM.Type != "" {
-		r, err := ipam.ExecAdd(netConf.IPAM.Type, args.StdinData)
+		var r types.Result
+		r, err = ipam.ExecAdd(netConf.IPAM.Type, args.StdinData)
 		if err != nil {
 			return fmt.Errorf("failed to set up IPAM plugin type %q from the device %q: %v", netConf.IPAM.Type, netConf.Master, err)
 		}
@@ -117,13 +125,15 @@ func cmdAdd(args *skel.CmdArgs) error {
 		}()
 
 		// Convert the IPAM result into the current Result type
-		newResult, err := current.NewResultFromResult(r)
+		var newResult *current.Result
+		newResult, err = current.NewResultFromResult(r)
 		if err != nil {
 			return err
 		}
 
 		if len(newResult.IPs) == 0 {
-			return errors.New("IPAM plugin returned missing IP config")
+			err = errors.New("IPAM plugin returned missing IP config")
+			return err
 		}
 
 		newResult.Interfaces = result.Interfaces

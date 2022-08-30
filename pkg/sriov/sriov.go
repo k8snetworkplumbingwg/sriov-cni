@@ -42,6 +42,7 @@ type Manager interface {
 	ReleaseVF(conf *sriovtypes.NetConf, podifName string, cid string, netns ns.NetNS) error
 	ResetVFConfig(conf *sriovtypes.NetConf) error
 	ApplyVFConfig(conf *sriovtypes.NetConf) error
+	FillOriginalVfInfo(conf *sriovtypes.NetConf) error
 }
 
 type sriovManager struct {
@@ -191,14 +192,6 @@ func (s *sriovManager) ApplyVFConfig(conf *sriovtypes.NetConf) error {
 	if err != nil {
 		return fmt.Errorf("failed to lookup master %q: %v", conf.Master, err)
 	}
-
-	// Save current the VF state before modifying it
-	vfState := getVfInfo(pfLink, conf.VFID)
-	if vfState == nil {
-		return fmt.Errorf("failed to find vf %d", conf.VFID)
-	}
-	conf.OrigVfState.FillFromVfInfo(vfState)
-
 	// 1. Set vlan
 	if conf.Vlan == nil {
 		vlan := new(int)
@@ -291,6 +284,21 @@ func (s *sriovManager) ApplyVFConfig(conf *sriovtypes.NetConf) error {
 	}
 
 	return nil
+}
+
+// FillOriginalVfInfo fills the original vf info
+func (s *sriovManager) FillOriginalVfInfo(conf *sriovtypes.NetConf) error {
+	pfLink, err := s.nLink.LinkByName(conf.Master)
+	if err != nil {
+		return fmt.Errorf("failed to lookup master %q: %v", conf.Master, err)
+	}
+	// Save current the VF state before modifying it
+	vfState := getVfInfo(pfLink, conf.VFID)
+	if vfState == nil {
+		return fmt.Errorf("failed to find vf %d", conf.VFID)
+	}
+	conf.OrigVfState.FillFromVfInfo(vfState)
+	return err
 }
 
 // ResetVFConfig reset a VF to its original state
