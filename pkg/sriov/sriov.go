@@ -400,7 +400,7 @@ func (s *sriovManager) ResetVFConfig(conf *sriovtypes.NetConf) error {
 	}
 
 	// Restore the original administrative MAC address
-	if conf.MAC != "" {
+	if conf.OrigVfState.AdminMAC != "" {
 		hwaddr, err := net.ParseMAC(conf.OrigVfState.AdminMAC)
 		if err != nil {
 			return fmt.Errorf("failed to parse original administrative MAC address %s: %v", conf.OrigVfState.AdminMAC, err)
