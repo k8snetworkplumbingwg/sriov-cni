@@ -3,7 +3,6 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -29,7 +28,7 @@ func GetSriovNumVfs(ifName string) (int, error) {
 		return vfTotal, fmt.Errorf("failed to open the sriov_numfs of device %q: %v", ifName, err)
 	}
 
-	data, err := ioutil.ReadFile(sriovFile)
+	data, err := os.ReadFile(sriovFile)
 	if err != nil {
 		return vfTotal, fmt.Errorf("failed to read the sriov_numfs of device %q: %v", ifName, err)
 	}
@@ -80,7 +79,7 @@ func GetPfName(vf string) (string, error) {
 		return "", err
 	}
 
-	files, err := ioutil.ReadDir(pfSymLink)
+	files, err := os.ReadDir(pfSymLink)
 	if err != nil {
 		return "", err
 	}
@@ -129,7 +128,7 @@ func GetSharedPF(ifName string) (string, error) {
 
 	fullpath, _ := filepath.EvalSymlinks(pfDir)
 	parentDir := fullpath[:len(fullpath)-len(ifName)]
-	dirList, _ := ioutil.ReadDir(parentDir)
+	dirList, _ := os.ReadDir(parentDir)
 
 	for _, file := range dirList {
 		if file.Name() != ifName {
@@ -149,7 +148,7 @@ func GetVFLinkNames(pciAddr string) (string, error) {
 		return "", err
 	}
 
-	fInfos, err := ioutil.ReadDir(vfDir)
+	fInfos, err := os.ReadDir(vfDir)
 	if err != nil {
 		return "", fmt.Errorf("failed to read net dir of the device %s: %v", pciAddr, err)
 	}
@@ -174,7 +173,7 @@ func GetVFLinkNamesFromVFID(pfName string, vfID int) ([]string, error) {
 		return nil, err
 	}
 
-	fInfos, err := ioutil.ReadDir(vfDir)
+	fInfos, err := os.ReadDir(vfDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read the virtfn%d dir of the device %q: %v", vfID, pfName, err)
 	}
@@ -233,7 +232,7 @@ func saveScratchNetConf(containerID, dataDir string, netconf []byte) error {
 
 	path := filepath.Join(dataDir, containerID)
 
-	err := ioutil.WriteFile(path, netconf, 0600)
+	err := os.WriteFile(path, netconf, 0600)
 	if err != nil {
 		return fmt.Errorf("failed to write container data in the path(%q): %v", path, err)
 	}
@@ -243,7 +242,7 @@ func saveScratchNetConf(containerID, dataDir string, netconf []byte) error {
 
 // ReadScratchNetConf takes in container ID, Pod interface name and data dir as string and returns a pointer to Conf
 func ReadScratchNetConf(cRefPath string) ([]byte, error) {
-	data, err := ioutil.ReadFile(cRefPath)
+	data, err := os.ReadFile(cRefPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read container data in the path(%q): %v", cRefPath, err)
 	}
