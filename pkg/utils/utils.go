@@ -1,8 +1,10 @@
 package utils
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -15,9 +17,36 @@ var (
 	NetDirectory = "/sys/class/net"
 	// SysBusPci is sysfs pci device directory
 	SysBusPci = "/sys/bus/pci/devices"
+	// SysV4ArpNotify is the sysfs IPv4 ARP Notify directory
+	SysV4ArpNotify = "/proc/sys/net/ipv4/conf/"
+	// SysV6NdiscNotify is the sysfs IPv6 Neighbor Discovery Notify directory
+	SysV6NdiscNotify = "/proc/sys/net/ipv6/conf/"
 	// UserspaceDrivers is a list of driver names that don't have netlink representation for their devices
 	UserspaceDrivers = []string{"vfio-pci", "uio_pci_generic", "igb_uio"}
 )
+
+// EnableArpAndNdiscNotify enables IPv4 arp_notify and IPv6 ndisc_notify for netdev
+func EnableArpAndNdiscNotify(ifName string) error {
+	/* For arp_notify, when a value of "1" is set then a Gratuitous ARP request will be sent
+	 * when the network device is brought up or if the link-layer address changes.
+	 * For ndsic_notify, when a value of "1" is set then a Unsolicited Neighbor Advertisement
+	 * will be sent when the network device is brought up or if the link-layer address changes.
+	 * Both of these being enabled would be useful in the case when an application reenables
+	 * an interface or if the MAC address configuration is changed. The kernel is responsible
+	 * for sending of these packets when the conditions are met.
+	 */
+	v4ArpNotifyPath := filepath.Join(SysV4ArpNotify, ifName, "arp_notify")
+	err := os.WriteFile(v4ArpNotifyPath, []byte("1"), os.ModeAppend)
+	if err != nil {
+		return fmt.Errorf("failed to write arp_notify=1 for interface %s: %v", ifName, err)
+	}
+	v6NdiscNotifyPath := filepath.Join(SysV6NdiscNotify, ifName, "ndisc_notify")
+	err = os.WriteFile(v6NdiscNotifyPath, []byte("1"), os.ModeAppend)
+	if err != nil {
+		return fmt.Errorf("failed to write ndisc_notify=1 for interface %s: %v", ifName, err)
+	}
+	return nil
+}
 
 // GetSriovNumVfs takes in a PF name(ifName) as string and returns number of VF configured as int
 func GetSriovNumVfs(ifName string) (int, error) {
@@ -256,4 +285,32 @@ func CleanCachedNetConf(cRefPath string) error {
 		return fmt.Errorf("error removing NetConf file %s: %q", cRefPath, err)
 	}
 	return nil
+}
+
+// IsValidMACAddress checks if net.HardwareAddr is a valid MAC address.
+func IsValidMACAddress(addr net.HardwareAddr) bool {
+	invalidMACAddresses := [][]byte{
+		{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF},
+	}
+	valid := false
+	if len(addr) == 6 {
+		valid = true
+		for _, invalidMACAddress := range invalidMACAddresses {
+			if bytes.Equal(addr, invalidMACAddress) {
+				valid = false
+			}
+		}
+	}
+	return valid
+}
+
+// IsIPv4 checks if a net.IP is an IPv4 address.
+func IsIPv4(ip net.IP) bool {
+	return ip.To4() != nil
+}
+
+// IsIPv6 checks if a net.IP is an IPv6 address.
+func IsIPv6(ip net.IP) bool {
+	return ip.To4() == nil && ip.To16() != nil
 }

@@ -11,114 +11,29 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-// mocked netlink interface
-// required for unit tests
-
-// NetlinkManager is an interface to mock nelink library
-type NetlinkManager interface {
-	LinkByName(string) (netlink.Link, error)
-	LinkSetVfVlan(netlink.Link, int, int) error
-	LinkSetVfVlanQos(netlink.Link, int, int, int) error
-	LinkSetVfHardwareAddr(netlink.Link, int, net.HardwareAddr) error
-	LinkSetHardwareAddr(netlink.Link, net.HardwareAddr) error
-	LinkSetUp(netlink.Link) error
-	LinkSetDown(netlink.Link) error
-	LinkSetNsFd(netlink.Link, int) error
-	LinkSetName(netlink.Link, string) error
-	LinkSetVfRate(netlink.Link, int, int, int) error
-	LinkSetVfSpoofchk(netlink.Link, int, bool) error
-	LinkSetVfTrust(netlink.Link, int, bool) error
-	LinkSetVfState(netlink.Link, int, uint32) error
-}
-
-// MyNetlink NetlinkManager
-type MyNetlink struct {
-	NetlinkManager
-}
-
-// LinkByName implements NetlinkManager
-func (n *MyNetlink) LinkByName(name string) (netlink.Link, error) {
-	return netlink.LinkByName(name)
-}
-
-// LinkSetVfVlan using NetlinkManager
-func (n *MyNetlink) LinkSetVfVlan(link netlink.Link, vf, vlan int) error {
-	return netlink.LinkSetVfVlan(link, vf, vlan)
-}
-
-// LinkSetVfVlanQos sets VLAN ID and QoS field for given VF using NetlinkManager
-func (n *MyNetlink) LinkSetVfVlanQos(link netlink.Link, vf, vlan, qos int) error {
-	return netlink.LinkSetVfVlanQos(link, vf, vlan, qos)
-}
-
-// LinkSetVfHardwareAddr using NetlinkManager
-func (n *MyNetlink) LinkSetVfHardwareAddr(link netlink.Link, vf int, hwaddr net.HardwareAddr) error {
-	return netlink.LinkSetVfHardwareAddr(link, vf, hwaddr)
-}
-
-// LinkSetHardwareAddr using NetlinkManager
-func (n *MyNetlink) LinkSetHardwareAddr(link netlink.Link, hwaddr net.HardwareAddr) error {
-	return netlink.LinkSetHardwareAddr(link, hwaddr)
-}
-
-// LinkSetUp using NetlinkManager
-func (n *MyNetlink) LinkSetUp(link netlink.Link) error {
-	return netlink.LinkSetUp(link)
-}
-
-// LinkSetDown using NetlinkManager
-func (n *MyNetlink) LinkSetDown(link netlink.Link) error {
-	return netlink.LinkSetDown(link)
-}
-
-// LinkSetNsFd using NetlinkManager
-func (n *MyNetlink) LinkSetNsFd(link netlink.Link, fd int) error {
-	return netlink.LinkSetNsFd(link, fd)
-}
-
-// LinkSetName using NetlinkManager
-func (n *MyNetlink) LinkSetName(link netlink.Link, name string) error {
-	return netlink.LinkSetName(link, name)
-}
-
-// LinkSetVfRate using NetlinkManager
-func (n *MyNetlink) LinkSetVfRate(link netlink.Link, vf int, minRate int, maxRate int) error {
-	return netlink.LinkSetVfRate(link, vf, minRate, maxRate)
-}
-
-// LinkSetVfSpoofchk using NetlinkManager
-func (n *MyNetlink) LinkSetVfSpoofchk(link netlink.Link, vf int, check bool) error {
-	return netlink.LinkSetVfSpoofchk(link, vf, check)
-}
-
-// LinkSetVfTrust using NetlinkManager
-func (n *MyNetlink) LinkSetVfTrust(link netlink.Link, vf int, state bool) error {
-	return netlink.LinkSetVfTrust(link, vf, state)
-}
-
-// LinkSetVfState using NetlinkManager
-func (n *MyNetlink) LinkSetVfState(link netlink.Link, vf int, state uint32) error {
-	return netlink.LinkSetVfState(link, vf, state)
-}
-
 type pciUtils interface {
-	getSriovNumVfs(ifName string) (int, error)
-	getVFLinkNamesFromVFID(pfName string, vfID int) ([]string, error)
-	getPciAddress(ifName string, vf int) (string, error)
+	GetSriovNumVfs(ifName string) (int, error)
+	GetVFLinkNamesFromVFID(pfName string, vfID int) ([]string, error)
+	GetPciAddress(ifName string, vf int) (string, error)
+	EnableArpAndNdiscNotify(ifName string) error
 }
 
 type pciUtilsImpl struct{}
 
-func (p *pciUtilsImpl) getSriovNumVfs(ifName string) (int, error) {
+func (p *pciUtilsImpl) GetSriovNumVfs(ifName string) (int, error) {
 	return utils.GetSriovNumVfs(ifName)
 }
 
-func (p *pciUtilsImpl) getVFLinkNamesFromVFID(pfName string, vfID int) ([]string, error) {
+func (p *pciUtilsImpl) GetVFLinkNamesFromVFID(pfName string, vfID int) ([]string, error) {
 	return utils.GetVFLinkNamesFromVFID(pfName, vfID)
 }
 
-func (p *pciUtilsImpl) getPciAddress(ifName string, vf int) (string, error) {
+func (p *pciUtilsImpl) GetPciAddress(ifName string, vf int) (string, error) {
 	return utils.GetPciAddress(ifName, vf)
+}
+
+func (p *pciUtilsImpl) EnableArpAndNdiscNotify(ifName string) error {
+	return utils.EnableArpAndNdiscNotify(ifName)
 }
 
 // Manager provides interface invoke sriov nic related operations
@@ -130,14 +45,14 @@ type Manager interface {
 }
 
 type sriovManager struct {
-	nLink NetlinkManager
+	nLink utils.NetlinkManager
 	utils pciUtils
 }
 
 // NewSriovManager returns an instance of SriovManager
 func NewSriovManager() Manager {
 	return &sriovManager{
-		nLink: &MyNetlink{},
+		nLink: &utils.MyNetlink{},
 		utils: &pciUtilsImpl{},
 	}
 }
@@ -192,7 +107,11 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, cid s
 			return fmt.Errorf("error setting container interface name %s for %s", linkName, tempName)
 		}
 
-		// 6. Bring IF up in Pod netns
+		// 6. Enable IPv4 ARP notify and IPv6 Network Discovery notify
+		// Error is ignored here because enabling this feature is only a performance enhancement.
+		_ = s.utils.EnableArpAndNdiscNotify(podifName)
+
+		// 7. Bring IF up in Pod netns
 		if err := s.nLink.LinkSetUp(linkObj); err != nil {
 			return fmt.Errorf("error bringing interface up in container ns: %q", err)
 		}
