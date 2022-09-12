@@ -9,7 +9,7 @@ import (
 
 type PCIAllocation interface {
 	SaveAllocatedPCI(string, string) error
-	CleanAllocatedPCI(string) error
+	DeleteAllocatedPCI(string) error
 	IsAllocated(string) error
 }
 
@@ -17,7 +17,9 @@ type PCIAllocator struct {
 	dataDir string
 }
 
-func NewPCIAllocator(dataDir string) PCIAllocation {
+// NewPCIAllocator returns a new PCI allocator
+// it will use the <dataDir>/pci folder to store the information about allocated PCI addresses
+func NewPCIAllocator(dataDir string) *PCIAllocator {
 	return &PCIAllocator{dataDir: filepath.Join(dataDir, "pci")}
 }
 
@@ -37,9 +39,9 @@ func (p *PCIAllocator) SaveAllocatedPCI(pciAddress, ns string) error {
 	return err
 }
 
-// CleanAllocatedPCI Remove the allocated PCI file
+// DeleteAllocatedPCI Remove the allocated PCI file
 // return error if the file doesn't exist
-func (p *PCIAllocator) CleanAllocatedPCI(pciAddress string) error {
+func (p *PCIAllocator) DeleteAllocatedPCI(pciAddress string) error {
 	path := filepath.Join(p.dataDir, pciAddress)
 	if err := os.Remove(path); err != nil {
 		return fmt.Errorf("error removing PCI address lock file %s: %v", path, err)
@@ -48,36 +50,38 @@ func (p *PCIAllocator) CleanAllocatedPCI(pciAddress string) error {
 }
 
 // IsAllocated checks if the PCI address file exist
-// if it exists we also check the network namespace still exist if not we clean the allocation
+// if it exists we also check the network namespace still exist if not we delete the allocation
 // The function will return an error if the pci is still allocated to a running pod
-func (p *PCIAllocator) IsAllocated(pciAddress string) error {
+func (p *PCIAllocator) IsAllocated(pciAddress string) (bool, error) {
 	path := filepath.Join(p.dataDir, pciAddress)
 	_, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil
+			return false, nil
 		}
 
-		return fmt.Errorf("failed to check for pci address file for %s: %v", path, err)
+		return false, fmt.Errorf("failed to check for pci address file for %s: %v", path, err)
 	}
 
 	dat, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("failed to read for pci address file for %s: %v", path, err)
+		return false, fmt.Errorf("failed to read for pci address file for %s: %v", path, err)
 	}
 
 	// To prevent a locking of a PCI address for every pciAddress file we also add the netns path where it's been used
 	// This way if for some reason the cmdDel command was not called but the pod namespace doesn't exist anymore
 	// we release the PCI address
-	_, err = ns.GetNS(string(dat))
+	networkNamespace, err := ns.GetNS(string(dat))
 	if err != nil {
-		err = p.CleanAllocatedPCI(pciAddress)
+		err = p.DeleteAllocatedPCI(pciAddress)
 		if err != nil {
-			return fmt.Errorf("error cleaning the pci allocation for vf pci address %s: %v", pciAddress, err)
+			return false, fmt.Errorf("error deleting the pci allocation for vf pci address %s: %v", pciAddress, err)
 		}
-	} else {
-		return fmt.Errorf("error the deivce is already allocated for pci address %s", pciAddress)
+
+		return false, nil
 	}
 
-	return nil
+	// Close the network namespace
+	networkNamespace.Close()
+	return true, nil
 }

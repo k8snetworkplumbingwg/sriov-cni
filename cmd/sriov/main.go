@@ -169,6 +169,12 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return fmt.Errorf("error saving NetConf %q", err)
 	}
 
+	allocator := utils.NewPCIAllocator(config.DefaultCNIDir)
+	// Mark the pci address as in used
+	if err = allocator.SaveAllocatedPCI(netConf.DeviceID, args.Netns); err != nil {
+		return fmt.Errorf("error saving the pci allocation for vf pci address %s: %v", netConf.DeviceID, err)
+	}
+
 	return types.PrintResult(result, netConf.CNIVersion)
 }
 
@@ -229,6 +235,12 @@ func cmdDel(args *skel.CmdArgs) error {
 
 	if err := sm.ResetVFConfig(netConf); err != nil {
 		return fmt.Errorf("cmdDel() error reseting VF: %q", err)
+	}
+
+	// Mark the pci address as released
+	allocator := utils.NewPCIAllocator(config.DefaultCNIDir)
+	if err = allocator.DeleteAllocatedPCI(netConf.DeviceID); err != nil {
+		return fmt.Errorf("error cleaning the pci allocation for vf pci address %s: %v", netConf.DeviceID, err)
 	}
 
 	return nil
