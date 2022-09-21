@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"time"
 
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
@@ -85,7 +86,10 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}}
 
 	if !netConf.DPDKMode {
-		macAddr, err = sm.SetupVF(netConf, args.IfName, args.ContainerID, netns)
+		macAddr, err = retry(5, 500, func() (string, error) {
+			return sm.SetupVF(netConf, args.IfName, args.ContainerID, netns)
+		})
+		//macAddr, err = sm.SetupVF(netConf, args.IfName, args.ContainerID, netns)
 		defer func() {
 			if err != nil {
 				err := netns.Do(func(_ ns.NetNS) error {
@@ -220,4 +224,15 @@ func cmdCheck(args *skel.CmdArgs) error {
 
 func main() {
 	skel.PluginMain(cmdAdd, cmdCheck, cmdDel, version.All, "")
+}
+
+func retry(attempts int, wait time.Duration, function func() (string, error)) (msg string, err error) {
+	for i := 0; i < attempts; i++ {
+		time.Sleep(wait * time.Millisecond)
+		msg, err = function()
+		if err == nil {
+			return msg, err
+		}
+	}
+	return msg, fmt.Errorf("failed after %d attempts with error: %s", attempts, err)
 }
