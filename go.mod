@@ -1,6 +1,6 @@
 module github.com/k8snetworkplumbingwg/sriov-cni
 
-go 1.17
+go 1.19
 
 require (
 	github.com/containernetworking/cni v0.8.1
