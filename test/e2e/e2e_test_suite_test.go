@@ -71,7 +71,7 @@ var (
 	testPfName      string
 	testDpFilePath  string
 
-	supportedKenrelDrivers    = []string{"iavf"}
+	supportedKernelDrivers    = []string{"iavf"}
 	supportedUserSpaceDrivers = []string{"vfio-pci"}
 )
 

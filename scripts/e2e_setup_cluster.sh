@@ -6,7 +6,7 @@ root="$(readlink --canonicalize "$here/..")"
 RETRY_MAX=10
 INTERVAL=10
 TIMEOUT=300
-MULTUS_DAEMONSET_URL="https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/images/multus-daemonset.yml"
+MULTUS_DAEMONSET_URL="https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deployments/multus-daemonset.yml"
 MULTUS_NAME="multus"
 CONFIG_FILE="config.json"
 CONFIG_PATH="/usr/share/e2e"
@@ -36,7 +36,7 @@ check_requirements() {
   for cmd in docker "${root}/bin/kind" kubectl ip; do
     if ! command -v "$cmd" &> /dev/null; then
       echo "$cmd is not available"
-      exit 1
+      return 1
     fi
   done
 
@@ -44,22 +44,22 @@ check_requirements() {
   kind_clusters=$("${root}"/bin/kind get clusters)
   if [[ "$kind_clusters" == *"kind"* ]]; then
     echo "ERROR: Please teardown existing KinD cluster"
-    exit 2
+    return 2
   fi
 
   if [[ ! -d "$CONFIG_PATH" ]]; then
     echo "ERROR: Directory where E2E tests configuration does not exists."
-    exit 3
+    return 3
   fi
 
   if [[ ! -r "$CONFIG_PATH"/"$CONFIG_FILE" ]]; then
     echo "ERROR: E2E configuration file read permission is missing."
-    exit 3
+    return 3
   fi
 }
 
 echo "## Checking requirements"
-check_requirements
+check_requirements || return $?
 
 echo '## Build SRIOV-CNI'
 make

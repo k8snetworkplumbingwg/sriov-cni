@@ -64,7 +64,15 @@ var _ = Describe("SR-IOV CNI test", func() {
 				stdoutString, stderrString, err = pod.ExecuteCommand(cs.CoreV1Interface, kubeConfig, podObj.Name, *testNs, "test", "ethtool -i net1")
 				Expect(err).Should(BeNil())
 				Expect(stderrString).Should(Equal(""))
-				Expect(stdoutString).Should(ContainSubstring("driver: iavf"))
+
+				var foundDriver bool
+				for _, driver := range supportedKernelDrivers {
+					if strings.Contains(stdoutString, "driver: "+driver) {
+						foundDriver = true
+						break
+					}
+				}
+				Expect(foundDriver).Should(BeTrue())
 
 				stdoutString, stderrString, err = pod.ExecuteCommand(cs.CoreV1Interface, kubeConfig, podObj.Name, *testNs, "test", "ethtool -i net2")
 				Expect(err).ShouldNot(BeNil())

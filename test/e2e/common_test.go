@@ -107,7 +107,7 @@ func determineDriverSpace(pfName string) (string, error) {
 			user++
 		}
 
-		supported, err = isDriverSupported(pciAddr, supportedKenrelDrivers)
+		supported, err = isDriverSupported(pciAddr, supportedKernelDrivers)
 		if err != nil {
 			return "", err
 		}

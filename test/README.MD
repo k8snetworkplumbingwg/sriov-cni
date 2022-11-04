@@ -2,7 +2,7 @@
 
 ### How to test e2e
 
-To be able to execute Go tests it is necessary to create configuration files that will provide information about interface to be used in tests and configuration of device plugin. Based on that information scripts will execute tests. It is in responsibility of vendor that provides host to create those configuration files and prepare network interfaces with correct driver and sufficient number of Virtual Functions (VF). Test suite will NOT create any VFs on its own. After KinD initialization each VFs driver is checked against supported drivers array. It is not allowed to mix kernel space drivers with user space drivers on one Physical Function (PF). Vendors can update the driver array if needed by providing pull request with change. The array is defined inside **sriov-cni/test/e2e/e2e_tests_suite_test.go**. Test suite based on configuration tries to automatically detect the driver space and run tests suitable only for those drivers.
+To be able to execute Go tests it is necessary to create configuration files that will provide information about interface to be used in tests and configuration of device plugin. Based on that information scripts will execute tests. It is in responsibility of vendor that provides host to create those configuration files and prepare network interfaces with correct driver and sufficient number of Virtual Functions (VF). Test suite will NOT create any VFs on its own. After KinD initialization each VFs driver is checked against supported drivers array. It is not allowed to mix kernel space drivers with user space drivers on one Physical Function (PF). Vendors can update the driver array if needed by providing pull request with change. The array is defined inside **sriov-cni/test/e2e/e2e_test_suite_test.go**. Test suite based on configuration tries to automatically detect the driver space and run tests suitable only for those drivers.
 
 ```
 var (
@@ -39,7 +39,7 @@ Example of the configuration file defined at **dpConfigFileName**
           "selectors": {
                   "vendors": ["8086"],
                   "devices": ["154c"],
-                  "driver": ["iavf"]
+                  "drivers": ["iavf"]
           }
   }]
 }
