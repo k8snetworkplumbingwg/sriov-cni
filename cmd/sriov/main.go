@@ -7,7 +7,7 @@ import (
 
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
-	"github.com/containernetworking/cni/pkg/types/current"
+	current "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ipam"
 	"github.com/containernetworking/plugins/pkg/ns"
@@ -169,7 +169,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return fmt.Errorf("error saving NetConf %q", err)
 	}
 
-	return types.PrintResult(result, current.ImplementedSpecVersion)
+	return types.PrintResult(result, netConf.CNIVersion)
 }
 
 func cmdDel(args *skel.CmdArgs) error {
