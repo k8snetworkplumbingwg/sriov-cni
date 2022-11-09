@@ -64,7 +64,7 @@ Scripts that creates cluster has to be sourced because they are exporting enviro
 ### How to teardown cluster
 
 ```
-$ ./scripts/e2e_teardown.sh
+$ ./scripts/e2e_teardown_cluster.sh
 ```
 
 ### Current test cases

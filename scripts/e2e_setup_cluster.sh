@@ -78,6 +78,8 @@ retry kubectl -n kube-system wait --for=condition=available deploy/coredns --tim
 
 echo "## Install multus"
 retry kubectl create -f "${MULTUS_DAEMONSET_URL}"
+# temporary fix as multus :stable image blocks the pod in "ConteinerCreating" state
+kubectl patch ds kube-multus-ds -n kube-system --type='json' -p='[{"op": "replace","path": "/spec/template/spec/containers/0/image", "value":"ghcr.io/k8snetworkplumbingwg/multus-cni:latest"}]'
 retry kubectl -n kube-system wait --for=condition=ready -l name="${MULTUS_NAME}" pod --timeout="${TIMEOUT}"s
 
 echo "## find KinD container"
