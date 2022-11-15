@@ -124,7 +124,7 @@ func UpdatePodInfo(ci coreclient.CoreV1Interface, pod *corev1.Pod, timeout time.
 
 // GetPodDefinition returns POD definition
 func GetPodDefinition(podName, ns string) *corev1.Pod {
-	var graceTime int64 = 0
+	var graceTime int64
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
@@ -256,7 +256,7 @@ func WaitForPodRecreation(core coreclient.CoreV1Interface, oldPodName, ns string
 	return waitForPodStateRunning(core, pods.Items[0].Name, pods.Items[0].Namespace, timeout, interval)
 }
 
-//WaitForPodStateRunning waits for pod to enter running state
+// WaitForPodStateRunning waits for pod to enter running state
 func waitForPodStateRunning(core coreclient.CoreV1Interface, podName, ns string, timeout, interval time.Duration) error {
 	return wait.PollImmediate(interval, timeout, func() (done bool, err error) {
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -275,7 +275,7 @@ func waitForPodStateRunning(core coreclient.CoreV1Interface, podName, ns string,
 	})
 }
 
-//waitForPodDeletion waits for pod to be deleted
+// waitForPodDeletion waits for pod to be deleted
 func waitForPodDeletion(core coreclient.CoreV1Interface, podName, ns string, timeout, interval time.Duration) error {
 	result := wait.PollImmediate(interval, timeout, func() (done bool, err error) {
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -323,7 +323,7 @@ func WaitForDpResourceUpdate(ci coreclient.CoreV1Interface, pod corev1.Pod, time
 	return isUpdated, err
 }
 
-//checkForDpResourceUpdate checks if device plugin's resource list has been updated
+// checkForDpResourceUpdate checks if device plugin's resource list has been updated
 func checkForDpResourceUpdate(ci coreclient.CoreV1Interface, pod corev1.Pod) (bool, error) {
 	isUpdated := false
 	res := ci.Pods(pod.Namespace).GetLogs(pod.Name, &corev1.PodLogOptions{})
@@ -349,7 +349,7 @@ func checkForDpResourceUpdate(ci coreclient.CoreV1Interface, pod corev1.Pod) (bo
 	return isUpdated, nil
 }
 
-//prepareSelectors perpares pod selectors to be used
+// prepareSelectors perpares pod selectors to be used
 func prepareSelectors(labels map[string]string) string {
 	var result string
 	index := 0
@@ -371,8 +371,9 @@ func prepareSelectors(labels map[string]string) string {
 // :param containerName - container name on which command should be executed
 // :param command - command to be executed on POD
 // :return string output of the command (stdout)
-// 	       string output of the command (stderr)
-//         error Error object or when everthing is correct nil
+//
+//		       string output of the command (stderr)
+//	        error Error object or when everthing is correct nil
 func ExecuteCommand(core coreclient.CoreV1Interface, config *restclient.Config, podName, ns, containerName, command string) (string, string, error) {
 	shellCommand := []string{"/bin/sh", "-c", command}
 	request := core.RESTClient().Post().Resource("pods").Name(podName).Namespace(ns).SubResource("exec")

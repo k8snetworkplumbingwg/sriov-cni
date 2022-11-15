@@ -11,7 +11,7 @@ import (
 	net "github.com/k8snetworkplumbingwg/sriov-cni/test/util/net"
 	pod "github.com/k8snetworkplumbingwg/sriov-cni/test/util/pod"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 

@@ -22,7 +22,7 @@ import (
 	pod "github.com/k8snetworkplumbingwg/sriov-cni/test/util/pod"
 	serviceaccount "github.com/k8snetworkplumbingwg/sriov-cni/test/util/serviceaccount"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
@@ -115,7 +115,7 @@ func TestSriovTests(t *testing.T) {
 	RunSpecs(t, "SR-IOV CNI E2E suite")
 }
 
-var _ = BeforeSuite(func(done Done) {
+var _ = BeforeSuite(func() {
 	cfg, err := clientcmd.BuildConfigFromFlags(*master, *kubeConfigPath)
 	Expect(err).Should(BeNil())
 
@@ -148,9 +148,7 @@ var _ = BeforeSuite(func(done Done) {
 
 	err = pod.WaitForPodStateRunningLabel(cs, "name=sriov-device-plugin", *testNs, timeout, interval)
 	Expect(err).To(BeNil())
-
-	close(done)
-}, 60)
+})
 
 var _ = AfterSuite(func() {
 	// Move PF with Vfs back to the Host network namespace

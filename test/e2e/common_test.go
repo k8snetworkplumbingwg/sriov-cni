@@ -6,7 +6,7 @@ package e2e
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -19,7 +19,7 @@ import (
 	net "github.com/k8snetworkplumbingwg/sriov-cni/test/util/net"
 	pod "github.com/k8snetworkplumbingwg/sriov-cni/test/util/pod"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
@@ -41,6 +41,7 @@ func createNADwithConfig(namespace, networkName, networkResName string, config N
 	nadObj = nad.AddNADIntSpecConfigProperty(nadObj, "vlan", config.vlanID)
 	nadObj = nad.AddNADIntSpecConfigProperty(nadObj, "vlanQoS", config.vlanQoS)
 	nadObj = nad.AddNADSpecConfigProperty(nadObj, "spoofchk", config.spoofchk)
+	nadObj = nad.AddNADIntSpecConfigProperty(nadObj, "min_tx_rate", int(config.minTxRate))
 	nadObj = nad.AddNADIntSpecConfigProperty(nadObj, "max_tx_rate", int(config.maxTxRate))
 	err := nad.ApplyNetworkAttachmentDefinition(networkClient.K8sCniCncfIoV1Interface, nadObj, timeout)
 	Expect(err).To(BeNil())
@@ -162,7 +163,7 @@ func readDpConfigurationFile(path string) (string, error) {
 	}
 	defer configFile.Close()
 
-	bytesVal, err := ioutil.ReadAll(configFile)
+	bytesVal, err := io.ReadAll(configFile)
 	if err != nil {
 		return "", err
 	}

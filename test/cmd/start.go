@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -67,7 +67,7 @@ func readConfigurationFile(path string, config *interfacesArray) error {
 	}
 	defer jsonFile.Close()
 
-	bytesVal, err := ioutil.ReadAll(jsonFile)
+	bytesVal, err := io.ReadAll(jsonFile)
 	if err != nil {
 		return err
 	}

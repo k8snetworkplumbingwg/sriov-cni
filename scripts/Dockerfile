@@ -1,6 +1,5 @@
-FROM kindest/node:v1.22.0
+FROM kindest/node:v1.25.3
 
-# copy sriov cni plugin
 COPY build/sriov /opt/cni/bin
 
 RUN chmod +x /opt/cni/bin/sriov
