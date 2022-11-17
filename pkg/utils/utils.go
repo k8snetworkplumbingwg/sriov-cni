@@ -120,7 +120,7 @@ func GetPfName(vf string) (string, error) {
 	return strings.TrimSpace(files[0].Name()), nil
 }
 
-// GetPciAddress takes in a interface(ifName) and VF id and returns returns its pci addr as string
+// GetPciAddress takes in a interface(ifName) and VF id and returns its pci addr as string
 func GetPciAddress(ifName string, vf int) (string, error) {
 	var pciaddr string
 	vfDir := filepath.Join(NetDirectory, ifName, "device", fmt.Sprintf("virtfn%d", vf))
@@ -282,7 +282,7 @@ func ReadScratchNetConf(cRefPath string) ([]byte, error) {
 // CleanCachedNetConf removed cached NetConf from disk
 func CleanCachedNetConf(cRefPath string) error {
 	if err := os.Remove(cRefPath); err != nil {
-		return fmt.Errorf("error removing NetConf file %s: %q", cRefPath, err)
+		return fmt.Errorf("error removing NetConf file %s: %v", cRefPath, err)
 	}
 	return nil
 }
