@@ -1,6 +1,9 @@
 package utils
 
 import (
+	"errors"
+	"time"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -76,6 +79,16 @@ var _ = Describe("Utils", func() {
 		It("Assuming not existing vf", func() {
 			_, err := GetVFLinkNamesFromVFID("enp175s0f1", 3)
 			Expect(err).To(HaveOccurred(), "Not existing VF should return an error")
+		})
+	})
+	Context("Checking Retry functon", func() {
+		It("Assuming calling function fails", func() {
+			err := Retry(5, 10*time.Millisecond, func() error { return errors.New("") })
+			Expect(err).To((HaveOccurred()), "Retry should return an error")
+		})
+		It("Assuming calling function does not fail", func() {
+			err := Retry(5, 10*time.Millisecond, func() error { return nil })
+			Expect(err).NotTo((HaveOccurred()), "Retry should not return an error")
 		})
 	})
 })
