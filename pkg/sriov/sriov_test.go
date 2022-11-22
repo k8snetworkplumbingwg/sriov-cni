@@ -223,6 +223,46 @@ var _ = Describe("Sriov", func() {
 			mocked.AssertExpectations(t)
 		})
 	})
+	Context("Checking FillOriginalVfInfo function", func() {
+		var (
+			netconf *sriovtypes.NetConf
+		)
+
+		BeforeEach(func() {
+			netconf = &sriovtypes.NetConf{
+				Master:      "enp175s0f1",
+				DeviceID:    "0000:af:06.0",
+				VFID:        0,
+				ContIFNames: "net1",
+				OrigVfState: sriovtypes.VfState{
+					HostIFName: "enp175s6",
+				},
+			}
+		})
+		It("Saves the current VF state", func() {
+			mocked := &mocks_utils.NetlinkManager{}
+			//fakeLink := &FakeLink{netlink.LinkAttrs{Index: 1000, Name: "dummylink"}}
+			fakeMac, err := net.ParseMAC("6e:16:06:0e:b7:e9")
+			Expect(err).NotTo(HaveOccurred())
+
+			fakeLink := &FakeLink{netlink.LinkAttrs{
+				Index:        1000,
+				Name:         "dummylink",
+				HardwareAddr: fakeMac,
+				Vfs: []netlink.VfInfo{
+					{
+						ID:  0,
+						Mac: net.HardwareAddr(fakeMac),
+					},
+				},
+			}}
+			mocked.On("LinkByName", netconf.Master).Return(fakeLink, nil)
+			sm := sriovManager{nLink: mocked}
+			err = sm.FillOriginalVfInfo(netconf)
+			Expect(err).NotTo(HaveOccurred())
+			mocked.AssertExpectations(t)
+		})
+	})
 	Context("Checking ResetVFConfig function - restore config no user params", func() {
 		var (
 			netconf *sriovtypes.NetConf
@@ -250,7 +290,6 @@ var _ = Describe("Sriov", func() {
 			mocked.AssertExpectations(t)
 		})
 	})
-
 	Context("Checking ResetVFConfig function - restore config with user params", func() {
 		var (
 			netconf *sriovtypes.NetConf
