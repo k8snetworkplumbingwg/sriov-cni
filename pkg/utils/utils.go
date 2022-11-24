@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var (
@@ -313,4 +314,17 @@ func IsIPv4(ip net.IP) bool {
 // IsIPv6 checks if a net.IP is an IPv6 address.
 func IsIPv6(ip net.IP) bool {
 	return ip.To4() == nil && ip.To16() != nil
+}
+
+// Retry retries a given function until no return error; times out after retries*sleep
+func Retry(retries int, sleep time.Duration, f func() error) error {
+	err := error(nil)
+	for retry := 0; retry < retries; retry++ {
+		err = f()
+		if err == nil {
+			return nil
+		}
+		time.Sleep(sleep)
+	}
+	return err
 }
