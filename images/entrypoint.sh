@@ -16,8 +16,8 @@ usage()
     printf "\n"
     printf "./entrypoint.sh\n"
     printf "\t-h --help\n"
-    printf "\t--cni-bin-dir=%s\n" $CNI_BIN_DIR
-    printf "\t--sriov-bin-file=%s\n" $SRIOV_BIN_FILE
+    printf "\t--cni-bin-dir=%s\n" "$CNI_BIN_DIR"
+    printf "\t--sriov-bin-file=%s\n" "$SRIOV_BIN_FILE"
 }
 
 # Parse parameters given as arguments to this script.
