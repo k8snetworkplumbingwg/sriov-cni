@@ -78,10 +78,16 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return fmt.Errorf("SRIOV-CNI failed to configure VF %q", err)
 	}
 
+	macAddr = netConf.OrigVfState.AdminMAC
+	if netConf.MAC != "" {
+		macAddr = netConf.MAC
+	}
+
 	result := &current.Result{}
 	result.Interfaces = []*current.Interface{{
 		Name:    args.IfName,
 		Sandbox: netns.Path(),
+		Mac:     macAddr,
 	}}
 
 	if !netConf.DPDKMode {
