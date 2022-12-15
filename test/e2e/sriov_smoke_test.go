@@ -45,14 +45,12 @@ var _ = Describe("SR-IOV CNI test", func() {
 			Expect(err).To(BeNil())
 		})
 
-		Context("POD is able to consume SR-IOV interfaces", func() {
-			It("Second interface is available within POD", func() {
+		Context("Pod is able to consume SR-IOV interfaces", func() {
+			It("Second interface is available within pod", func() {
 				nadObj := createNAD(*testNs, testNetworkName, testNetworkResName)
-				defer deleteNAD(testNetworkName, nadObj)
 
-				By("Create POD")
+				By("Create pod")
 				podObj, err = pod.TryToCreateRunningPod(cs.CoreV1Interface, "test-pod-vf-go", *testNs, testNetworkName, testNetworkResName, util.Timeout)
-				defer deletePod(podObj)
 				Expect(err).To(BeNil())
 
 				By("Verification - Check second network interfaces")
@@ -79,25 +77,25 @@ var _ = Describe("SR-IOV CNI test", func() {
 				Expect(err.Error()).Should(Equal("command terminated with exit code 71"))
 				Expect(stderrString).Should(ContainSubstring("Cannot get driver information: No such device"))
 				Expect(stdoutString).Should(Equal(""))
+
+				deletePod(podObj)
+				deleteNAD(testNetworkName, nadObj)
 			})
 
-			It("Verify if all available VFs can be used by POD with second interface", func() {
+			It("Verify if all available VFs can be used by pod with second interface", func() {
 				By("Verify that number of VFs is equal to the requested number of VFs")
 				vfsInfo, err := net.GetVfsLinksInfoList(testPfName, containerNsPath)
 				Expect(err).Should(BeNil())
 				Expect(len(vfsInfo)).ShouldNot(Equal(0))
 
 				nadObj := createNAD(*testNs, testNetworkName, testNetworkResName)
-				defer deleteNAD(testNetworkName, nadObj)
 
-				By("Create list of PODs - one for each VF available on PF")
+				By("Create pods - one for each VF available on PF")
 				podList, err := pod.CreateListOfPods(cs.CoreV1Interface, len(vfsInfo), "test-pod-vf", *testNs, testNetworkName, testNetworkResName)
-				defer deletePods(podList)
 				Expect(err).To(BeNil())
 
-				By("Try to create another POD, should fail - no more interfaces")
+				By("Try to create another pod, should fail - no more interfaces")
 				podLast, err := pod.TryToCreateRunningPod(cs.CoreV1Interface, "test-pod-last", *testNs, testNetworkName, testNetworkResName, util.ShortTimeout)
-				defer deletePod(podLast)
 				Expect(err).ToNot(BeNil())
 
 				events, err := pod.GetPodEventsList(cs, podLast, timeout)
@@ -111,15 +109,15 @@ var _ = Describe("SR-IOV CNI test", func() {
 					}
 				}
 				Expect(found).To(Equal(true))
+
+				deletePods(podList)
+				deletePod(podLast)
+				deleteNAD(testNetworkName, nadObj)
 			})
 		})
 
 		Context("Smoke tests", func() {
 			It("Check all features in one smoke test - set not default states", func() {
-				By("Set all links to enable state on VFs and PF to down to have well know state before test execution")
-				err = net.SetAllVfOnLinkState(testPfName, containerNsPath, net.LinkStateAuto)
-				Expect(err).To(BeNil())
-
 				nad0 := NADConfiguration{
 					linkState: "auto",
 					vlanID:    0,
@@ -143,28 +141,25 @@ var _ = Describe("SR-IOV CNI test", func() {
 					vlanID:    250,
 					vlanQoS:   1,
 					spoofchk:  "off",
-					minTxRate: 0,
+					minTxRate: 10,
 					maxTxRate: 20,
 				}
 
 				nadObj := createNADwithConfig(*testNs, testNetworkName, testNetworkResName, nad1)
 				defer deleteNAD(testNetworkName, nadObj)
-				Expect(err).To(BeNil())
 
 				nadObj2 := createNADwithConfig(*testNs, fmt.Sprintf("%s-2", testNetworkName), testNetworkResName, nad2)
 				defer deleteNAD(fmt.Sprintf("%s-2", testNetworkName), nadObj2)
-				Expect(err).To(BeNil())
 
-				By("Create PODs")
+				By("Create 1st pod")
 				podObj, err = pod.TryToCreateRunningPod(cs.CoreV1Interface, "test-pod-smoke-1", *testNs, testNetworkName, testNetworkResName, util.Timeout)
-				defer deletePod(podObj)
 				Expect(err).To(BeNil())
 
+				By("Create 2nd pod")
 				podObj2, err = pod.TryToCreateRunningPod(cs.CoreV1Interface, "test-pod-smoke-2", *testNs, fmt.Sprintf("%s-2", testNetworkName), testNetworkResName, util.Timeout)
-				defer deletePod(podObj2)
 				Expect(err).To(BeNil())
 
-				By("Verify that PODs MAC was not changed")
+				By("Verify that pods MAC was not changed")
 				net1Mac, stderrString, err = pod.ExecuteCommand(cs.CoreV1Interface, kubeConfig, podObj.Name, *testNs, "test", "ip add show net1 | grep ether | awk '{print $2}'")
 				net1Mac = strings.TrimSuffix(net1Mac, "\n")
 				Expect(err).Should(BeNil())
@@ -177,7 +172,7 @@ var _ = Describe("SR-IOV CNI test", func() {
 				Expect(stderrString).Should(Equal(""))
 				Expect(net2Mac).ShouldNot(Equal(""))
 
-				By("Verify that VF has MAC defined in POD specification")
+				By("Verify that VF has MAC defined in pod specification")
 				vfsInfo, err := net.GetVfsLinksInfoList(testPfName, containerNsPath)
 				Expect(err).Should(BeNil())
 				for index, vf := range vfsInfo {
@@ -190,6 +185,14 @@ var _ = Describe("SR-IOV CNI test", func() {
 						nad0.compare(vf)
 					}
 				}
+
+				deletePod(podObj)
+				deletePod(podObj2)
+
+				By("Waiting for pods to terminate")
+				waitForPodDelete(podObj)
+				waitForPodDelete(podObj2)
+				By("Pods terminated succesfully")
 			})
 		})
 	})

@@ -55,8 +55,11 @@ func main() {
 		fmt.Println("________________________________________________________________________________________________________")
 
 		cmd := exec.Command("go", "test", "-v", "-timeout", "40m", "./test/e2e/...")
-		output, _ := cmd.CombinedOutput()
-		fmt.Println(string(output))
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err = cmd.Run(); err != nil {
+			log.Printf("Error running %v %v: %v", cmd.Path, cmd.Args, err)
+		}
 	}
 }
 

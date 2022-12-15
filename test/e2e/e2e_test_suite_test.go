@@ -91,7 +91,7 @@ func init() {
 
 	var err error
 	testDriverKind, err = determineDriverSpace(testPfName)
-	if err != nil || testDriverKind == "" {
+	if err != nil {
 		log.Fatalf("Unable to find driver kind (user-space or kernel). Error: %s\n", err)
 	}
 
@@ -106,7 +106,8 @@ func init() {
 		log.Fatalln("kind network namespace is not defined. Please check.")
 	}
 
-	fmt.Println("Tests are going to be run with PF", testPfName, "interfaces within KinD network namespace:", containerNsPath, "on driver:", testDriverKind)
+	fmt.Println("Tests are going to be run with PF", testPfName, "interface within KinD network namespace:", containerNsPath)
+	fmt.Println("Driver type:", testDriverKind)
 	fmt.Println("Device Plugin configuration read from", testDpFilePath)
 }
 

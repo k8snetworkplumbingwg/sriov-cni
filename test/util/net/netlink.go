@@ -109,12 +109,7 @@ func SetVfsMAC(pfName, containerNs string) (err, netnsErr error) {
 
 	var baseMac = "4a:ea:39:09:4e:"
 	for index := 0; index < len(link.Attrs().Vfs); index++ {
-		var mac string
-		if index < 17 {
-			mac = baseMac + fmt.Sprintf("0%x", index)
-		} else {
-			mac = baseMac + fmt.Sprintf("%x", index)
-		}
+		mac := baseMac + fmt.Sprintf("%02x", index)
 
 		hwMac, err := net.ParseMAC(mac)
 		if err != nil {

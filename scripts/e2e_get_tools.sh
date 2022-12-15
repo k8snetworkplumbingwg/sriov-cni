@@ -1,8 +1,6 @@
 #!/bin/bash
 # ensure this file is sourced to add required components to PATH
 
-set -o errexit
-
 here="$(dirname "$(readlink --canonicalize "${BASH_SOURCE[0]}")")"
 root="$(readlink --canonicalize "$here/..")"
 
@@ -23,5 +21,3 @@ curl -Lo "${root}/bin/kubectl" "https://storage.googleapis.com/kubernetes-releas
 chmod +x "${root}/bin/kubectl"
 
 export PATH="$PATH:$root/bin"
-
-set +o errexit

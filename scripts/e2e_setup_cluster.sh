@@ -3,7 +3,7 @@
 here="$(dirname "$(readlink --canonicalize "${BASH_SOURCE[0]}")")"
 RETRY_MAX=10
 INTERVAL=10
-TIMEOUT=300
+TIMEOUT=60
 MULTUS_DAEMONSET_URL="https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deployments/multus-daemonset.yml"
 MULTUS_NAME="multus"
 CONFIG_FILE="config.json"

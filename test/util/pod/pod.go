@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/scheme"
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
@@ -204,11 +205,10 @@ func AddToPodDefinitionHugePages1Gi(pod *corev1.Pod, containerNumber, amountLimi
 
 // Delete will delete a pod
 func Delete(ci coreclient.CoreV1Interface, pod *corev1.Pod, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	err := ci.Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
-	pod = nil
-	return err
+	t := timeout.Milliseconds() / 1000
+	return ci.Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{
+		GracePeriodSeconds: &t,
+	})
 }
 
 // DeleteList will delete list of pods
@@ -225,6 +225,24 @@ func DeleteList(ci coreclient.CoreV1Interface, podList []*corev1.Pod, timeout ti
 		return errors.New("some POD returns error during deletions")
 	}
 
+	return nil
+}
+
+func WaitForDelete(ci coreclient.CoreV1Interface, pod *corev1.Pod, timeout time.Duration) error {
+	t := timeout.Milliseconds() / 1000
+	wi, err := ci.Pods(pod.Namespace).Watch(context.TODO(), metav1.ListOptions{
+		LabelSelector:  pod.Name,
+		Watch:          true,
+		TimeoutSeconds: &t,
+	})
+	if err != nil {
+		return err
+	}
+	for a := range wi.ResultChan() {
+		if a.Type == watch.Deleted {
+			return nil
+		}
+	}
 	return nil
 }
 

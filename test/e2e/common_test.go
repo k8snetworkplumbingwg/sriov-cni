@@ -77,12 +77,19 @@ func deleteNAD(networkName string, nadObj *cniv1.NetworkAttachmentDefinition) {
 }
 
 func deletePod(podObj *corev1.Pod) {
+	By("Delete pod")
 	err := pod.Delete(cs.CoreV1Interface, podObj, timeout)
 	Expect(err).To(BeNil())
 }
 
 func deletePods(podObj []*corev1.Pod) {
+	By("Delete pods")
 	err := pod.DeleteList(cs.CoreV1Interface, podObj, timeout)
+	Expect(err).To(BeNil())
+}
+
+func waitForPodDelete(podObj *corev1.Pod) {
+	err := pod.WaitForDelete(cs.CoreV1Interface, podObj, timeout)
 	Expect(err).To(BeNil())
 }
 
@@ -90,6 +97,10 @@ func determineDriverSpace(pfName string) (string, error) {
 	number, err := utils.GetSriovNumVfs(pfName)
 	if err != nil {
 		return "", err
+	}
+
+	if number == 0 {
+		return "", fmt.Errorf("no VFs found on %s", pfName)
 	}
 
 	var user, kernel int
