@@ -300,6 +300,7 @@ func IsValidMACAddress(addr net.HardwareAddr) bool {
 		for _, invalidMACAddress := range invalidMACAddresses {
 			if bytes.Equal(addr, invalidMACAddress) {
 				valid = false
+				break
 			}
 		}
 	}
