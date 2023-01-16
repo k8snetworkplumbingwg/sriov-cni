@@ -6,15 +6,16 @@ on:
     schedule:
       - cron: "0 8 * * 0" # every sunday
 jobs:
-  build:
+  build-test:
     strategy:
       matrix:
         go-version: [1.19.x]
         os: [ubuntu-latest]
+        goos: [linux]
+        goarch: [amd64, arm64, ppc64le]
     runs-on: ${{ matrix.os }}
     env:
       GO111MODULE: on
-      TARGET: amd64
     steps:
       - name: Set up Go
         uses: actions/setup-go@v3
@@ -24,15 +25,19 @@ jobs:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v2
 
-      - name: Build
+      - name: Build test for ${{ matrix.goarch }}
+        env:
+          GOARCH: ${{ matrix.goarch }}
+          GOOS: ${{ matrix.goos }}
         run: GOARCH="${TARGET}" go build ./cmd/sriov/...
 
       - name: Go test
+        if: ${{ matrix.goarch }} == "amd64"
         run: sudo go test ./... # sudo needed for netns change in test
 
   coverage:
     runs-on: ubuntu-latest
-    needs: build
+    needs: build-test
     name: coverage
     steps:
       - name: Set up Go
