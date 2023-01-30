@@ -284,6 +284,83 @@ func CleanCachedNetConf(cRefPath string) error {
 	return nil
 }
 
+// SetVFEffectiveMAC will try to set the mac address on a specific VF interface
+//
+// the function will also validate that the mac address was configured as expect
+// it will return an error if it didn't manage to configure the vf mac address
+// or the mac is not equal to the expect one
+// retries 20 times and wait 100 milliseconds
+//
+// Some NIC drivers (i.e. i40e/iavf) set VF MAC address asynchronously
+// via PF. This means that while the PF could already show the VF with
+// the desired MAC address, the netdev VF may still have the original
+// one. If in this window we issue a netdev VF MAC address set, the driver
+// will return an error and the pod will fail to create.
+// Other NICs (Mellanox) require explicit netdev VF MAC address so we
+// cannot skip this part.
+// Retry up to 5 times; wait 200 milliseconds between retries
+func SetVFEffectiveMAC(netLinkManager NetlinkManager, netDeviceName string, macAddress string) error {
+	hwaddr, err := net.ParseMAC(macAddress)
+	if err != nil {
+		return fmt.Errorf("failed to parse MAC address %s: %v", macAddress, err)
+	}
+
+	orgLinkObj, err := netLinkManager.LinkByName(netDeviceName)
+	if err != nil {
+		return err
+	}
+
+	return Retry(20, 100*time.Millisecond, func() error {
+		if err := netLinkManager.LinkSetHardwareAddr(orgLinkObj, hwaddr); err != nil {
+			return err
+		}
+
+		linkObj, err := netLinkManager.LinkByName(netDeviceName)
+		if err != nil {
+			return fmt.Errorf("failed to get netlink device with name %s: %q", orgLinkObj.Attrs().Name, err)
+		}
+		if linkObj.Attrs().HardwareAddr.String() != macAddress {
+			return fmt.Errorf("effective mac address is different from requested one")
+		}
+
+		return nil
+	})
+}
+
+// SetVFHardwareMAC will try to set the hardware mac address on a specific VF ID under a requested PF
+
+// the function will also validate that the mac address was configured as expect
+// it will return an error if it didn't manage to configure the vf mac address
+// or the mac is not equal to the expect one
+// retries 20 times and wait 100 milliseconds
+func SetVFHardwareMAC(netLinkManager NetlinkManager, pfDevice string, vfID int, macAddress string) error {
+	hwaddr, err := net.ParseMAC(macAddress)
+	if err != nil {
+		return fmt.Errorf("failed to parse MAC address %s: %v", macAddress, err)
+	}
+
+	orgLinkObj, err := netLinkManager.LinkByName(pfDevice)
+	if err != nil {
+		return err
+	}
+
+	return Retry(20, 100*time.Millisecond, func() error {
+		if err := netLinkManager.LinkSetVfHardwareAddr(orgLinkObj, vfID, hwaddr); err != nil {
+			return err
+		}
+
+		linkObj, err := netLinkManager.LinkByName(pfDevice)
+		if err != nil {
+			return fmt.Errorf("failed to get netlink device with name %s: %q", orgLinkObj.Attrs().Name, err)
+		}
+		if linkObj.Attrs().Vfs[vfID].Mac.String() != macAddress {
+			return fmt.Errorf("hardware mac address is different from requested one")
+		}
+
+		return nil
+	})
+}
+
 // IsValidMACAddress checks if net.HardwareAddr is a valid MAC address.
 func IsValidMACAddress(addr net.HardwareAddr) bool {
 	invalidMACAddresses := [][]byte{

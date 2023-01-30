@@ -2,10 +2,15 @@ package utils
 
 import (
 	"errors"
+	"net"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/vishvananda/netlink"
+
+	mocks_utils "github.com/k8snetworkplumbingwg/sriov-cni/pkg/utils/mocks"
 )
 
 var _ = Describe("Utils", func() {
@@ -81,7 +86,7 @@ var _ = Describe("Utils", func() {
 			Expect(err).To(HaveOccurred(), "Not existing VF should return an error")
 		})
 	})
-	Context("Checking Retry functon", func() {
+	Context("Checking Retry function", func() {
 		It("Assuming calling function fails", func() {
 			err := Retry(5, 10*time.Millisecond, func() error { return errors.New("") })
 			Expect(err).To((HaveOccurred()), "Retry should return an error")
@@ -89,6 +94,94 @@ var _ = Describe("Utils", func() {
 		It("Assuming calling function does not fail", func() {
 			err := Retry(5, 10*time.Millisecond, func() error { return nil })
 			Expect(err).NotTo((HaveOccurred()), "Retry should not return an error")
+		})
+	})
+	Context("Checking SetVFEffectiveMAC function", func() {
+		It("assuming calling function fails", func() {
+			mocked := &mocks_utils.NetlinkManager{}
+			fakeMac, err := net.ParseMAC("6e:16:06:0e:b7:e9")
+			Expect(err).ToNot(HaveOccurred())
+			fakeNewMac, err := net.ParseMAC("60:00:00:00:00:01")
+			Expect(err).ToNot(HaveOccurred())
+
+			fakeLink := &FakeLink{netlink.LinkAttrs{
+				Index:        1000,
+				Name:         "enp175s0f1",
+				HardwareAddr: fakeMac,
+			}}
+
+			mocked.On("LinkByName", "enp175s0f1").Return(fakeLink, nil)
+			mocked.On("LinkSetHardwareAddr", fakeLink, fakeNewMac).Return(nil)
+
+			err = SetVFEffectiveMAC(mocked, "enp175s0f1", "60:00:00:00:00:01")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("effective mac address is different from requested one"))
+		})
+
+		It("assuming calling function does not fails", func() {
+			mocked := &mocks_utils.NetlinkManager{}
+			fakeMac, err := net.ParseMAC("60:00:00:00:00:01")
+			Expect(err).ToNot(HaveOccurred())
+			fakeNewMac, err := net.ParseMAC("60:00:00:00:00:01")
+			Expect(err).ToNot(HaveOccurred())
+
+			fakeLink := &FakeLink{netlink.LinkAttrs{
+				Index:        1000,
+				Name:         "enp175s0f1",
+				HardwareAddr: fakeMac,
+			}}
+
+			mocked.On("LinkByName", "enp175s0f1").Return(fakeLink, nil)
+			mocked.On("LinkSetHardwareAddr", fakeLink, fakeNewMac).Return(nil)
+
+			err = SetVFEffectiveMAC(mocked, "enp175s0f1", "60:00:00:00:00:01")
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+	Context("Checking SetVFHardwareMAC function", func() {
+		It("assuming calling function fails", func() {
+			mocked := &mocks_utils.NetlinkManager{}
+			fakeMac, err := net.ParseMAC("6e:16:06:0e:b7:e9")
+			Expect(err).ToNot(HaveOccurred())
+			fakeNewMac, err := net.ParseMAC("60:00:00:00:00:01")
+			Expect(err).ToNot(HaveOccurred())
+
+			fakeLink := &FakeLink{netlink.LinkAttrs{
+				Index: 1000,
+				Name:  "enp175s0f1",
+				Vfs: []netlink.VfInfo{
+					{Mac: fakeMac},
+				},
+			}}
+
+			mocked.On("LinkByName", "enp175s0f1").Return(fakeLink, nil)
+			mocked.On("LinkSetVfHardwareAddr", fakeLink, 0, fakeNewMac).Return(nil)
+
+			err = SetVFHardwareMAC(mocked, "enp175s0f1", 0, "60:00:00:00:00:01")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("hardware mac address is different from requested one"))
+		})
+
+		It("assuming calling function does not fails", func() {
+			mocked := &mocks_utils.NetlinkManager{}
+			fakeMac, err := net.ParseMAC("60:00:00:00:00:01")
+			Expect(err).ToNot(HaveOccurred())
+			fakeNewMac, err := net.ParseMAC("60:00:00:00:00:01")
+			Expect(err).ToNot(HaveOccurred())
+
+			fakeLink := &FakeLink{netlink.LinkAttrs{
+				Index: 1000,
+				Name:  "enp175s0f1",
+				Vfs: []netlink.VfInfo{
+					{Mac: fakeMac},
+				},
+			}}
+
+			mocked.On("LinkByName", "enp175s0f1").Return(fakeLink, nil)
+			mocked.On("LinkSetVfHardwareAddr", fakeLink, 0, fakeNewMac).Return(nil)
+
+			err = SetVFHardwareMAC(mocked, "enp175s0f1", 0, "60:00:00:00:00:01")
+			Expect(err).ToNot(HaveOccurred())
 		})
 	})
 })

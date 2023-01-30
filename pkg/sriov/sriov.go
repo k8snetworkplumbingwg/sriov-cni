@@ -2,9 +2,6 @@ package sriov
 
 import (
 	"fmt"
-	"net"
-	"time"
-
 	"github.com/containernetworking/plugins/pkg/ns"
 
 	sriovtypes "github.com/k8snetworkplumbingwg/sriov-cni/pkg/types"
@@ -84,29 +81,12 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, netns
 	macAddress := linkObj.Attrs().HardwareAddr.String()
 	// 3. Set MAC address
 	if conf.MAC != "" {
-		hwaddr, err := net.ParseMAC(conf.MAC)
-		if err != nil {
-			return "", fmt.Errorf("failed to parse MAC address %s: %v", conf.MAC, err)
-		}
-
 		// Save the original effective MAC address before overriding it
 		conf.OrigVfState.EffectiveMAC = linkObj.Attrs().HardwareAddr.String()
 
-		/* Some NIC drivers (i.e. i40e/iavf) set VF MAC address asynchronously
-		   via PF. This means that while the PF could already show the VF with
-		   the desired MAC address, the netdev VF may still have the original
-		   one. If in this window we issue a netdev VF MAC address set, the driver
-		   will return an error and the pod will fail to create.
-		   Other NICs (Mellanox) require explicit netdev VF MAC address so we
-		   cannot skip this part.
-		   Retry up to 5 times; wait 200 milliseconds between retries
-		*/
-		err = utils.Retry(5, 200*time.Millisecond, func() error {
-			return s.nLink.LinkSetHardwareAddr(linkObj, hwaddr)
-		})
-
+		err = utils.SetVFEffectiveMAC(s.nLink, tempName, conf.MAC)
 		if err != nil {
-			return "", fmt.Errorf("failed to set netlink MAC address to %s: %v", hwaddr, err)
+			return "", fmt.Errorf("failed to set netlink MAC address to %s: %v", conf.MAC, err)
 		}
 		macAddress = conf.MAC
 	}
@@ -169,15 +149,11 @@ func (s *sriovManager) ReleaseVF(conf *sriovtypes.NetConf, podifName string, net
 			return fmt.Errorf("failed to rename link %s to host name %s: %q", podifName, conf.OrigVfState.HostIFName, err)
 		}
 
-		// reset effective MAC address
 		if conf.MAC != "" {
-			hwaddr, err := net.ParseMAC(conf.OrigVfState.EffectiveMAC)
+			// reset effective MAC address
+			err = utils.SetVFEffectiveMAC(s.nLink, conf.OrigVfState.HostIFName, conf.OrigVfState.EffectiveMAC)
 			if err != nil {
-				return fmt.Errorf("failed to parse original effective MAC address %s: %v", conf.OrigVfState.EffectiveMAC, err)
-			}
-
-			if err = s.nLink.LinkSetHardwareAddr(linkObj, hwaddr); err != nil {
-				return fmt.Errorf("failed to restore original effective netlink MAC address %s: %v", hwaddr, err)
+				return fmt.Errorf("failed to restore original effective netlink MAC address %s: %v", conf.OrigVfState.EffectiveMAC, err)
 			}
 		}
 
@@ -226,13 +202,9 @@ func (s *sriovManager) ApplyVFConfig(conf *sriovtypes.NetConf) error {
 
 	// 2. Set mac address
 	if conf.MAC != "" {
-		hwaddr, err := net.ParseMAC(conf.MAC)
-		if err != nil {
-			return fmt.Errorf("failed to parse MAC address %s: %v", conf.MAC, err)
-		}
-
-		if err = s.nLink.LinkSetVfHardwareAddr(pfLink, conf.VFID, hwaddr); err != nil {
-			return fmt.Errorf("failed to set MAC address to %s: %v", hwaddr, err)
+		// when we restore the original hardware mac address we may get a device or resource busy. so we introduce retry
+		if err := utils.SetVFHardwareMAC(s.nLink, conf.Master, conf.VFID, conf.MAC); err != nil {
+			return fmt.Errorf("failed to set MAC address to %s: %v", conf.MAC, err)
 		}
 	}
 
@@ -342,25 +314,9 @@ func (s *sriovManager) ResetVFConfig(conf *sriovtypes.NetConf) error {
 
 	// Restore the original administrative MAC address
 	if conf.MAC != "" {
-		hwaddr, err := net.ParseMAC(conf.OrigVfState.AdminMAC)
-		if err != nil {
-			return fmt.Errorf("failed to parse original administrative MAC address %s: %v", conf.OrigVfState.AdminMAC, err)
-		}
-
-		/* Some NIC drivers (i.e. i40e/iavf) set VF MAC address asynchronously
-		   via PF. This means that while the PF could already show the VF with
-		   the desired MAC address, the netdev VF may still have the original
-		   one. If in this window we issue a netdev VF MAC address set, the driver
-		   will return an error and the pod will fail to create.
-		   Other NICs (Mellanox) require explicit netdev VF MAC address so we
-		   cannot skip this part.
-		   Retry up to 5 times; wait 200 milliseconds between retries
-		*/
-		err = utils.Retry(5, 200*time.Millisecond, func() error {
-			return s.nLink.LinkSetVfHardwareAddr(pfLink, conf.VFID, hwaddr)
-		})
-		if err != nil {
-			return fmt.Errorf("failed to restore original administrative MAC address %s: %v", hwaddr, err)
+		// when we restore the original hardware mac address we may get a device or resource busy. so we introduce retry
+		if err := utils.SetVFHardwareMAC(s.nLink, conf.Master, conf.VFID, conf.OrigVfState.AdminMAC); err != nil {
+			return fmt.Errorf("failed to restore original administrative MAC address %s: %v", conf.OrigVfState.AdminMAC, err)
 		}
 	}
 
