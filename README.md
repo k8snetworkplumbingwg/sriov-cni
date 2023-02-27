@@ -38,7 +38,7 @@ Creating VFs is outside the scope of the SR-IOV CNI plugin. [More information ab
 
 To deploy SR-IOV CNI by itself on a Kubernetes 1.16+ cluster:
 
-`kubectl apply -f images/k8s-v1.16/sriov-cni-daemonset.yaml`
+`kubectl apply -f images/sriov-cni-daemonset.yaml`
 
 **Note** The above deployment is not sufficient to manage and configure SR-IOV virtual functions. [See the full orchestration guide for more information.](https://github.com/k8snetworkplumbingwg/sriov-network-device-plugin#sr-iov-network-device-plugin)
 
