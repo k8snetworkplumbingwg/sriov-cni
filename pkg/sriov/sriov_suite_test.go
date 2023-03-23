@@ -2,7 +2,7 @@ package sriov
 
 import (
 	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/utils"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"testing"

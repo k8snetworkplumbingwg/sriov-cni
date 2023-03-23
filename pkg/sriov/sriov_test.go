@@ -8,7 +8,7 @@ import (
 	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/sriov/mocks"
 	sriovtypes "github.com/k8snetworkplumbingwg/sriov-cni/pkg/types"
 	mocks_utils "github.com/k8snetworkplumbingwg/sriov-cni/pkg/utils/mocks"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/mock"
 	"github.com/vishvananda/netlink"
