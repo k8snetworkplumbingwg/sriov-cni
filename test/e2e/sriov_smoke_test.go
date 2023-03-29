@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -16,6 +17,8 @@ import (
 )
 
 var _ = Describe("SR-IOV CNI test", func() {
+	ctx := context.Background()
+	defer ctx.Done()
 	Context("Test with kernel Virtual Function driver", func() {
 		var err error
 		var podObj, podObj2 *corev1.Pod
@@ -54,12 +57,12 @@ var _ = Describe("SR-IOV CNI test", func() {
 				Expect(err).To(BeNil())
 
 				By("Verification - Check second network interfaces")
-				stdoutString, stderrString, err = pod.ExecuteCommand(cs.CoreV1Interface, kubeConfig, podObj.Name, *testNs, "test", "ethtool -i eth0")
+				stdoutString, stderrString, err = pod.ExecuteCommand(ctx, cs.CoreV1Interface, kubeConfig, podObj.Name, *testNs, "test", "ethtool -i eth0")
 				Expect(err).Should(BeNil())
 				Expect(stderrString).Should(Equal(""))
 				Expect(stdoutString).Should(ContainSubstring("driver: veth"))
 
-				stdoutString, stderrString, err = pod.ExecuteCommand(cs.CoreV1Interface, kubeConfig, podObj.Name, *testNs, "test", "ethtool -i net1")
+				stdoutString, stderrString, err = pod.ExecuteCommand(ctx, cs.CoreV1Interface, kubeConfig, podObj.Name, *testNs, "test", "ethtool -i net1")
 				Expect(err).Should(BeNil())
 				Expect(stderrString).Should(Equal(""))
 
@@ -72,7 +75,7 @@ var _ = Describe("SR-IOV CNI test", func() {
 				}
 				Expect(foundDriver).Should(BeTrue())
 
-				stdoutString, stderrString, err = pod.ExecuteCommand(cs.CoreV1Interface, kubeConfig, podObj.Name, *testNs, "test", "ethtool -i net2")
+				stdoutString, stderrString, err = pod.ExecuteCommand(ctx, cs.CoreV1Interface, kubeConfig, podObj.Name, *testNs, "test", "ethtool -i net2")
 				Expect(err).ShouldNot(BeNil())
 				Expect(err.Error()).Should(Equal("command terminated with exit code 71"))
 				Expect(stderrString).Should(ContainSubstring("Cannot get driver information: No such device"))
@@ -160,13 +163,13 @@ var _ = Describe("SR-IOV CNI test", func() {
 				Expect(err).To(BeNil())
 
 				By("Verify that pods MAC was not changed")
-				net1Mac, stderrString, err = pod.ExecuteCommand(cs.CoreV1Interface, kubeConfig, podObj.Name, *testNs, "test", "ip add show net1 | grep ether | awk '{print $2}'")
+				net1Mac, stderrString, err = pod.ExecuteCommand(ctx, cs.CoreV1Interface, kubeConfig, podObj.Name, *testNs, "test", "ip add show net1 | grep ether | awk '{print $2}'")
 				net1Mac = strings.TrimSuffix(net1Mac, "\n")
 				Expect(err).Should(BeNil())
 				Expect(stderrString).Should(Equal(""))
 				Expect(net1Mac).ShouldNot(Equal(""))
 
-				net2Mac, stderrString, err := pod.ExecuteCommand(cs.CoreV1Interface, kubeConfig, podObj2.Name, *testNs, "test", "ip add show net1 | grep ether | awk '{print $2}'")
+				net2Mac, stderrString, err := pod.ExecuteCommand(ctx, cs.CoreV1Interface, kubeConfig, podObj2.Name, *testNs, "test", "ip add show net1 | grep ether | awk '{print $2}'")
 				net2Mac = strings.TrimSuffix(net2Mac, "\n")
 				Expect(err).Should(BeNil())
 				Expect(stderrString).Should(Equal(""))

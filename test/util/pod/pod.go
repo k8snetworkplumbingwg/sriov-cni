@@ -392,7 +392,7 @@ func prepareSelectors(labels map[string]string) string {
 //
 //		       string output of the command (stderr)
 //	        error Error object or when everthing is correct nil
-func ExecuteCommand(core coreclient.CoreV1Interface, config *restclient.Config, podName, ns, containerName, command string) (string, string, error) {
+func ExecuteCommand(ctx context.Context, core coreclient.CoreV1Interface, config *restclient.Config, podName, ns, containerName, command string) (string, string, error) {
 	shellCommand := []string{"/bin/sh", "-c", command}
 	request := core.RESTClient().Post().Resource("pods").Name(podName).Namespace(ns).SubResource("exec")
 	options := &corev1.PodExecOptions{
@@ -411,7 +411,7 @@ func ExecuteCommand(core coreclient.CoreV1Interface, config *restclient.Config, 
 	}
 
 	var stdout, stderr bytes.Buffer
-	err = exec.Stream(remotecommand.StreamOptions{
+	err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
 		Stdin:  nil,
 		Stdout: &stdout,
 		Stderr: &stderr,
