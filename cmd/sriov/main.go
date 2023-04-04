@@ -85,7 +85,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 				return err
 			})
 			if err == nil {
-				_ = sm.ReleaseVF(netConf, args.IfName, args.ContainerID, netns)
+				_ = sm.ReleaseVF(netConf, args.IfName, netns)
 			}
 			// Reset the VF if failure occurs before the netconf is cached
 			_ = sm.ResetVFConfig(netConf)
@@ -102,7 +102,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}}
 
 	if !netConf.DPDKMode {
-		macAddr, err = sm.SetupVF(netConf, args.IfName, args.ContainerID, netns)
+		macAddr, err = sm.SetupVF(netConf, args.IfName, netns)
 
 		if err != nil {
 			return fmt.Errorf("failed to set up pod interface %q from the device %q: %v", args.IfName, netConf.Master, err)
@@ -246,7 +246,7 @@ func cmdDel(args *skel.CmdArgs) error {
 		}
 		defer netns.Close()
 
-		if err = sm.ReleaseVF(netConf, args.IfName, args.ContainerID, netns); err != nil {
+		if err = sm.ReleaseVF(netConf, args.IfName, netns); err != nil {
 			return err
 		}
 	}
@@ -260,7 +260,7 @@ func cmdDel(args *skel.CmdArgs) error {
 	return nil
 }
 
-func cmdCheck(args *skel.CmdArgs) error {
+func cmdCheck(_ *skel.CmdArgs) error {
 	return nil
 }
 

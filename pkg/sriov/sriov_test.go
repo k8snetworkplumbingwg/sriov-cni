@@ -42,13 +42,11 @@ var _ = Describe("Sriov", func() {
 	Context("Checking SetupVF function", func() {
 		var (
 			podifName string
-			contID    string
 			netconf   *sriovtypes.NetConf
 		)
 
 		BeforeEach(func() {
 			podifName = "net1"
-			contID = "dummycid"
 			netconf = &sriovtypes.NetConf{
 				Master:      "enp175s0f1",
 				DeviceID:    "0000:af:06.0",
@@ -91,7 +89,7 @@ var _ = Describe("Sriov", func() {
 			mocked.On("LinkSetVfVlanQos", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("int")).Return(nil)
 			mockedPciUtils.On("EnableArpAndNdiscNotify", mock.AnythingOfType("string")).Return(nil)
 			sm := sriovManager{nLink: mocked, utils: mockedPciUtils}
-			macAddr, err := sm.SetupVF(netconf, podifName, contID, targetNetNS)
+			macAddr, err := sm.SetupVF(netconf, podifName, targetNetNS)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(macAddr).To(Equal("6e:16:06:0e:b7:e9"))
 		})
@@ -127,7 +125,7 @@ var _ = Describe("Sriov", func() {
 			mocked.On("LinkSetUp", fakeLink).Return(nil)
 			mockedPciUtils.On("EnableArpAndNdiscNotify", mock.AnythingOfType("string")).Return(nil)
 			sm := sriovManager{nLink: mocked, utils: mockedPciUtils}
-			macAddr, err := sm.SetupVF(netconf, podifName, contID, targetNetNS)
+			macAddr, err := sm.SetupVF(netconf, podifName, targetNetNS)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(macAddr).To(Equal(netconf.MAC))
 			mocked.AssertExpectations(t)
@@ -137,13 +135,11 @@ var _ = Describe("Sriov", func() {
 	Context("Checking ReleaseVF function", func() {
 		var (
 			podifName string
-			contID    string
 			netconf   *sriovtypes.NetConf
 		)
 
 		BeforeEach(func() {
 			podifName = "net1"
-			contID = "dummycid"
 			netconf = &sriovtypes.NetConf{
 				Master:      "enp175s0f1",
 				DeviceID:    "0000:af:06.0",
@@ -171,7 +167,7 @@ var _ = Describe("Sriov", func() {
 			mocked.On("LinkSetName", fakeLink, netconf.OrigVfState.HostIFName).Return(nil)
 			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
 			sm := sriovManager{nLink: mocked}
-			err = sm.ReleaseVF(netconf, podifName, contID, targetNetNS)
+			err = sm.ReleaseVF(netconf, podifName, targetNetNS)
 			Expect(err).NotTo(HaveOccurred())
 			mocked.AssertExpectations(t)
 		})
@@ -179,13 +175,11 @@ var _ = Describe("Sriov", func() {
 	Context("Checking ReleaseVF function - restore config", func() {
 		var (
 			podifName string
-			contID    string
 			netconf   *sriovtypes.NetConf
 		)
 
 		BeforeEach(func() {
 			podifName = "net1"
-			contID = "dummycid"
 			netconf = &sriovtypes.NetConf{
 				Master:      "enp175s0f1",
 				DeviceID:    "0000:af:06.0",
@@ -218,7 +212,7 @@ var _ = Describe("Sriov", func() {
 			Expect(err).NotTo(HaveOccurred())
 			mocked.On("LinkSetHardwareAddr", fakeLink, origEffMac).Return(nil)
 			sm := sriovManager{nLink: mocked}
-			err = sm.ReleaseVF(netconf, podifName, contID, targetNetNS)
+			err = sm.ReleaseVF(netconf, podifName, targetNetNS)
 			Expect(err).NotTo(HaveOccurred())
 			mocked.AssertExpectations(t)
 		})
