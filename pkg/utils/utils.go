@@ -248,11 +248,7 @@ func SaveNetConf(cid, dataDir, podIfName string, conf interface{}) error {
 	cRef := strings.Join(s, "-")
 
 	// save the rendered netconf for cmdDel
-	if err = saveScratchNetConf(cRef, dataDir, netConfBytes); err != nil {
-		return err
-	}
-
-	return nil
+	return saveScratchNetConf(cRef, dataDir, netConfBytes)
 }
 
 func saveScratchNetConf(containerID, dataDir string, netconf []byte) error {

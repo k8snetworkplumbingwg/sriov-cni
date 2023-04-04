@@ -116,10 +116,8 @@ func createSymlinks(link, target string) error {
 	if err := os.MkdirAll(target, 0755); err != nil {
 		return err
 	}
-	if err := os.Symlink(target, link); err != nil {
-		return err
-	}
-	return nil
+
+	return os.Symlink(target, link)
 }
 
 // RemoveTmpSysFs removes mocked sysfs
@@ -134,8 +132,6 @@ func RemoveTmpSysFs() error {
 	if err = ts.originalRoot.Close(); err != nil {
 		return err
 	}
-	if err = os.RemoveAll(ts.dirRoot); err != nil {
-		return err
-	}
-	return nil
+
+	return os.RemoveAll(ts.dirRoot)
 }
