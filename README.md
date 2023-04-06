@@ -21,8 +21,7 @@ SR-IOV CNI plugin works with [SR-IOV device plugin](https://github.com/k8snetwor
 
 ## Build
 
-This plugin uses Go modules for dependency management and requires Go 1.17+ to build.
-
+This plugin uses Go modules for dependency management and requires Go 1.17+ to build here is a small meaningless change
 To build the plugin binary:
 
 ``
