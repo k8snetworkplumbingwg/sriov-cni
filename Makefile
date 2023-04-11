@@ -12,7 +12,7 @@ GOBIN=$(CURDIR)/bin
 BUILDDIR=$(CURDIR)/build
 BASE=$(GOPATH)/src/$(REPO_PATH)
 GOFILES = $(shell find . -name *.go | grep -vE "(\/vendor\/)|(_test.go)")
-PKGS     = $(or $(PKG),$(shell cd $(BASE) && env GOPATH=$(GOPATH) $(GO) list ./... | grep -v "^$(PACKAGE)/vendor/"))
+PKGS     = $(or $(PKG),$(shell cd $(BASE) && env GOPATH=$(GOPATH) $(GO) list ./... | grep -v "^$(PACKAGE)/vendor/" | grep -v "^github.com/k8snetworkplumbingwg/sriov-cni/test/e2e"))
 TESTPKGS = $(shell env GOPATH=$(GOPATH) $(GO) list -f '{{ if or .TestGoFiles .XTestGoFiles }}{{ .ImportPath }}{{ end }}' $(PKGS))
 
 export GOPATH
@@ -22,7 +22,7 @@ export GO111MODULE=on
 IMAGEDIR=$(BASE)/images
 DOCKERFILE=$(CURDIR)/Dockerfile
 TAG=ghcr.io/k8snetworkplumbingwg/sriov-cni
-# Accept proxy settings for docker 
+# Accept proxy settings for docker
 DOCKERARGS=
 ifdef HTTP_PROXY
 	DOCKERARGS += --build-arg http_proxy=$(HTTP_PROXY)
@@ -151,7 +151,6 @@ clean: | $(BASE) ; $(info  Cleaning...) @ ## Cleanup everything
 	@rm -rf $(GOPATH)
 	@rm -rf $(BUILDDIR)
 	@rm -rf $(GOBIN)
-	@rm -rf test/
 
 .PHONY: help
 help: ; @ ## Display this help message
