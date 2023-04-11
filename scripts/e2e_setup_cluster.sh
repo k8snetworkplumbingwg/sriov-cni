@@ -16,14 +16,14 @@ retry() {
   local to=${TIMEOUT:=20}
   cmd="$*"
 
-  while [ $retries -gt 0 ]; do
+  while [ "$retries" -gt 0 ]; do
     status=0
-    timeout $to bash -c "echo $cmd && $cmd" || status=$?
+    timeout "$to" bash -c "echo $cmd && $cmd" || status=$?
     if [ $status -eq 0 ]; then
       break
     fi
     echo "Exit code: '$status'. Sleeping '$delay' seconds before retrying"
-    sleep $delay
+    sleep "$delay"
     ((retries--)) || true
   done
   return $status
