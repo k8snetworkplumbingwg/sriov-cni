@@ -155,3 +155,21 @@ func LoadConfFromCache(args *skel.CmdArgs) (*sriovtypes.NetConf, string, error) 
 
 	return netConf, cRefPath, nil
 }
+
+// GetMacAddressForResult return the mac address we should report to the CNI call return object
+// if the device is on kernel mode we report that one back
+// if not we check the administrative mac address on the PF
+// if it is set and is not zero, report it.
+func GetMacAddressForResult(netConf *sriovtypes.NetConf) string {
+	if netConf.MAC != "" {
+		return netConf.MAC
+	}
+	if !netConf.DPDKMode {
+		return netConf.OrigVfState.EffectiveMAC
+	}
+	if netConf.OrigVfState.AdminMAC != "00:00:00:00:00:00" {
+		return netConf.OrigVfState.AdminMAC
+	}
+
+	return ""
+}

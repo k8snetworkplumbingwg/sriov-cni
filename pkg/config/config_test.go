@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/containernetworking/plugins/pkg/testutils"
+	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/types"
 	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/utils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -154,6 +155,51 @@ var _ = Describe("Config", func() {
 		It("Assuming not existing PF", func() {
 			_, _, err := getVfInfo("0000:af:07.0")
 			Expect(err).To(HaveOccurred())
+		})
+	})
+	Context("Checking GetMacAddressForResult function", func() {
+		It("Should return the mac address requested by the user", func() {
+			netconf := &types.NetConf{
+				MAC: "MAC",
+				OrigVfState: types.VfState{
+					EffectiveMAC: "EffectiveMAC",
+					AdminMAC:     "AdminMAC",
+				},
+			}
+
+			Expect(GetMacAddressForResult(netconf)).To(Equal("MAC"))
+		})
+		It("Should return the EffectiveMAC mac address if the user didn't request and the the driver is not DPDK", func() {
+			netconf := &types.NetConf{
+				DPDKMode: false,
+				OrigVfState: types.VfState{
+					EffectiveMAC: "EffectiveMAC",
+					AdminMAC:     "AdminMAC",
+				},
+			}
+
+			Expect(GetMacAddressForResult(netconf)).To(Equal("EffectiveMAC"))
+		})
+		It("Should return the AdminMAC mac address if the user didn't request and the the driver is DPDK", func() {
+			netconf := &types.NetConf{
+				DPDKMode: true,
+				OrigVfState: types.VfState{
+					EffectiveMAC: "EffectiveMAC",
+					AdminMAC:     "AdminMAC",
+				},
+			}
+
+			Expect(GetMacAddressForResult(netconf)).To(Equal("AdminMAC"))
+		})
+		It("Should return empty string if the user didn't request the the driver is DPDK and adminMac is 0", func() {
+			netconf := &types.NetConf{
+				DPDKMode: true,
+				OrigVfState: types.VfState{
+					AdminMAC: "00:00:00:00:00:00",
+				},
+			}
+
+			Expect(GetMacAddressForResult(netconf)).To(Equal(""))
 		})
 	})
 })

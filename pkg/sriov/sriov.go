@@ -36,7 +36,7 @@ func (p *pciUtilsImpl) EnableArpAndNdiscNotify(ifName string) error {
 
 // Manager provides interface invoke sriov nic related operations
 type Manager interface {
-	SetupVF(conf *sriovtypes.NetConf, podifName string, netns ns.NetNS) (string, error)
+	SetupVF(conf *sriovtypes.NetConf, podifName string, netns ns.NetNS) error
 	ReleaseVF(conf *sriovtypes.NetConf, podifName string, netns ns.NetNS) error
 	ResetVFConfig(conf *sriovtypes.NetConf) error
 	ApplyVFConfig(conf *sriovtypes.NetConf) error
@@ -57,12 +57,12 @@ func NewSriovManager() Manager {
 }
 
 // SetupVF sets up a VF in Pod netns
-func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, netns ns.NetNS) (string, error) {
+func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, netns ns.NetNS) error {
 	linkName := conf.OrigVfState.HostIFName
 
 	linkObj, err := s.nLink.LinkByName(linkName)
 	if err != nil {
-		return "", fmt.Errorf("error getting VF netdevice with name %s", linkName)
+		return fmt.Errorf("error getting VF netdevice with name %s", linkName)
 	}
 
 	// tempName used as intermediary name to avoid name conflicts
@@ -70,30 +70,27 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, netns
 
 	// 1. Set link down
 	if err := s.nLink.LinkSetDown(linkObj); err != nil {
-		return "", fmt.Errorf("failed to down vf device %q: %v", linkName, err)
+		return fmt.Errorf("failed to down vf device %q: %v", linkName, err)
 	}
 
 	// 2. Set temp name
 	if err := s.nLink.LinkSetName(linkObj, tempName); err != nil {
-		return "", fmt.Errorf("error setting temp IF name %s for %s", tempName, linkName)
+		return fmt.Errorf("error setting temp IF name %s for %s", tempName, linkName)
 	}
 
-	macAddress := linkObj.Attrs().HardwareAddr.String()
+	// Save the original effective MAC address before overriding it
+	conf.OrigVfState.EffectiveMAC = linkObj.Attrs().HardwareAddr.String()
 	// 3. Set MAC address
 	if conf.MAC != "" {
-		// Save the original effective MAC address before overriding it
-		conf.OrigVfState.EffectiveMAC = linkObj.Attrs().HardwareAddr.String()
-
 		err = utils.SetVFEffectiveMAC(s.nLink, tempName, conf.MAC)
 		if err != nil {
-			return "", fmt.Errorf("failed to set netlink MAC address to %s: %v", conf.MAC, err)
+			return fmt.Errorf("failed to set netlink MAC address to %s: %v", conf.MAC, err)
 		}
-		macAddress = conf.MAC
 	}
 
 	// 4. Change netns
 	if err := s.nLink.LinkSetNsFd(linkObj, int(netns.Fd())); err != nil {
-		return "", fmt.Errorf("failed to move IF %s to netns: %q", tempName, err)
+		return fmt.Errorf("failed to move IF %s to netns: %q", tempName, err)
 	}
 
 	if err := netns.Do(func(_ ns.NetNS) error {
@@ -127,11 +124,11 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, netns
 
 		return nil
 	}); err != nil {
-		return "", fmt.Errorf("error setting up interface in container namespace: %q", err)
+		return fmt.Errorf("error setting up interface in container namespace: %q", err)
 	}
 	conf.ContIFNames = podifName
 
-	return macAddress, nil
+	return nil
 }
 
 // ReleaseVF reset a VF from Pod netns and return it to init netns
@@ -311,6 +308,7 @@ func (s *sriovManager) FillOriginalVfInfo(conf *sriovtypes.NetConf) error {
 		return fmt.Errorf("failed to find vf %d", conf.VFID)
 	}
 	conf.OrigVfState.FillFromVfInfo(vfState)
+
 	return err
 }
 

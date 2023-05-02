@@ -36,7 +36,7 @@ func (vs *VfState) FillFromVfInfo(info *netlink.VfInfo) {
 type NetConf struct {
 	types.NetConf
 	OrigVfState   VfState // Stores the original VF state as it was prior to any operations done during cmdAdd flow
-	DPDKMode      bool
+	DPDKMode      bool    `json:"-"`
 	Master        string
 	MAC           string
 	Vlan          *int   `json:"vlan"`
