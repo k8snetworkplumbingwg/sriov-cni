@@ -366,10 +366,8 @@ func (s *sriovManager) ResetVFConfig(conf *sriovtypes.NetConf) error {
 
 	// Restore VF trust
 	if conf.Trust != "" {
-		// TODO: netlink go implementation does not support getting VF trust, need to add support there first
-		// for now, just set VF trust to off if it was specified by the user in netconf
-		if err = s.nLink.LinkSetVfTrust(pfLink, conf.VFID, false); err != nil {
-			return fmt.Errorf("failed to disable trust for vf %d: %v", conf.VFID, err)
+		if err = s.nLink.LinkSetVfTrust(pfLink, conf.VFID, conf.OrigVfState.Trust); err != nil {
+			return fmt.Errorf("failed to set trust for vf %d: %v", conf.VFID, err)
 		}
 	}
 
