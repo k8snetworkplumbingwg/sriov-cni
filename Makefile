@@ -33,7 +33,6 @@ endif
 
 # Go tools
 GO      = go
-GODOC   = godoc
 GOFMT   = gofmt
 TIMEOUT = 15
 V ?= 0
