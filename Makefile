@@ -63,7 +63,7 @@ $(BUILDDIR)/$(BINARY_NAME): $(GOFILES) | $(BUILDDIR)
 
 GOLANGCILINT = $(GOBIN)/golangci-lint
 $(GOLANGCILINT): | $(BASE) ; $(info  Installing golangci-lint...)
-	$Q go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45
+	$Q go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.52.2
 
 GOCOVMERGE = $(GOBIN)/gocovmerge
 $(GOCOVMERGE): | $(BASE) ; $(info  Building gocovmerge...)
