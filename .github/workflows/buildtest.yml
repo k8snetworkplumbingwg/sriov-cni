@@ -33,7 +33,7 @@ jobs:
 
       - name: Go test
         if: ${{ matrix.goarch }} == "amd64"
-        run: sudo go test ./... # sudo needed for netns change in test
+        run: sudo go test -race ./... # sudo needed for netns change in test
 
   coverage:
     runs-on: ubuntu-latest
