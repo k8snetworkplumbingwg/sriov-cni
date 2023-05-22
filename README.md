@@ -44,7 +44,7 @@ To deploy SR-IOV CNI by itself on a Kubernetes 1.16+ cluster:
 
 
 ## Usage
-SR-IOV CNI networks are commonly configured using Multus and SR-IOV Device Plugin using Network Attachment Definitions. More information about configuring Kubernetes networks using this pattern can be found in the [Multus configuration reference document.](https://intel.github.io/multus-cni/docs/configuration.html)
+SR-IOV CNI networks are commonly configured using Multus and SR-IOV Device Plugin using Network Attachment Definitions. More information about configuring Kubernetes networks using this pattern can be found in the [Multus configuration reference document.](https://github.com/k8snetworkplumbingwg/multus-cni/blob/master/docs/configuration.md)
 
 A Network Attachment Definition for SR-IOV CNI takes the form:
 
