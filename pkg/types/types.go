@@ -9,6 +9,7 @@ import (
 type VfState struct {
 	HostIFName   string
 	SpoofChk     bool
+	Trust        bool
 	AdminMAC     string
 	EffectiveMAC string
 	Vlan         int
@@ -27,6 +28,7 @@ func (vs *VfState) FillFromVfInfo(info *netlink.VfInfo) {
 	vs.Vlan = info.Vlan
 	vs.VlanQoS = info.Qos
 	vs.SpoofChk = info.Spoofchk
+	vs.Trust = info.Trust != 0
 }
 
 // NetConf extends types.NetConf for sriov-cni
