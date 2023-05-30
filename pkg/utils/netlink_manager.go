@@ -11,6 +11,8 @@ import (
 // NetlinkManager is an interface to mock nelink library
 type NetlinkManager interface {
 	LinkByName(string) (netlink.Link, error)
+	LinkSetAllmulticastOn(netlink.Link) error
+	LinkSetAllmulticastOff(netlink.Link) error
 	LinkSetVfVlan(netlink.Link, int, int) error
 	LinkSetVfVlanQos(netlink.Link, int, int, int) error
 	LinkSetVfHardwareAddr(netlink.Link, int, net.HardwareAddr) error
@@ -33,6 +35,16 @@ type MyNetlink struct {
 // LinkByName implements NetlinkManager
 func (n *MyNetlink) LinkByName(name string) (netlink.Link, error) {
 	return netlink.LinkByName(name)
+}
+
+// LinkSetAllmulticastOn sets allmulticast on
+func (n *MyNetlink) LinkSetAllmulticastOn(link netlink.Link) error {
+	return netlink.LinkSetAllmulticastOn(link)
+}
+
+// LinkSetAllmulticastOff sets allmulticast off
+func (n *MyNetlink) LinkSetAllmulticastOff(link netlink.Link) error {
+	return netlink.LinkSetAllmulticastOff(link)
 }
 
 // LinkSetVfVlan using NetlinkManager

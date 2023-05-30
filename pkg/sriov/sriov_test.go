@@ -121,6 +121,44 @@ var _ = Describe("Sriov", func() {
 			Expect(macAddr).To(Equal(netconf.MAC))
 			mocked.AssertExpectations(t)
 		})
+
+		DescribeTable("Setting all multicast", func(value, mockFunc string) {
+			var targetNetNS ns.NetNS
+			targetNetNS, err := testutils.NewNS()
+			defer func() {
+				if targetNetNS != nil {
+					targetNetNS.Close()
+				}
+			}()
+			Expect(err).NotTo(HaveOccurred())
+
+			mocked := &mocks_utils.NetlinkManager{}
+			mockedPciUtils := &mocks.PciUtils{}
+
+			fakeLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
+				Index: 1000,
+				Name:  "dummylink",
+			}}
+
+			netconf.AllMulti = value
+
+			mocked.On("LinkByName", mock.AnythingOfType("string")).Return(fakeLink, nil)
+			mocked.On(mockFunc, mock.Anything).Return(nil)
+			mocked.On("LinkSetDown", fakeLink).Return(nil)
+			mocked.On("LinkSetName", fakeLink, mock.Anything).Return(nil)
+			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
+			mocked.On("LinkSetUp", fakeLink).Return(nil)
+			mocked.On("LinkSetVfVlan", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int")).Return(nil)
+			mocked.On("LinkSetVfVlanQos", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("int")).Return(nil)
+			mockedPciUtils.On("EnableArpAndNdiscNotify", mock.AnythingOfType("string")).Return(nil)
+
+			sm := sriovManager{nLink: mocked, utils: mockedPciUtils}
+			_, err = sm.SetupVF(netconf, podifName, targetNetNS)
+			Expect(err).NotTo(HaveOccurred())
+		},
+			Entry("Enabling all multicast", "on", "LinkSetAllmulticastOn"),
+			Entry("Disabling all multicast", "off", "LinkSetAllmulticastOff"),
+		)
 	})
 
 	Context("Checking ReleaseVF function", func() {
@@ -240,6 +278,37 @@ var _ = Describe("Sriov", func() {
 			Expect(err).NotTo(HaveOccurred())
 			mocked.AssertExpectations(t)
 		})
+
+		DescribeTable("restores all multicast when provided in netconf", func(value, mockFunc string) {
+			var targetNetNS ns.NetNS
+			targetNetNS, err := testutils.NewNS()
+			defer func() {
+				if targetNetNS != nil {
+					targetNetNS.Close()
+				}
+			}()
+			Expect(err).NotTo(HaveOccurred())
+
+			fakeLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{Index: 1000, Name: "dummylink"}}
+			mocked := &mocks_utils.NetlinkManager{}
+
+			netconf.OrigVfState.AllMulti = value != "on"
+			netconf.AllMulti = value
+
+			mocked.On("LinkByName", netconf.ContIFNames).Return(fakeLink, nil)
+			mocked.On(mockFunc, mock.Anything).Return(nil)
+			mocked.On("LinkSetDown", fakeLink).Return(nil)
+			mocked.On("LinkSetName", fakeLink, netconf.OrigVfState.HostIFName).Return(nil)
+			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
+
+			sm := sriovManager{nLink: mocked}
+			err = sm.ReleaseVF(netconf, podifName, targetNetNS)
+			Expect(err).NotTo(HaveOccurred())
+			mocked.AssertExpectations(t)
+		},
+			Entry("Restoring all multicast off", "on", "LinkSetAllmulticastOff"),
+			Entry("Restoring all multicast on", "off", "LinkSetAllmulticastOn"),
+		)
 	})
 	Context("Checking FillOriginalVfInfo function", func() {
 		var (
