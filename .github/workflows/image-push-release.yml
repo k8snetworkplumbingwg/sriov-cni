@@ -116,7 +116,7 @@ jobs:
 
   push-manifest:
     runs-on: ubuntu-20.04
-    needs: [build-and-push-amd64-sriov-cni,build-and-push-amr64-sriov-cni,build-and-push-ppc64le-sriov-cni]
+    needs: [build-and-push-amd64-sriov-cni,build-and-push-arm64-sriov-cni,build-and-push-ppc64le-sriov-cni]
     steps:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
