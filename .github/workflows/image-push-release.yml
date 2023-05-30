@@ -13,13 +13,13 @@ jobs:
     name: Image push AMD64
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
 
       - name: Login to Docker
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -27,13 +27,14 @@ jobs:
 
       - name: Docker meta
         id: docker_meta
-        uses: crazy-max/ghaction-docker-meta@v1
+        uses: docker/metadata-action@v4
         with:
           images: ${{ env.IMAGE_NAME }}
-          tag-latest: false
+          tags: |
+            type=ref,event=tag
 
       - name: Build and push sriov-cni
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v4
         with:
           context: .
           push: true
@@ -48,13 +49,13 @@ jobs:
     name: Image push ARM64
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
 
       - name: Login to Docker
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -62,13 +63,14 @@ jobs:
 
       - name: Docker meta
         id: docker_meta
-        uses: crazy-max/ghaction-docker-meta@v1
+        uses: docker/metadata-action@v4
         with:
           images: ${{ env.IMAGE_NAME }}
-          tag-latest: false
+          tags: |
+            type=ref,event=tag
 
       - name: Build and push sriov-cni
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v4
         with:
           context: .
           push: true
@@ -82,13 +84,13 @@ jobs:
     name: Image push ppc64le
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
 
       - name: Login to Docker
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -96,13 +98,14 @@ jobs:
 
       - name: Docker meta
         id: docker_meta
-        uses: crazy-max/ghaction-docker-meta@v1
+        uses: docker/metadata-action@v4
         with:
           images: ${{ env.IMAGE_NAME }}
-          tag-latest: false
+          tags: |
+            type=ref,event=tag
 
       - name: Build and push sriov-cni
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v4
         with:
           context: .
           push: true
@@ -116,17 +119,18 @@ jobs:
     needs: [build-and-push-amd64-sriov-cni,build-and-push-amr64-sriov-cni,build-and-push-ppc64le-sriov-cni]
     steps:
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v1
+      uses: docker/setup-buildx-action@v2
 
     - name: Docker meta
       id: docker_meta
-      uses: crazy-max/ghaction-docker-meta@v1
+      uses: docker/metadata-action@v4
       with:
         images: ${{ env.IMAGE_NAME }}
-        tag-latest: false
+        tags: |
+          type=ref,event=tag
 
     - name: Login to GitHub Container Registry
-      uses: docker/login-action@v1
+      uses: docker/login-action@v2
       with:
         registry: ghcr.io
         username: ${{ github.repository_owner }}
@@ -134,15 +138,7 @@ jobs:
 
     - name: Create manifest for multi-arch images
       run: |
-        # pull
-        docker pull ${{ steps.docker_meta.outputs.tags }}-amd64
-        docker pull ${{ steps.docker_meta.outputs.tags }}-arm64
-        docker pull ${{ steps.docker_meta.outputs.tags }}-ppc64le
-        # create
-        docker manifest create ${{ steps.docker_meta.outputs.tags }} ${{ steps.docker_meta.outputs.tags }}-amd64 ${{ steps.docker_meta.outputs.tags }}-arm64 ${{ steps.docker_meta.outputs.tags }}-ppc64le
-        # annotate
-        docker manifest annotate ${{ steps.docker_meta.outputs.tags }} ${{ steps.docker_meta.outputs.tags }}-amd64 --arch amd64
-        docker manifest annotate ${{ steps.docker_meta.outputs.tags }} ${{ steps.docker_meta.outputs.tags }}-arm64 --arch arm64
-        docker manifest annotate ${{ steps.docker_meta.outputs.tags }} ${{ steps.docker_meta.outputs.tags }}-ppc64le --arch ppc64le
-        # push
-        docker manifest push ${{ steps.docker_meta.outputs.tags }}
+        docker buildx imagetools create -t ${{ env.IMAGE_NAME }}:${{ steps.docker_meta.outputs.tags }} \
+        ${{ env.IMAGE_NAME }}:${{ steps.docker_meta.outputs.tags }}-amd64 \
+        ${{ env.IMAGE_NAME }}:${{ steps.docker_meta.outputs.tags }}-arm64 \
+        ${{ env.IMAGE_NAME }}:${{ steps.docker_meta.outputs.tags }}-ppc64le
