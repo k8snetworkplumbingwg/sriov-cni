@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"syscall"
+
+	"github.com/vishvananda/netlink"
 )
 
 type tmpSysFs struct {
@@ -134,4 +136,21 @@ func RemoveTmpSysFs() error {
 	}
 
 	return os.RemoveAll(ts.dirRoot)
+}
+
+// FakeLink is a dummy netlink struct used during testing
+type FakeLink struct {
+	netlink.LinkAttrs
+}
+
+// type FakeLink struct {
+// 	linkAtrrs *netlink.LinkAttrs
+// }
+
+func (l *FakeLink) Attrs() *netlink.LinkAttrs {
+	return &l.LinkAttrs
+}
+
+func (l *FakeLink) Type() string {
+	return "FakeLink"
 }
