@@ -105,7 +105,7 @@ This is the minimum configuration for a working kernel driver interface using an
 ```
 
 #### Extended kernel driver config
-This configuration sets a number of extra parameters that may be key for SR-IOV networks including a vlan tag, disabled spoof checking and enabled trust mode. These parameters are commonly set in more advanced SR-IOV VF based networks.
+This configuration sets a number of extra parameters that may be key for SR-IOV networks including a vlan tag, disabled spoof checking, enabled allmulticast mode and enabled trust mode. These parameters are commonly set in more advanced SR-IOV VF based networks.
 
 ```json
 {
@@ -115,6 +115,7 @@ This configuration sets a number of extra parameters that may be key for SR-IOV 
   "vlan": 1000,
   "spoofchk": "off",
   "trust": "on",
+  "all_multicast": "on",
   "ipam": {
     "type": "host-local",
     "subnet": "10.56.217.0/24",
