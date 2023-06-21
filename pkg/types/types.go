@@ -17,7 +17,6 @@ type VfState struct {
 	MinTxRate    int
 	MaxTxRate    int
 	LinkState    uint32
-	AllMulti     bool
 }
 
 // FillFromVfInfo - Fill attributes according to the provided netlink.VfInfo struct
@@ -44,12 +43,11 @@ type NetConf struct {
 	DeviceID      string `json:"deviceID"` // PCI address of a VF in valid sysfs format
 	VFID          int
 	ContIFNames   string // VF names after in the container; used during deletion
-	MinTxRate     *int   `json:"min_tx_rate"`             // Mbps, 0 = disable rate limiting
-	MaxTxRate     *int   `json:"max_tx_rate"`             // Mbps, 0 = disable rate limiting
-	SpoofChk      string `json:"spoofchk,omitempty"`      // on|off
-	Trust         string `json:"trust,omitempty"`         // on|off
-	LinkState     string `json:"link_state,omitempty"`    // auto|enable|disable
-	AllMulti      string `json:"all_multicast,omitempty"` // on|off
+	MinTxRate     *int   `json:"min_tx_rate"`          // Mbps, 0 = disable rate limiting
+	MaxTxRate     *int   `json:"max_tx_rate"`          // Mbps, 0 = disable rate limiting
+	SpoofChk      string `json:"spoofchk,omitempty"`   // on|off
+	Trust         string `json:"trust,omitempty"`      // on|off
+	LinkState     string `json:"link_state,omitempty"` // auto|enable|disable
 	RuntimeConfig struct {
 		Mac string `json:"mac,omitempty"`
 	} `json:"runtimeConfig,omitempty"`
