@@ -73,9 +73,9 @@ var _ = Describe("Sriov", func() {
 			mocked.On("LinkSetVfVlanQos", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("int")).Return(nil)
 			mockedPciUtils.On("EnableArpAndNdiscNotify", mock.AnythingOfType("string")).Return(nil)
 			sm := sriovManager{nLink: mocked, utils: mockedPciUtils}
-			macAddr, err := sm.SetupVF(netconf, podifName, targetNetNS)
+			err = sm.SetupVF(netconf, podifName, targetNetNS)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(macAddr).To(Equal("6e:16:06:0e:b7:e9"))
+			Expect(netconf.OrigVfState.EffectiveMAC).To(Equal("6e:16:06:0e:b7:e9"))
 		})
 		It("Setting VF's MAC address", func() {
 			var targetNetNS ns.NetNS
@@ -116,9 +116,8 @@ var _ = Describe("Sriov", func() {
 			mocked.On("LinkSetUp", fakeLink).Return(nil)
 			mockedPciUtils.On("EnableArpAndNdiscNotify", mock.AnythingOfType("string")).Return(nil)
 			sm := sriovManager{nLink: mocked, utils: mockedPciUtils}
-			macAddr, err := sm.SetupVF(netconf, podifName, targetNetNS)
+			err = sm.SetupVF(netconf, podifName, targetNetNS)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(macAddr).To(Equal(netconf.MAC))
 			mocked.AssertExpectations(t)
 		})
 
@@ -153,7 +152,7 @@ var _ = Describe("Sriov", func() {
 			mockedPciUtils.On("EnableArpAndNdiscNotify", mock.AnythingOfType("string")).Return(nil)
 
 			sm := sriovManager{nLink: mocked, utils: mockedPciUtils}
-			_, err = sm.SetupVF(netconf, podifName, targetNetNS)
+			err = sm.SetupVF(netconf, podifName, targetNetNS)
 			Expect(err).NotTo(HaveOccurred())
 		},
 			Entry("Enabling all multicast", "on", "LinkSetAllmulticastOn"),
