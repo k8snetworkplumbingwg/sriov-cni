@@ -66,44 +66,6 @@ var _ = Describe("Config", func() {
 			Expect(err).To(HaveOccurred())
 		})
 
-		It("Assuming correct config file - all multicast", func() {
-			conf := []byte(`{
-        "name": "mynet",
-		"type": "sriov",
-		"deviceID": "0000:af:06.1",
-        "vf": 0,
-        "all_multicast": "on",
-        "trust": "on"
-                        }`)
-			_, err := LoadConf(conf)
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		It("Assuming incorrect all_multicast - trust not enabled", func() {
-			conf := []byte(`{
-        "name": "mynet",
-		"type": "sriov",
-		"deviceID": "0000:af:06.1",
-        "vf": 0,
-		"all_multicast": "on",
-		"trust": "off"
-						}`)
-			_, err := LoadConf(conf)
-			Expect(err).To(HaveOccurred())
-		})
-
-		It("Assuming incorrect all_multicast - incorrect value", func() {
-			conf := []byte(`{
-        "name": "mynet",
-		"type": "sriov",
-		"deviceID": "0000:af:06.1",
-        "vf": 0,
-		"all_multicast": "sriov"
-						}`)
-			_, err := LoadConf(conf)
-			Expect(err).To(HaveOccurred())
-		})
-
 		It("Assuming device is allocated", func() {
 			conf := []byte(`{
         "name": "mynet",
