@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"strings"
 
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
@@ -65,6 +66,9 @@ func cmdAdd(args *skel.CmdArgs) error {
 	if netConf.RuntimeConfig.Mac != "" {
 		netConf.MAC = netConf.RuntimeConfig.Mac
 	}
+
+	// Always use lower case for mac address
+	netConf.MAC = strings.ToLower(netConf.MAC)
 
 	netns, err := ns.GetNS(args.Netns)
 	if err != nil {
