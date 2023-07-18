@@ -69,28 +69,38 @@ func LoadConf(bytes []byte) (*sriovtypes.NetConf, error) {
 		return nil, fmt.Errorf("LoadConf(): the VF %s does not have a interface name or a dpdk driver", n.DeviceID)
 	}
 
-	if n.Vlan != nil {
-		// validate vlan id range
-		if *n.Vlan < 0 || *n.Vlan > 4094 {
-			return nil, fmt.Errorf("LoadConf(): vlan id %d invalid: value must be in the range 0-4094", *n.Vlan)
-		}
+	if n.Vlan == nil {
+		vlan := 0
+		n.Vlan = &vlan
 	}
 
-	if n.VlanQoS != nil {
-		// validate that VLAN QoS is in the 0-7 range
-		if *n.VlanQoS < 0 || *n.VlanQoS > 7 {
-			return nil, fmt.Errorf("LoadConf(): vlan QoS PCP %d invalid: value must be in the range 0-7", *n.VlanQoS)
-		}
+	// validate vlan id range
+	if *n.Vlan < 0 || *n.Vlan > 4094 {
+		return nil, fmt.Errorf("LoadConf(): vlan id %d invalid: value must be in the range 0-4094", *n.Vlan)
 	}
 
-	// validate that vlan id is set if vlan qos is set
-	if n.VlanQoS != nil && n.Vlan == nil {
-		return nil, fmt.Errorf(("LoadConf(): vlan id must be configured to set vlan QoS"))
+	if *n.Vlan == 0 && (n.VlanQoS != nil || n.VlanProto != nil) {
+		return nil, fmt.Errorf("LoadConf(): non-zero vlan id must be configured to set vlan Qos and/or Proto")
 	}
 
-	// validate non-zero value for vlan id if vlan qos is set to a non-zero value
-	if (n.VlanQoS != nil && *n.VlanQoS != 0) && *n.Vlan == 0 {
-		return nil, fmt.Errorf("LoadConf(): non-zero vlan id must be configured to set vlan QoS to a non-zero value")
+	if n.VlanQoS == nil {
+		qos := 0
+		n.VlanQoS = &qos
+	}
+
+	// validate that VLAN QoS is in the 0-7 range
+	if *n.VlanQoS < 0 || *n.VlanQoS > 7 {
+		return nil, fmt.Errorf("LoadConf(): vlan QoS PCP %d invalid: value must be in the range 0-7", *n.VlanQoS)
+	}
+
+	if n.VlanProto == nil {
+		proto := sriovtypes.Proto8021q
+		n.VlanProto = &proto
+	}
+
+	*n.VlanProto = strings.ToLower(*n.VlanProto)
+	if *n.VlanProto != sriovtypes.Proto8021ad && *n.VlanProto != sriovtypes.Proto8021q {
+		return nil, fmt.Errorf("LoadConf(): vlan Proto %s invalid: value must be '802.1Q' or '802.1ad'", *n.VlanProto)
 	}
 
 	// validate that link state is one of supported values

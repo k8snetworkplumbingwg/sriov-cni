@@ -296,6 +296,7 @@ var _ = Describe("Sriov", func() {
 			fakeLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{Index: 1000, Name: "dummylink"}}
 
 			mocked.On("LinkByName", netconf.Master).Return(fakeLink, nil)
+			mocked.On("LinkSetVfVlanQosProto", fakeLink, netconf.VFID, netconf.OrigVfState.Vlan, netconf.OrigVfState.VlanQoS, sriovtypes.VlanProtoInt[sriovtypes.Proto8021q]).Return(nil)
 			sm := sriovManager{nLink: mocked}
 			err := sm.ResetVFConfig(netconf)
 			Expect(err).NotTo(HaveOccurred())
@@ -347,7 +348,7 @@ var _ = Describe("Sriov", func() {
 			}}}
 
 			mocked.On("LinkByName", netconf.Master).Return(fakeLink, nil)
-			mocked.On("LinkSetVfVlanQos", fakeLink, netconf.VFID, netconf.OrigVfState.Vlan, netconf.OrigVfState.VlanQoS).Return(nil)
+			mocked.On("LinkSetVfVlanQosProto", fakeLink, netconf.VFID, netconf.OrigVfState.Vlan, netconf.OrigVfState.VlanQoS, sriovtypes.VlanProtoInt[sriovtypes.Proto8021q]).Return(nil)
 			mocked.On("LinkSetVfSpoofchk", fakeLink, netconf.VFID, netconf.OrigVfState.SpoofChk).Return(nil)
 			mocked.On("LinkSetVfHardwareAddr", fakeLink, netconf.VFID, origMac).Return(nil)
 			mocked.On("LinkSetVfTrust", fakeLink, netconf.VFID, false).Return(nil)

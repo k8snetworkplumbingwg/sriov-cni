@@ -11,8 +11,7 @@ import (
 // NetlinkManager is an interface to mock nelink library
 type NetlinkManager interface {
 	LinkByName(string) (netlink.Link, error)
-	LinkSetVfVlan(netlink.Link, int, int) error
-	LinkSetVfVlanQos(netlink.Link, int, int, int) error
+	LinkSetVfVlanQosProto(netlink.Link, int, int, int, int) error
 	LinkSetVfHardwareAddr(netlink.Link, int, net.HardwareAddr) error
 	LinkSetHardwareAddr(netlink.Link, net.HardwareAddr) error
 	LinkSetUp(netlink.Link) error
@@ -35,14 +34,9 @@ func (n *MyNetlink) LinkByName(name string) (netlink.Link, error) {
 	return netlink.LinkByName(name)
 }
 
-// LinkSetVfVlan using NetlinkManager
-func (n *MyNetlink) LinkSetVfVlan(link netlink.Link, vf, vlan int) error {
-	return netlink.LinkSetVfVlan(link, vf, vlan)
-}
-
-// LinkSetVfVlanQos sets VLAN ID and QoS field for given VF using NetlinkManager
-func (n *MyNetlink) LinkSetVfVlanQos(link netlink.Link, vf, vlan, qos int) error {
-	return netlink.LinkSetVfVlanQos(link, vf, vlan, qos)
+// LinkSetVfVlanQosProto sets VLAN ID, QoS and Proto field for given VF using NetlinkManager
+func (n *MyNetlink) LinkSetVfVlanQosProto(link netlink.Link, vf, vlan, qos, proto int) error {
+	return netlink.LinkSetVfVlanQosProto(link, vf, vlan, qos, proto)
 }
 
 // LinkSetVfHardwareAddr using NetlinkManager
