@@ -170,8 +170,8 @@ func GetSharedPF(ifName string) (string, error) {
 	return pfName, fmt.Errorf("Shared PF not found")
 }
 
-// GetVFLinkNames returns VF's network interface name given it's PCI addr
-func GetVFLinkNames(pciAddr string) (string, error) {
+// GetVFLinkName returns VF's network interface name given it's PCI addr
+func GetVFLinkName(pciAddr string) (string, error) {
 	var names []string
 	vfDir := filepath.Join(SysBusPci, pciAddr, "net")
 	if _, err := os.Lstat(vfDir); err != nil {

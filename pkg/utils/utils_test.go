@@ -75,7 +75,7 @@ var _ = Describe("Utils", func() {
 		// 	Expect(err).To(HaveOccurred(), "Looking for shared PF for not supported NIC should return an error")
 		// })
 	})
-	Context("Checking GetVFLinkNames function", func() {
+	Context("Checking GetVFLinkName function", func() {
 		It("Assuming existing vf", func() {
 			result, err := GetVFLinkNamesFromVFID("enp175s0f1", 0)
 			Expect(result).To(ContainElement("enp175s6"), "Existing PF should have at least one VF")

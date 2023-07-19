@@ -51,8 +51,8 @@ func LoadConf(bytes []byte) (*sriovtypes.NetConf, error) {
 	}
 
 	// Assuming VF is netdev interface; Get interface name(s)
-	hostIFNames, err := utils.GetVFLinkNames(n.DeviceID)
-	if err != nil || hostIFNames == "" {
+	hostIFName, err := utils.GetVFLinkName(n.DeviceID)
+	if err != nil || hostIFName == "" {
 		// VF interface not found; check if VF has dpdk driver
 		hasDpdkDriver, err := utils.HasDpdkDriver(n.DeviceID)
 		if err != nil {
@@ -61,11 +61,11 @@ func LoadConf(bytes []byte) (*sriovtypes.NetConf, error) {
 		n.DPDKMode = hasDpdkDriver
 	}
 
-	if hostIFNames != "" {
-		n.OrigVfState.HostIFName = hostIFNames
+	if hostIFName != "" {
+		n.OrigVfState.HostIFName = hostIFName
 	}
 
-	if hostIFNames == "" && !n.DPDKMode {
+	if hostIFName == "" && !n.DPDKMode {
 		return nil, fmt.Errorf("LoadConf(): the VF %s does not have a interface name or a dpdk driver", n.DeviceID)
 	}
 

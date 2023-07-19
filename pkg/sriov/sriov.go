@@ -112,7 +112,6 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, netns
 	}); err != nil {
 		return fmt.Errorf("error setting up interface in container namespace: %q", err)
 	}
-	conf.ContIFNames = podifName
 
 	return nil
 }
@@ -122,10 +121,6 @@ func (s *sriovManager) ReleaseVF(conf *sriovtypes.NetConf, podifName string, net
 	initns, err := ns.GetCurrentNS()
 	if err != nil {
 		return fmt.Errorf("failed to get init netns: %v", err)
-	}
-
-	if len(conf.ContIFNames) < 1 && len(conf.ContIFNames) != len(conf.OrigVfState.HostIFName) {
-		return fmt.Errorf("number of interface names mismatch ContIFNames: %d HostIFNames: %d", len(conf.ContIFNames), len(conf.OrigVfState.HostIFName))
 	}
 
 	return netns.Do(func(_ ns.NetNS) error {

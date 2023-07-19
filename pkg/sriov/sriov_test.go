@@ -32,10 +32,9 @@ var _ = Describe("Sriov", func() {
 		BeforeEach(func() {
 			podifName = "net1"
 			netconf = &sriovtypes.NetConf{
-				Master:      "enp175s0f1",
-				DeviceID:    "0000:af:06.0",
-				VFID:        0,
-				ContIFNames: "net1",
+				Master:   "enp175s0f1",
+				DeviceID: "0000:af:06.0",
+				VFID:     0,
 				OrigVfState: sriovtypes.VfState{
 					HostIFName: "enp175s6",
 				},
@@ -131,10 +130,9 @@ var _ = Describe("Sriov", func() {
 		BeforeEach(func() {
 			podifName = "net1"
 			netconf = &sriovtypes.NetConf{
-				Master:      "enp175s0f1",
-				DeviceID:    "0000:af:06.0",
-				VFID:        0,
-				ContIFNames: "net1",
+				Master:   "enp175s0f1",
+				DeviceID: "0000:af:06.0",
+				VFID:     0,
 				OrigVfState: sriovtypes.VfState{
 					HostIFName:   "enp175s6",
 					EffectiveMAC: "6e:16:06:0e:b7:e9",
@@ -156,7 +154,7 @@ var _ = Describe("Sriov", func() {
 
 			fakeLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{Index: 1000, Name: "dummylink", HardwareAddr: fakeMac}}
 
-			mocked.On("LinkByName", netconf.ContIFNames).Return(fakeLink, nil)
+			mocked.On("LinkByName", podifName).Return(fakeLink, nil)
 			mocked.On("LinkSetDown", fakeLink).Return(nil)
 			mocked.On("LinkSetName", fakeLink, netconf.OrigVfState.HostIFName).Return(nil)
 			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
@@ -175,10 +173,9 @@ var _ = Describe("Sriov", func() {
 		BeforeEach(func() {
 			podifName = "net1"
 			netconf = &sriovtypes.NetConf{
-				Master:      "enp175s0f1",
-				DeviceID:    "0000:af:06.0",
-				VFID:        0,
-				ContIFNames: "net1",
+				Master:   "enp175s0f1",
+				DeviceID: "0000:af:06.0",
+				VFID:     0,
 				OrigVfState: sriovtypes.VfState{
 					HostIFName:   "enp175s6",
 					EffectiveMAC: "c6:c8:7f:1f:21:90",
@@ -197,7 +194,7 @@ var _ = Describe("Sriov", func() {
 			fakeLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{Index: 1000, Name: "dummylink"}}
 			mocked := &mocks_utils.NetlinkManager{}
 
-			mocked.On("LinkByName", netconf.ContIFNames).Return(fakeLink, nil)
+			mocked.On("LinkByName", podifName).Return(fakeLink, nil)
 			mocked.On("LinkSetDown", fakeLink).Return(nil)
 			mocked.On("LinkSetName", fakeLink, netconf.OrigVfState.HostIFName).Return(nil)
 			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
@@ -228,7 +225,7 @@ var _ = Describe("Sriov", func() {
 				HardwareAddr: fakeMac,
 			}}
 
-			mocked.On("LinkByName", netconf.ContIFNames).Return(fakeLink, nil)
+			mocked.On("LinkByName", podifName).Return(fakeLink, nil)
 			mocked.On("LinkByName", netconf.OrigVfState.HostIFName).Return(tempLink, nil)
 			mocked.On("LinkSetDown", fakeLink).Return(nil)
 			mocked.On("LinkSetHardwareAddr", tempLink, fakeMac).Return(nil)
@@ -247,10 +244,9 @@ var _ = Describe("Sriov", func() {
 
 		BeforeEach(func() {
 			netconf = &sriovtypes.NetConf{
-				Master:      "enp175s0f1",
-				DeviceID:    "0000:af:06.0",
-				VFID:        0,
-				ContIFNames: "net1",
+				Master:   "enp175s0f1",
+				DeviceID: "0000:af:06.0",
+				VFID:     0,
 				OrigVfState: sriovtypes.VfState{
 					HostIFName: "enp175s6",
 				},
@@ -287,10 +283,9 @@ var _ = Describe("Sriov", func() {
 
 		BeforeEach(func() {
 			netconf = &sriovtypes.NetConf{
-				Master:      "enp175s0f1",
-				DeviceID:    "0000:af:06.0",
-				VFID:        0,
-				ContIFNames: "net1",
+				Master:   "enp175s0f1",
+				DeviceID: "0000:af:06.0",
+				VFID:     0,
 				OrigVfState: sriovtypes.VfState{
 					HostIFName: "enp175s6",
 				},
@@ -319,18 +314,17 @@ var _ = Describe("Sriov", func() {
 			minTxRate := 1000
 
 			netconf = &sriovtypes.NetConf{
-				Master:      "enp175s0f1",
-				DeviceID:    "0000:af:06.0",
-				VFID:        0,
-				ContIFNames: "net1",
-				MAC:         "d2:fc:22:a7:0d:e8",
-				Vlan:        &vlan,
-				VlanQoS:     &vlanQos,
-				SpoofChk:    "on",
-				MaxTxRate:   &maxTxRate,
-				MinTxRate:   &minTxRate,
-				Trust:       "on",
-				LinkState:   "enable",
+				Master:    "enp175s0f1",
+				DeviceID:  "0000:af:06.0",
+				VFID:      0,
+				MAC:       "d2:fc:22:a7:0d:e8",
+				Vlan:      &vlan,
+				VlanQoS:   &vlanQos,
+				SpoofChk:  "on",
+				MaxTxRate: &maxTxRate,
+				MinTxRate: &minTxRate,
+				Trust:     "on",
+				LinkState: "enable",
 				OrigVfState: sriovtypes.VfState{
 					HostIFName:   "enp175s6",
 					SpoofChk:     false,
