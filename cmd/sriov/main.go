@@ -223,6 +223,11 @@ func cmdDel(args *skel.CmdArgs) error {
 		return nil
 	}
 
+	// Verify VF ID existence.
+	if _, err := utils.GetVfid(netConf.DeviceID, netConf.Master); err != nil {
+		return fmt.Errorf("cmdDel() error obtaining VF ID: %q", err)
+	}
+
 	sm := sriov.NewSriovManager()
 
 	/* ResetVFConfig resets a VF administratively. We must run ResetVFConfig
