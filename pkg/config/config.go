@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/containernetworking/cni/pkg/skel"
+	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/logging"
 	sriovtypes "github.com/k8snetworkplumbingwg/sriov-cni/pkg/types"
 	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/utils"
 )
@@ -15,6 +16,17 @@ var (
 	// DefaultCNIDir used for caching NetConf
 	DefaultCNIDir = "/var/lib/cni/sriov"
 )
+
+// SetLogging sets global logging parameters.
+func SetLogging(stdinData []byte, containerID, netns, ifName string) error {
+	n := &sriovtypes.NetConf{}
+	if err := json.Unmarshal(stdinData, n); err != nil {
+		return fmt.Errorf("SetLogging(): failed to load netconf: %v", err)
+	}
+
+	logging.Init(n.LogLevel, n.LogFile, containerID, netns, ifName)
+	return nil
+}
 
 // LoadConf parses and validates stdin netconf and returns NetConf object
 func LoadConf(bytes []byte) (*sriovtypes.NetConf, error) {
@@ -36,11 +48,15 @@ func LoadConf(bytes []byte) (*sriovtypes.NetConf, error) {
 		return nil, fmt.Errorf("LoadConf(): VF pci addr is required")
 	}
 
-	allocator := utils.NewPCIAllocator(DefaultCNIDir)
 	// Check if the device is already allocated.
 	// This is to prevent issues where kubelet request to delete a pod and in the same time a new pod using the same
 	// vf is started. we can have an issue where the cmdDel of the old pod is called AFTER the cmdAdd of the new one
 	// This will block the new pod creation until the cmdDel is done.
+	logging.Debug("Check if the device is already allocated",
+		"func", "LoadConf",
+		"DefaultCNIDir", DefaultCNIDir,
+		"n.DeviceID", n.DeviceID)
+	allocator := utils.NewPCIAllocator(DefaultCNIDir)
 	isAllocated, err := allocator.IsAllocated(n.DeviceID)
 	if err != nil {
 		return n, err

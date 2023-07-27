@@ -13,6 +13,7 @@ import (
 	"github.com/containernetworking/plugins/pkg/ipam"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/config"
+	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/logging"
 	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/sriov"
 	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/utils"
 	"github.com/vishvananda/netlink"
@@ -43,6 +44,13 @@ func getEnvArgs(envArgsString string) (*envArgs, error) {
 }
 
 func cmdAdd(args *skel.CmdArgs) error {
+	if err := config.SetLogging(args.StdinData, args.ContainerID, args.Netns, args.IfName); err != nil {
+		return err
+	}
+	logging.Debug("function called",
+		"func", "cmdAdd",
+		"args.Path", args.Path, "args.StdinData", string(args.StdinData), "args.Args", args.Args)
+
 	netConf, err := config.LoadConf(args.StdinData)
 	if err != nil {
 		return fmt.Errorf("SRIOV-CNI failed to load netconf: %v", err)
@@ -179,12 +187,20 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	// Cache NetConf for CmdDel
+	logging.Debug("Cache NetConf for CmdDel",
+		"func", "cmdAdd",
+		"config.DefaultCNIDir", config.DefaultCNIDir,
+		"netConf", netConf)
 	if err = utils.SaveNetConf(args.ContainerID, config.DefaultCNIDir, args.IfName, netConf); err != nil {
 		return fmt.Errorf("error saving NetConf %q", err)
 	}
 
+	// Mark the pci address as in use.
+	logging.Debug("Mark the PCI address as in use",
+		"func", "cmdAdd",
+		"config.DefaultCNIDir", config.DefaultCNIDir,
+		"netConf.DeviceID", netConf.DeviceID)
 	allocator := utils.NewPCIAllocator(config.DefaultCNIDir)
-	// Mark the pci address as in used
 	if err = allocator.SaveAllocatedPCI(netConf.DeviceID, args.Netns); err != nil {
 		return fmt.Errorf("error saving the pci allocation for vf pci address %s: %v", netConf.DeviceID, err)
 	}
@@ -193,6 +209,13 @@ func cmdAdd(args *skel.CmdArgs) error {
 }
 
 func cmdDel(args *skel.CmdArgs) error {
+	if err := config.SetLogging(args.StdinData, args.ContainerID, args.Netns, args.IfName); err != nil {
+		return err
+	}
+	logging.Debug("function called",
+		"func", "cmdDel",
+		"args.Path", args.Path, "args.StdinData", string(args.StdinData), "args.Args", args.Args)
+
 	netConf, cRefPath, err := config.LoadConfFromCache(args)
 	if err != nil {
 		// If cmdDel() fails, cached netconf is cleaned up by
@@ -202,6 +225,9 @@ func cmdDel(args *skel.CmdArgs) error {
 		// Return nil when LoadConfFromCache fails since the rest
 		// of cmdDel() code relies on netconf as input argument
 		// and there is no meaning to continue.
+		logging.Error("Cannot load config file from cache",
+			"func", "cmdDel",
+			"err", err)
 		return nil
 	}
 
@@ -261,6 +287,10 @@ func cmdDel(args *skel.CmdArgs) error {
 	}
 
 	// Mark the pci address as released
+	logging.Debug("Mark the PCI address as released",
+		"func", "cmdDel",
+		"config.DefaultCNIDir", config.DefaultCNIDir,
+		"netConf.DeviceID", netConf.DeviceID)
 	allocator := utils.NewPCIAllocator(config.DefaultCNIDir)
 	if err = allocator.DeleteAllocatedPCI(netConf.DeviceID); err != nil {
 		return fmt.Errorf("error cleaning the pci allocation for vf pci address %s: %v", netConf.DeviceID, err)
