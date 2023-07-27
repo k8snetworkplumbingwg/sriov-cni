@@ -14,6 +14,7 @@ BASE=$(GOPATH)/src/$(REPO_PATH)
 GOFILES = $(shell find . -name *.go | grep -vE "(\/vendor\/)|(_test.go)")
 PKGS     = $(or $(PKG),$(shell cd $(BASE) && env GOPATH=$(GOPATH) $(GO) list ./... | grep -v "^$(PACKAGE)/vendor/"))
 TESTPKGS = $(shell env GOPATH=$(GOPATH) $(GO) list -f '{{ if or .TestGoFiles .XTestGoFiles }}{{ .ImportPath }}{{ end }}' $(PKGS))
+IMAGE_BUILDER ?= docker
 
 export GOPATH
 export GOBIN
@@ -136,7 +137,7 @@ fmt: ; $(info  Running gofmt...) @ ## Run gofmt on all source files
 # To pass proxy for Docker invoke it as 'make image HTTP_POXY=http://192.168.0.1:8080'
 .PHONY: image
 image: | $(BASE) ; $(info Building Docker image...) @ ## Build SR-IOV CNI docker image
-	@docker build -t $(TAG) -f $(DOCKERFILE)  $(CURDIR) $(DOCKERARGS)
+	@$(IMAGE_BUILDER) build -t $(TAG) -f $(DOCKERFILE)  $(CURDIR) $(DOCKERARGS)
 
 # Misc
 
