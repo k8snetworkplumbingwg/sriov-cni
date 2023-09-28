@@ -67,6 +67,9 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, netns
 		return fmt.Errorf("error getting VF netdevice with name %s", linkName)
 	}
 
+	// Save the original effective MAC address before overriding it
+	conf.OrigVfState.EffectiveMAC = linkObj.Attrs().HardwareAddr.String()
+
 	// tempName used as intermediary name to avoid name conflicts
 	tempName := fmt.Sprintf("%s%d", "temp_", linkObj.Attrs().Index)
 
@@ -87,23 +90,8 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, netns
 		return fmt.Errorf("error setting temp IF name %s for %s", tempName, linkName)
 	}
 
-	// Save the original effective MAC address before overriding it
-	conf.OrigVfState.EffectiveMAC = linkObj.Attrs().HardwareAddr.String()
-	// 3. Set MAC address
-	if conf.MAC != "" {
-		logging.Debug("3. Set MAC address",
-			"func", "SetupVF",
-			"s.nLink", s.nLink,
-			"tempName", tempName,
-			"conf.MAC", conf.MAC)
-		err = utils.SetVFEffectiveMAC(s.nLink, tempName, conf.MAC)
-		if err != nil {
-			return fmt.Errorf("failed to set netlink MAC address to %s: %v", conf.MAC, err)
-		}
-	}
-
-	// 4. Change netns
-	logging.Debug("4. Change netns",
+	// 3. Change netns
+	logging.Debug("3. Change netns",
 		"func", "SetupVF",
 		"linkObj", linkObj,
 		"netns.Fd()", int(netns.Fd()))
@@ -112,8 +100,8 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, netns
 	}
 
 	if err := netns.Do(func(_ ns.NetNS) error {
-		// 5. Set Pod IF name
-		logging.Debug("5. Set Pod IF name",
+		// 4. Set Pod IF name
+		logging.Debug("4. Set Pod IF name",
 			"func", "SetupVF",
 			"linkObj", linkObj,
 			"podifName", podifName)
@@ -121,12 +109,25 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, netns
 			return fmt.Errorf("error setting container interface name %s for %s", linkName, tempName)
 		}
 
-		// 6. Enable IPv4 ARP notify and IPv6 Network Discovery notify
+		// 5. Enable IPv4 ARP notify and IPv6 Network Discovery notify
 		// Error is ignored here because enabling this feature is only a performance enhancement.
-		logging.Debug("6. Enable IPv4 ARP notify and IPv6 Network Discovery notify",
+		logging.Debug("5. Enable IPv4 ARP notify and IPv6 Network Discovery notify",
 			"func", "SetupVF",
 			"podifName", podifName)
 		_ = s.utils.EnableArpAndNdiscNotify(podifName)
+
+		// 6. Set MAC address
+		if conf.MAC != "" {
+			logging.Debug("6. Set MAC address",
+				"func", "SetupVF",
+				"s.nLink", s.nLink,
+				"podifName", podifName,
+				"conf.MAC", conf.MAC)
+			err = utils.SetVFEffectiveMAC(s.nLink, podifName, conf.MAC)
+			if err != nil {
+				return fmt.Errorf("failed to set netlink MAC address to %s: %v", conf.MAC, err)
+			}
+		}
 
 		// 7. Bring IF up in Pod netns
 		logging.Debug("7. Bring IF up in Pod netns",
