@@ -73,6 +73,7 @@ var _ = Describe("Config", func() {
 		zeroVlanID := 0
 		invalidVlanID := 5000
 		validQoS := 1
+		zeroQoS := 0
 		invalidQoS := 10
 		valid8021qProto := "802.1Q"
 		valid8021adProto := "802.1ad"
@@ -108,14 +109,15 @@ var _ = Describe("Config", func() {
 			},
 			Entry("valid vlan ID", &validVlanID, nil, nil, false),
 			Entry("invalid vlan ID", &invalidVlanID, nil, nil, true),
-			Entry("vlan ID equal to zero and QoS set", &zeroVlanID, &validQoS, nil, true),
-			Entry("vlan ID equal to zero and Proto set", &zeroVlanID, nil, &valid8021qProto, true),
+			Entry("vlan ID equal to zero and non-zero QoS set", &zeroVlanID, &validQoS, nil, true),
+			Entry("vlan ID equal to zero and 802.1ad Proto set", &zeroVlanID, nil, &valid8021adProto, true),
 			Entry("invalid QoS", &validVlanID, &invalidQoS, nil, true),
 			Entry("invalid Proto", &validVlanID, nil, &invalidProto, true),
 			Entry("valid 802.1q Proto", &validVlanID, nil, &valid8021qProto, false),
 			Entry("valid 802.1ad Proto", &validVlanID, nil, &valid8021adProto, false),
-			Entry("no vlan ID and QoS set", nil, &validQoS, nil, true),
-			Entry("no vlan ID and Proto set", nil, nil, &valid8021adProto, true),
+			Entry("no vlan ID and non-zero QoS set", nil, &validQoS, nil, true),
+			Entry("no vlan ID and 802.1ad Proto set", nil, nil, &valid8021adProto, true),
+			Entry("default values for vlan, qos and proto", &zeroVlanID, &zeroQoS, &valid8021qProto, false),
 		)
 
 		It("Assuming device is allocated", func() {
