@@ -208,6 +208,9 @@ func cmdDel(args *skel.CmdArgs) error {
 	defer func() {
 		if err == nil && cRefPath != "" {
 			_ = utils.CleanCachedNetConf(cRefPath)
+
+			allocator := utils.NewPCIAllocator(config.DefaultCNIDir)
+			_ = allocator.DeleteAllocatedPCI(netConf.DeviceID)
 		}
 	}()
 
@@ -258,12 +261,6 @@ func cmdDel(args *skel.CmdArgs) error {
 		if err = sm.ReleaseVF(netConf, args.IfName, netns); err != nil {
 			return err
 		}
-	}
-
-	// Mark the pci address as released
-	allocator := utils.NewPCIAllocator(config.DefaultCNIDir)
-	if err = allocator.DeleteAllocatedPCI(netConf.DeviceID); err != nil {
-		return fmt.Errorf("error cleaning the pci allocation for vf pci address %s: %v", netConf.DeviceID, err)
 	}
 
 	return nil
