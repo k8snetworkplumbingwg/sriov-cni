@@ -2,9 +2,11 @@ package utils
 
 import (
 	"fmt"
-	"github.com/containernetworking/plugins/pkg/ns"
 	"os"
 	"path/filepath"
+
+	"github.com/containernetworking/plugins/pkg/ns"
+	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/logging"
 )
 
 type PCIAllocation interface {
@@ -73,6 +75,9 @@ func (p *PCIAllocator) IsAllocated(pciAddress string) (bool, error) {
 	// we release the PCI address
 	networkNamespace, err := ns.GetNS(string(dat))
 	if err != nil {
+		logging.Debug("Mark the PCI address as released",
+			"func", "IsAllocated",
+			"pciAddress", pciAddress)
 		err = p.DeleteAllocatedPCI(pciAddress)
 		if err != nil {
 			return false, fmt.Errorf("error deleting the pci allocation for vf pci address %s: %v", pciAddress, err)
