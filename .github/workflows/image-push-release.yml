@@ -30,6 +30,8 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: ${{ env.IMAGE_NAME }}
+          flavor: |
+            latest=false
           tags: |
             type=ref,event=tag
 
@@ -41,7 +43,6 @@ jobs:
           platforms: linux/amd64
           tags: |
             ${{ steps.docker_meta.outputs.tags }}-amd64
-            ${{ steps.docker_meta.outputs.tags }}:${{ github.sha }}
           file: ./Dockerfile
 
   build-and-push-arm64-sriov-cni:
@@ -66,6 +67,8 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: ${{ env.IMAGE_NAME }}
+          flavor: |
+            latest=false
           tags: |
             type=ref,event=tag
 
@@ -101,6 +104,8 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: ${{ env.IMAGE_NAME }}
+          flavor: |
+            latest=false
           tags: |
             type=ref,event=tag
 
@@ -126,6 +131,8 @@ jobs:
       uses: docker/metadata-action@v4
       with:
         images: ${{ env.IMAGE_NAME }}
+        flavor: |
+          latest=false
         tags: |
           type=ref,event=tag
 
@@ -138,7 +145,7 @@ jobs:
 
     - name: Create manifest for multi-arch images
       run: |
-        docker buildx imagetools create -t ${{ env.IMAGE_NAME }}:${{ steps.docker_meta.outputs.tags }} \
-        ${{ env.IMAGE_NAME }}:${{ steps.docker_meta.outputs.tags }}-amd64 \
-        ${{ env.IMAGE_NAME }}:${{ steps.docker_meta.outputs.tags }}-arm64 \
-        ${{ env.IMAGE_NAME }}:${{ steps.docker_meta.outputs.tags }}-ppc64le
+        docker buildx imagetools create -t ${{ steps.docker_meta.outputs.tags }} \
+        ${{ steps.docker_meta.outputs.tags }}-amd64 \
+        ${{ steps.docker_meta.outputs.tags }}-arm64 \
+        ${{ steps.docker_meta.outputs.tags }}-ppc64le
