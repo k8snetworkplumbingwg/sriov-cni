@@ -139,6 +139,9 @@ fmt: ; $(info  Running gofmt...) @ ## Run gofmt on all source files
 image: | $(BASE) ; $(info Building Docker image...) @ ## Build SR-IOV CNI docker image
 	@$(IMAGE_BUILDER) build -t $(TAG) -f $(DOCKERFILE)  $(CURDIR) $(DOCKERARGS)
 
+test-image: image
+	$Q $(BASE)/images/image_test.sh $(IMAGE_BUILDER) $(TAG)
+
 # Misc
 
 .PHONY: deps-update
