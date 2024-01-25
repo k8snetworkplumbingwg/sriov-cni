@@ -22,6 +22,7 @@ type NetlinkManager interface {
 	LinkSetVfSpoofchk(netlink.Link, int, bool) error
 	LinkSetVfTrust(netlink.Link, int, bool) error
 	LinkSetVfState(netlink.Link, int, uint32) error
+	LinkDelAltName(netlink.Link, string) error
 }
 
 // MyNetlink NetlinkManager
@@ -87,4 +88,9 @@ func (n *MyNetlink) LinkSetVfTrust(link netlink.Link, vf int, state bool) error 
 // LinkSetVfState using NetlinkManager
 func (n *MyNetlink) LinkSetVfState(link netlink.Link, vf int, state uint32) error {
 	return netlink.LinkSetVfState(link, vf, state)
+}
+
+// LinkDelAltName using NetlinkManager
+func (n *MyNetlink) LinkDelAltName(link netlink.Link, altName string) error {
+	return netlink.LinkDelAltName(link, altName)
 }

@@ -90,8 +90,26 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, netns
 		return fmt.Errorf("error setting temp IF name %s for %s", tempName, linkName)
 	}
 
-	// 3. Change netns
-	logging.Debug("3. Change netns",
+	// 3. Remove alt name from the nic
+	logging.Debug("3. Remove interface original name from alt names",
+		"func", "SetupVF",
+		"linkObj", linkObj,
+		"OriginalLinkName", linkName,
+		"tempName", tempName)
+	linkObj, err = s.nLink.LinkByName(tempName)
+	if err != nil {
+		return fmt.Errorf("error getting VF netdevice with name %s: %v", tempName, err)
+	}
+	for _, altName := range linkObj.Attrs().AltNames {
+		if altName == linkName {
+			if err := s.nLink.LinkDelAltName(linkObj, linkName); err != nil {
+				return fmt.Errorf("error removing VF altname %s: %v", linkName, err)
+			}
+		}
+	}
+
+	// 4. Change netns
+	logging.Debug("4. Change netns",
 		"func", "SetupVF",
 		"linkObj", linkObj,
 		"netns.Fd()", int(netns.Fd()))
@@ -100,8 +118,8 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, netns
 	}
 
 	if err := netns.Do(func(_ ns.NetNS) error {
-		// 4. Set Pod IF name
-		logging.Debug("4. Set Pod IF name",
+		// 5. Set Pod IF name
+		logging.Debug("5. Set Pod IF name",
 			"func", "SetupVF",
 			"linkObj", linkObj,
 			"podifName", podifName)
@@ -109,16 +127,16 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, netns
 			return fmt.Errorf("error setting container interface name %s for %s", linkName, tempName)
 		}
 
-		// 5. Enable IPv4 ARP notify and IPv6 Network Discovery notify
+		// 6. Enable IPv4 ARP notify and IPv6 Network Discovery notify
 		// Error is ignored here because enabling this feature is only a performance enhancement.
-		logging.Debug("5. Enable IPv4 ARP notify and IPv6 Network Discovery notify",
+		logging.Debug("6. Enable IPv4 ARP notify and IPv6 Network Discovery notify",
 			"func", "SetupVF",
 			"podifName", podifName)
 		_ = s.utils.EnableArpAndNdiscNotify(podifName)
 
-		// 6. Set MAC address
+		// 7. Set MAC address
 		if conf.MAC != "" {
-			logging.Debug("6. Set MAC address",
+			logging.Debug("7. Set MAC address",
 				"func", "SetupVF",
 				"s.nLink", s.nLink,
 				"podifName", podifName,
@@ -129,8 +147,8 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, netns
 			}
 		}
 
-		// 7. Bring IF up in Pod netns
-		logging.Debug("7. Bring IF up in Pod netns",
+		// 8. Bring IF up in Pod netns
+		logging.Debug("8. Bring IF up in Pod netns",
 			"func", "SetupVF",
 			"linkObj", linkObj)
 		if err := s.nLink.LinkSetUp(linkObj); err != nil {
