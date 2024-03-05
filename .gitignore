@@ -82,6 +82,9 @@ Temporary Items
 # Local History for Visual Studio Code
 .history/
 
+### IntelliJ ###
+.idea
+
 ### VisualStudioCode Patch ###
 # Ignore all local history of files
 .history
