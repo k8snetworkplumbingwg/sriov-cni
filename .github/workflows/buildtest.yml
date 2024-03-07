@@ -56,3 +56,34 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           file: test/coverage/lcov.info
+
+  sriov-operator-e2e-test:
+    name: SR-IOV operator e2e tests
+    needs: [ build-test ]
+    runs-on: [ sriov ]
+    env:
+      TEST_REPORT_PATH: k8s-artifacts
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v3
+
+      - name: build sriov-cni image
+        run: podman build -t ghaction-sriov-cni:pr-${{github.event.pull_request.number}} .
+  
+      - name: Check out sriov operator's code
+        uses: actions/checkout@v2
+        with:
+          repository: k8snetworkplumbingwg/sriov-network-operator
+          path: sriov-network-operator-wc
+
+      - name: run test
+        run: make test-e2e-conformance-virtual-k8s-cluster-ci
+        working-directory: sriov-network-operator-wc
+        env:
+          LOCAL_SRIOV_CNI_IMAGE: ghaction-sriov-cni:pr-${{github.event.pull_request.number}}
+
+      - uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: ${{ env.TEST_REPORT_PATH }}
+          path: ./sriov-network-operator-wc/${{ env.TEST_REPORT_PATH }}
