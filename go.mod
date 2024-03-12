@@ -9,7 +9,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.9.2
 	github.com/onsi/gomega v1.27.5
 	github.com/stretchr/testify v1.6.1
-	github.com/vishvananda/netlink v1.2.1-beta.2.0.20230905152006-63484bbf69f8
+	github.com/vishvananda/netlink v1.2.1-beta.2.0.20240221172127-ec7bcb248e94
 	golang.org/x/net v0.17.0
 )
 
@@ -35,4 +35,5 @@ require (
 replace (
 	github.com/onsi/ginkgo/v2 => github.com/onsi/ginkgo/v2 v2.9.2
 	github.com/onsi/gomega => github.com/onsi/gomega v1.27.5
+	github.com/vishvananda/netlink => github.com/vishvananda/netlink v1.2.1-beta.2.0.20240221172127-ec7bcb248e94
 )
