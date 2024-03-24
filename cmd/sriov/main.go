@@ -121,6 +121,10 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	result.Interfaces[0].Mac = config.GetMacAddressForResult(netConf)
+	// check if we are able to find MTU for the virtual function
+	if netConf.MTU != nil {
+		result.Interfaces[0].Mtu = *netConf.MTU
+	}
 
 	// run the IPAM plugin
 	if netConf.IPAM.Type != "" {
