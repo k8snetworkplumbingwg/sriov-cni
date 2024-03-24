@@ -160,6 +160,11 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, netns
 		return fmt.Errorf("error setting up interface in container namespace: %q", err)
 	}
 
+	// Copy the MTU value to a new variable
+	// and use it as a pointer
+	vfMTU := linkObj.Attrs().MTU
+	conf.MTU = &vfMTU
+
 	return nil
 }
 
@@ -313,6 +318,11 @@ func (s *sriovManager) ApplyVFConfig(conf *sriovtypes.NetConf) error {
 			return fmt.Errorf("failed to set vf %d link state to %d: %v", conf.VFID, state, err)
 		}
 	}
+
+	// Copy the MTU value to a new variable
+	// and use it as a pointer
+	pfMtu := pfLink.Attrs().MTU
+	conf.MTU = &pfMtu
 
 	return nil
 }
