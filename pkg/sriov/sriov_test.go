@@ -181,8 +181,62 @@ var _ = Describe("Sriov", func() {
 			Expect(err).NotTo(HaveOccurred())
 			mocked.AssertExpectations(t)
 		})
-	})
+		It("Return MTU from PF", func() {
+			var targetNetNS ns.NetNS
+			targetNetNS, err := testutils.NewNS()
+			defer func() {
+				if targetNetNS != nil {
+					targetNetNS.Close()
+				}
+			}()
+			Expect(err).NotTo(HaveOccurred())
+			mocked := &mocks_utils.NetlinkManager{}
+			mockedPciUtils := &mocks.PciUtils{}
+			fakeMac, err := net.ParseMAC("6e:16:06:0e:b7:e9")
+			Expect(err).NotTo(HaveOccurred())
 
+			netconf.MAC = "e4:11:22:33:44:55"
+			expMac, err := net.ParseMAC(netconf.MAC)
+			Expect(err).NotTo(HaveOccurred())
+
+			fakeLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
+				Index:        1000,
+				Name:         "dummylink",
+				HardwareAddr: fakeMac,
+				MTU:          1500,
+			}}
+
+			net1Link := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
+				Index:        1000,
+				Name:         "net1",
+				HardwareAddr: expMac,
+				MTU:          1500,
+			}}
+
+			net2Link := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
+				Index:        1000,
+				Name:         "temp_1000",
+				HardwareAddr: expMac,
+				MTU:          1500,
+			}}
+
+			mocked.On("LinkByName", "enp175s6").Return(fakeLink, nil)
+			mocked.On("LinkByName", "temp_1000").Return(net2Link, nil)
+			mocked.On("LinkByName", "net1").Return(net1Link, nil)
+			mocked.On("LinkSetDown", fakeLink).Return(nil)
+			mocked.On("LinkSetName", fakeLink, mock.Anything).Return(nil)
+			mocked.On("LinkSetName", net2Link, mock.Anything).Return(nil)
+			mocked.On("LinkSetHardwareAddr", net1Link, expMac).Return(nil)
+			mocked.On("LinkSetNsFd", net2Link, mock.AnythingOfType("int")).Return(nil)
+			mocked.On("LinkSetUp", net2Link).Return(nil)
+			mockedPciUtils.On("EnableArpAndNdiscNotify", mock.AnythingOfType("string")).Return(nil)
+			sm := sriovManager{nLink: mocked, utils: mockedPciUtils}
+			err = sm.SetupVF(netconf, podifName, targetNetNS)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(*netconf.MTU).To(Equal(1500))
+			mocked.AssertExpectations(t)
+		})
+	})
 	Context("Checking ReleaseVF function", func() {
 		var (
 			podifName string
@@ -423,5 +477,30 @@ var _ = Describe("Sriov", func() {
 			mocked.AssertExpectations(t)
 		})
 	})
+	Context("Checking ApplyVFConfig function", func() {
+		var (
+			netconf *sriovtypes.NetConf
+		)
 
+		It("Return MTU from PF", func() {
+			mocked := &mocks_utils.NetlinkManager{}
+			mockedPciUtils := &mocks.PciUtils{}
+			vlan := 0
+			vlanProto := sriovtypes.Proto8021q
+			netconf = &sriovtypes.NetConf{Master: "ens1s0", Vlan: &vlan, VlanQoS: &vlan, VlanProto: &vlanProto}
+			fakeLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
+				Index: 1000,
+				Name:  "ens1s0",
+				MTU:   9000,
+			}}
+
+			mocked.On("LinkByName", "ens1s0").Return(fakeLink, nil)
+			mocked.On("LinkSetVfVlanQosProto", fakeLink, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			sm := sriovManager{nLink: mocked, utils: mockedPciUtils}
+			err := sm.ApplyVFConfig(netconf)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(*netconf.MTU).To(Equal(9000))
+			mocked.AssertExpectations(t)
+		})
+	})
 })

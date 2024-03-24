@@ -47,6 +47,7 @@ type NetConf struct {
 	DPDKMode      bool    `json:"-"`
 	Master        string
 	MAC           string
+	MTU           *int    // interface MTU
 	Vlan          *int    `json:"vlan"`
 	VlanQoS       *int    `json:"vlanQoS"`
 	VlanProto     *string `json:"vlanProto"` // 802.1ad|802.1q
