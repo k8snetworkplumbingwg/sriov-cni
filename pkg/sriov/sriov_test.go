@@ -412,7 +412,6 @@ var _ = Describe("Sriov", func() {
 			fakeLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{Index: 1000, Name: "dummylink"}}
 
 			mocked.On("LinkByName", netconf.Master).Return(fakeLink, nil)
-			mocked.On("LinkSetVfVlanQosProto", fakeLink, netconf.VFID, netconf.OrigVfState.Vlan, netconf.OrigVfState.VlanQoS, sriovtypes.VlanProtoInt[sriovtypes.Proto8021q]).Return(nil)
 			sm := sriovManager{nLink: mocked}
 			err := sm.ResetVFConfig(netconf)
 			Expect(err).NotTo(HaveOccurred())
