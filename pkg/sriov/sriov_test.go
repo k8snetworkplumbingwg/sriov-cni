@@ -69,8 +69,6 @@ var _ = Describe("Sriov", func() {
 			mocked.On("LinkSetName", fakeLink, mock.Anything).Return(nil)
 			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
 			mocked.On("LinkSetUp", fakeLink).Return(nil)
-			mocked.On("LinkSetVfVlan", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int")).Return(nil)
-			mocked.On("LinkSetVfVlanQos", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("int")).Return(nil)
 			mockedPciUtils.On("EnableArpAndNdiscNotify", mock.AnythingOfType("string")).Return(nil)
 			sm := sriovManager{nLink: mocked, utils: mockedPciUtils}
 			err = sm.SetupVF(netconf, podifName, targetNetNS)
@@ -235,6 +233,62 @@ var _ = Describe("Sriov", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(*netconf.MTU).To(Equal(1500))
 			mocked.AssertExpectations(t)
+		})
+	})
+	Context("Checking ApplyVFConfig function", func() {
+		var (
+			netconf  *sriovtypes.NetConf
+			mocked   *mocks_utils.NetlinkManager
+			fakeLink *utils.FakeLink
+		)
+
+		BeforeEach(func() {
+			netconf = &sriovtypes.NetConf{
+				Master: "enp175s0f1",
+				VFID:   0,
+			}
+			mocked = &mocks_utils.NetlinkManager{}
+			fakeLink = &utils.FakeLink{}
+		})
+
+		It("should not call functions to configure the VF when config has no optional parameters", func() {
+			mocked.On("LinkByName", mock.AnythingOfType("string")).Return(fakeLink, nil)
+			sm := sriovManager{nLink: mocked}
+			err := sm.ApplyVFConfig(netconf)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should call functions to configure the VF when config has optional parameters", func() {
+			vlan := 100
+			netconf.Vlan = &vlan
+			qos := 0
+			netconf.VlanQoS = &qos
+			vlanProto := "802.1q"
+			netconf.VlanProto = &vlanProto
+
+			hwaddr, err := net.ParseMAC("aa:f3:8d:65:1b:d4")
+			Expect(err).NotTo(HaveOccurred())
+
+			maxTxRate := 4000
+			minTxRate := 1000
+			netconf.MaxTxRate = &maxTxRate
+			netconf.MinTxRate = &minTxRate
+
+			netconf.SpoofChk = "on"
+			netconf.Trust = "on"
+			netconf.LinkState = "enable"
+
+			mocked.On("LinkByName", mock.AnythingOfType("string")).Return(fakeLink, nil)
+			mocked.On("LinkSetVfVlanQosProto", fakeLink, netconf.VFID, *netconf.Vlan, *netconf.VlanQoS, sriovtypes.VlanProtoInt[sriovtypes.Proto8021q]).Return(nil)
+			mocked.On("LinkSetVfHardwareAddr", fakeLink, netconf.VFID, hwaddr).Return(nil)
+			mocked.On("LinkSetVfRate", fakeLink, netconf.VFID, *netconf.MinTxRate, *netconf.MaxTxRate).Return(nil)
+			mocked.On("LinkSetVfSpoofchk", fakeLink, netconf.VFID, true).Return(nil)
+			mocked.On("LinkSetVfTrust", fakeLink, netconf.VFID, true).Return(nil)
+			mocked.On("LinkSetVfState", fakeLink, netconf.VFID, netlink.VF_LINK_STATE_ENABLE).Return(nil)
+
+			sm := sriovManager{nLink: mocked}
+			err = sm.ApplyVFConfig(netconf)
+			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 	Context("Checking ReleaseVF function", func() {
