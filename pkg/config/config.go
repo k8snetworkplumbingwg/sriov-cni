@@ -86,43 +86,50 @@ func LoadConf(bytes []byte) (*sriovtypes.NetConf, error) {
 	}
 
 	if n.Vlan == nil {
-		vlan := 0
-		n.Vlan = &vlan
-	}
+		// validate non-nil value for vlan qos
+		if n.VlanQoS != nil {
+			return nil, fmt.Errorf("LoadConf(): vlan id must be configured to set vlan QoS to a non-nil value")
+		}
 
-	// validate vlan id range
-	if *n.Vlan < 0 || *n.Vlan > 4094 {
-		return nil, fmt.Errorf("LoadConf(): vlan id %d invalid: value must be in the range 0-4094", *n.Vlan)
-	}
+		// validate non-nil value for vlan proto
+		if n.VlanProto != nil {
+			return nil, fmt.Errorf("LoadConf(): vlan id must be configured to set vlan proto to a non-nil value")
+		}
+	} else {
+		// validate vlan id range
+		if *n.Vlan < 0 || *n.Vlan > 4094 {
+			return nil, fmt.Errorf("LoadConf(): vlan id %d invalid: value must be in the range 0-4094", *n.Vlan)
+		}
 
-	if n.VlanQoS == nil {
-		qos := 0
-		n.VlanQoS = &qos
-	}
+		if n.VlanQoS == nil {
+			qos := 0
+			n.VlanQoS = &qos
+		}
 
-	// validate that VLAN QoS is in the 0-7 range
-	if *n.VlanQoS < 0 || *n.VlanQoS > 7 {
-		return nil, fmt.Errorf("LoadConf(): vlan QoS PCP %d invalid: value must be in the range 0-7", *n.VlanQoS)
-	}
+		// validate that VLAN QoS is in the 0-7 range
+		if *n.VlanQoS < 0 || *n.VlanQoS > 7 {
+			return nil, fmt.Errorf("LoadConf(): vlan QoS PCP %d invalid: value must be in the range 0-7", *n.VlanQoS)
+		}
 
-	// validate non-zero value for vlan id if vlan qos is set to a non-zero value
-	if *n.VlanQoS != 0 && *n.Vlan == 0 {
-		return nil, fmt.Errorf("LoadConf(): non-zero vlan id must be configured to set vlan QoS to a non-zero value")
-	}
+		// validate non-zero value for vlan id if vlan qos is set to a non-zero value
+		if *n.VlanQoS != 0 && *n.Vlan == 0 {
+			return nil, fmt.Errorf("LoadConf(): non-zero vlan id must be configured to set vlan QoS to a non-zero value")
+		}
 
-	if n.VlanProto == nil {
-		proto := sriovtypes.Proto8021q
-		n.VlanProto = &proto
-	}
+		if n.VlanProto == nil {
+			proto := sriovtypes.Proto8021q
+			n.VlanProto = &proto
+		}
 
-	*n.VlanProto = strings.ToLower(*n.VlanProto)
-	if *n.VlanProto != sriovtypes.Proto8021ad && *n.VlanProto != sriovtypes.Proto8021q {
-		return nil, fmt.Errorf("LoadConf(): vlan Proto %s invalid: value must be '802.1Q' or '802.1ad'", *n.VlanProto)
-	}
+		*n.VlanProto = strings.ToLower(*n.VlanProto)
+		if *n.VlanProto != sriovtypes.Proto8021ad && *n.VlanProto != sriovtypes.Proto8021q {
+			return nil, fmt.Errorf("LoadConf(): vlan Proto %s invalid: value must be '802.1Q' or '802.1ad'", *n.VlanProto)
+		}
 
-	// validate non-zero value for vlan id if vlan proto is set to 802.1ad
-	if *n.VlanProto == sriovtypes.Proto8021ad && *n.Vlan == 0 {
-		return nil, fmt.Errorf("LoadConf(): non-zero vlan id must be configured to set vlan proto 802.1ad")
+		// validate non-zero value for vlan id if vlan proto is set to 802.1ad
+		if *n.VlanProto == sriovtypes.Proto8021ad && *n.Vlan == 0 {
+			return nil, fmt.Errorf("LoadConf(): non-zero vlan id must be configured to set vlan proto 802.1ad")
+		}
 	}
 
 	// validate that link state is one of supported values
