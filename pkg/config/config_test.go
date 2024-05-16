@@ -175,44 +175,44 @@ var _ = Describe("Config", func() {
 	})
 	Context("Checking GetMacAddressForResult function", func() {
 		It("Should return the mac address requested by the user", func() {
-			netconf := &types.NetConf{
+			netconf := &types.NetConf{SriovNetConf: types.SriovNetConf{
 				MAC: "MAC",
 				OrigVfState: types.VfState{
 					EffectiveMAC: "EffectiveMAC",
 					AdminMAC:     "AdminMAC",
-				},
+				}},
 			}
 
 			Expect(GetMacAddressForResult(netconf)).To(Equal("MAC"))
 		})
 		It("Should return the EffectiveMAC mac address if the user didn't request and the the driver is not DPDK", func() {
-			netconf := &types.NetConf{
+			netconf := &types.NetConf{SriovNetConf: types.SriovNetConf{
 				DPDKMode: false,
 				OrigVfState: types.VfState{
 					EffectiveMAC: "EffectiveMAC",
 					AdminMAC:     "AdminMAC",
-				},
+				}},
 			}
 
 			Expect(GetMacAddressForResult(netconf)).To(Equal("EffectiveMAC"))
 		})
 		It("Should return the AdminMAC mac address if the user didn't request and the the driver is DPDK", func() {
-			netconf := &types.NetConf{
+			netconf := &types.NetConf{SriovNetConf: types.SriovNetConf{
 				DPDKMode: true,
 				OrigVfState: types.VfState{
 					EffectiveMAC: "EffectiveMAC",
 					AdminMAC:     "AdminMAC",
-				},
+				}},
 			}
 
 			Expect(GetMacAddressForResult(netconf)).To(Equal("AdminMAC"))
 		})
 		It("Should return empty string if the user didn't request the the driver is DPDK and adminMac is 0", func() {
-			netconf := &types.NetConf{
+			netconf := &types.NetConf{SriovNetConf: types.SriovNetConf{
 				DPDKMode: true,
 				OrigVfState: types.VfState{
 					AdminMAC: "00:00:00:00:00:00",
-				},
+				}},
 			}
 
 			Expect(GetMacAddressForResult(netconf)).To(Equal(""))
