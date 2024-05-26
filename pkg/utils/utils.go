@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	sriovtypes "github.com/k8snetworkplumbingwg/sriov-cni/pkg/types"
 )
 
 var (
@@ -238,10 +240,10 @@ func HasDpdkDriver(pciAddr string) (bool, error) {
 
 // SaveNetConf takes in container ID, data dir and Pod interface name as string and a json encoded struct Conf
 // and save this Conf in data dir
-func SaveNetConf(cid, dataDir, podIfName string, conf interface{}) error {
-	netConfBytes, err := json.Marshal(conf)
+func SaveNetConf(cid, dataDir, podIfName string, netConf *sriovtypes.NetConf) error {
+	netConfBytes, err := json.Marshal(netConf)
 	if err != nil {
-		return fmt.Errorf("error serializing delegate netconf: %v", err)
+		return fmt.Errorf("error serializing delegate netConf: %v", err)
 	}
 
 	s := []string{cid, podIfName}

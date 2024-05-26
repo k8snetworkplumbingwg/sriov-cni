@@ -1,6 +1,8 @@
 package types
 
 import (
+	"encoding/json"
+	"fmt"
 	"github.com/containernetworking/cni/pkg/types"
 	"github.com/vishvananda/netlink"
 )
@@ -40,9 +42,13 @@ func (vs *VfState) FillFromVfInfo(info *netlink.VfInfo) {
 	vs.Trust = info.Trust != 0
 }
 
-// NetConf extends types.NetConf for sriov-cni
 type NetConf struct {
 	types.NetConf
+	SriovNetConf
+}
+
+// NetConf extends types.NetConf for sriov-cni
+type SriovNetConf struct {
 	OrigVfState   VfState // Stores the original VF state as it was prior to any operations done during cmdAdd flow
 	DPDKMode      bool    `json:"-"`
 	Master        string
@@ -63,4 +69,37 @@ type NetConf struct {
 	} `json:"runtimeConfig,omitempty"`
 	LogLevel string `json:"logLevel,omitempty"`
 	LogFile  string `json:"logFile,omitempty"`
+}
+
+func (n *NetConf) MarshalJSON() ([]byte, error) {
+	netConfBytes, err := json.Marshal(&n.NetConf)
+	if err != nil {
+		return nil, fmt.Errorf("error serializing delegate netConf: %v", err)
+	}
+
+	sriovNetConfBytes, err := json.Marshal(&n.SriovNetConf)
+	if err != nil {
+		return nil, fmt.Errorf("error serializing delegate sriovNetConf: %v", err)
+	}
+
+	netConfMap := make(map[string]interface{})
+	if err := json.Unmarshal(netConfBytes, &netConfMap); err != nil {
+		return nil, err
+	}
+
+	sriovNetConfMap := make(map[string]interface{})
+	if err := json.Unmarshal(sriovNetConfBytes, &sriovNetConfMap); err != nil {
+		return nil, err
+	}
+
+	for k, v := range netConfMap {
+		sriovNetConfMap[k] = v
+	}
+
+	sriovNetConfBytes, err = json.Marshal(sriovNetConfMap)
+	if err != nil {
+		return nil, err
+	}
+
+	return sriovNetConfBytes, nil
 }

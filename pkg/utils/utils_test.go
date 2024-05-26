@@ -1,8 +1,11 @@
 package utils
 
 import (
+	"encoding/json"
 	"errors"
 	"net"
+	"os"
+	"path/filepath"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -10,6 +13,9 @@ import (
 
 	"github.com/vishvananda/netlink"
 
+	cnitypes "github.com/containernetworking/cni/pkg/types"
+
+	sriovtypes "github.com/k8snetworkplumbingwg/sriov-cni/pkg/types"
 	mocks_utils "github.com/k8snetworkplumbingwg/sriov-cni/pkg/utils/mocks"
 )
 
@@ -182,6 +188,49 @@ var _ = Describe("Utils", func() {
 
 			err = SetVFHardwareMAC(mocked, "enp175s0f1", 0, "60:00:00:00:00:01")
 			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+
+	Context("Checking SaveNetConf function", func() {
+		var tmpDir string
+
+		BeforeEach(func() {
+			var err error
+			tmpDir, err = os.MkdirTemp("", "sriov")
+			Expect(err).ToNot(HaveOccurred())
+		})
+		It("should save all the netConf struct to the cache file without dns", func() {
+			netconf := &sriovtypes.NetConf{NetConf: cnitypes.NetConf{CNIVersion: "1.0.0"}, SriovNetConf: sriovtypes.SriovNetConf{DeviceID: "0000:af:06.0"}}
+			err := SaveNetConf("test", tmpDir, "net1", netconf)
+			Expect(err).ToNot(HaveOccurred())
+
+			data, err := os.ReadFile(filepath.Join(tmpDir, "test-net1"))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(data).ToNot(ContainSubstring("dns"))
+
+			newNetConf := &sriovtypes.NetConf{}
+			err = json.Unmarshal(data, newNetConf)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(netconf.DeviceID).To(Equal(newNetConf.DeviceID))
+			Expect(netconf.CNIVersion).To(Equal(newNetConf.CNIVersion))
+		})
+		It("should save all the netConf struct to the cache file with dns", func() {
+			netconf := sriovtypes.NetConf{NetConf: cnitypes.NetConf{CNIVersion: "1.0.0", DNS: cnitypes.DNS{Domain: "bla"}}, SriovNetConf: sriovtypes.SriovNetConf{DeviceID: "0000:af:06.0"}}
+			err := SaveNetConf("test", tmpDir, "net1", &netconf)
+			Expect(err).ToNot(HaveOccurred())
+
+			data, err := os.ReadFile(filepath.Join(tmpDir, "test-net1"))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(data).To(ContainSubstring("dns"))
+
+			newNetConf := &sriovtypes.NetConf{}
+			err = json.Unmarshal(data, newNetConf)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(netconf.DeviceID).To(Equal(newNetConf.DeviceID))
+			Expect(netconf.CNIVersion).To(Equal(newNetConf.CNIVersion))
+			Expect(netconf.DNS.Domain).To(Equal(newNetConf.DNS.Domain))
 		})
 	})
 })
