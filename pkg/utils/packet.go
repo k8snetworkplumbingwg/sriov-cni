@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"net"
 	"syscall"
+	"time"
 
 	current "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv6"
+	"golang.org/x/sys/unix"
 )
 
 var (
@@ -193,4 +195,37 @@ func AnnounceIPs(ifName string, ipConfigs []*current.IPConfig) error {
 		}
 	}
 	return nil
+}
+
+// Blocking wait for interface ifName to have carrier (!NO_CARRIER flag).
+func WaitForCarrier(ifName string, waitTime time.Duration) bool {
+	var nextSleepDuration time.Duration
+
+	start := time.Now()
+
+	for nextSleepDuration == 0 || time.Since(start) < waitTime {
+		if nextSleepDuration == 0 {
+			nextSleepDuration = 2 * time.Millisecond
+		} else {
+			time.Sleep(nextSleepDuration)
+			/* Grow wait time exponentionally (factor 1.5). */
+			nextSleepDuration += nextSleepDuration / 2
+		}
+
+		linkObj, err := netLinkLib.LinkByName(ifName)
+		if err != nil {
+			return false
+		}
+
+		/* Wait for carrier, i.e. IFF_UP|IFF_RUNNING. Note that there is also
+		 * IFF_LOWER_UP, but we follow iproute2 ([1]).
+		 *
+		 * [1] https://git.kernel.org/pub/scm/network/iproute2/iproute2.git/tree/ip/ipaddress.c?id=f9601b10c21145f76c3d46c163bac39515ed2061#n86
+		 */
+		if linkObj.Attrs().RawFlags&(unix.IFF_UP|unix.IFF_RUNNING) == (unix.IFF_UP | unix.IFF_RUNNING) {
+			return true
+		}
+	}
+
+	return false
 }

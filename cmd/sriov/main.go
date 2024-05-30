@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
@@ -205,10 +206,15 @@ func cmdAdd(args *skel.CmdArgs) error {
 			 * may be sending packets with the incorrect link-layer address. Eventually, most network stacks would send ARPs and/or Neighbor
 			 * Solicitation packets when the connection is unreachable. This would correct the invalid cache; however this may take a significant
 			 * amount of time to complete.
-			 *
-			 * The error is ignored here because enabling this feature is only a performance enhancement.
 			 */
-			_ = utils.AnnounceIPs(args.IfName, result.IPs)
+
+			/* The interface might not yet have carrier. Wait for it for a short time. */
+			hasCarrier := utils.WaitForCarrier(args.IfName, 200*time.Millisecond)
+
+			/* The error is ignored here because enabling this feature is only a performance enhancement. */
+			err = utils.AnnounceIPs(args.IfName, result.IPs)
+
+			logging.Debug("announcing IPs", "hasCarrier", hasCarrier, "IPs", result.IPs, "announceError", err)
 			return nil
 		})
 	}
