@@ -30,6 +30,8 @@ type MyNetlink struct {
 	NetlinkManager
 }
 
+var netLinkLib NetlinkManager = &MyNetlink{}
+
 // LinkByName implements NetlinkManager
 func (n *MyNetlink) LinkByName(name string) (netlink.Link, error) {
 	return netlink.LinkByName(name)
