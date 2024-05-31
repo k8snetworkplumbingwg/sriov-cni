@@ -164,10 +164,8 @@ func SendUnsolicitedNeighborAdvertisement(srcIP net.IP, linkObj netlink.Link) er
 
 // AnnounceIPs sends either a GARP or Unsolicited NA depending on the IP address type (IPv4 vs. IPv6 respectively) configured on the interface.
 func AnnounceIPs(ifName string, ipConfigs []*current.IPConfig) error {
-	myNetLink := MyNetlink{}
-
 	// Retrieve the interface name in the container.
-	linkObj, err := myNetLink.LinkByName(ifName)
+	linkObj, err := netLinkLib.LinkByName(ifName)
 	if err != nil {
 		return fmt.Errorf("failed to get netlink device with name %q: %v", ifName, err)
 	}
