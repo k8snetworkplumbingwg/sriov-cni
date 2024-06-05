@@ -50,7 +50,7 @@ jobs:
 
       - name: Go test with coverage
         run: sudo make test-coverage # sudo needed for netns change in test
-      
+
       - name: Coveralls
         uses: coverallsapp/github-action@v2
         with:
@@ -69,7 +69,7 @@ jobs:
 
       - name: build sriov-cni image
         run: podman build -t ghaction-sriov-cni:pr-${{github.event.pull_request.number}} .
-  
+
       - name: Check out sriov operator's code
         uses: actions/checkout@v2
         with:

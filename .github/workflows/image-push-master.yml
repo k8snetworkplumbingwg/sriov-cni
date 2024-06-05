@@ -2,6 +2,7 @@ name: "Push images on merge to master"
 
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository }}
+  image-push-owner: 'k8snetworkplumbingwg'
 
 on:
   push:
@@ -9,6 +10,7 @@ on:
       - master
 jobs:
   build-and-push-amd64-sriov-cni:
+    if: ${{ github.repository_owner == env.image-push-owner }}
     name: Image Push AMD64
     runs-on: ubuntu-20.04
     steps:
@@ -37,6 +39,7 @@ jobs:
           file: ./Dockerfile
 
   build-and-push-arm64-sriov-cni:
+    if: ${{ github.repository_owner == env.image-push-owner }}
     name: Image Push ARM64
     runs-on: ubuntu-20.04
     steps:
@@ -67,6 +70,7 @@ jobs:
           file: ./Dockerfile.arm64
 
   build-and-push-ppc64le-sriov-cni:
+    if: ${{ github.repository_owner == env.image-push-owner }}
     name: Image Push ppc64le
     runs-on: ubuntu-20.04
     steps:
@@ -97,6 +101,7 @@ jobs:
           file: ./Dockerfile.ppc64le
 
   push-manifest:
+    if: ${{ github.repository_owner == env.image-push-owner }}
     runs-on: ubuntu-20.04
     needs: [build-and-push-amd64-sriov-cni,build-and-push-arm64-sriov-cni,build-and-push-ppc64le-sriov-cni]
     steps:
