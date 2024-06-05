@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
@@ -126,6 +127,8 @@ func cmdAdd(args *skel.CmdArgs) error {
 		result.Interfaces[0].Mtu = *netConf.MTU
 	}
 
+	doAnnounce := false
+
 	// run the IPAM plugin
 	if netConf.IPAM.Type != "" {
 		var r types.Result
@@ -161,31 +164,12 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 		if !netConf.DPDKMode {
 			err = netns.Do(func(_ ns.NetNS) error {
-				err := ipam.ConfigureIface(args.IfName, newResult)
-				if err != nil {
-					return err
-				}
-
-				/* After IPAM configuration is done, the following needs to handle the case of an IP address being reused by a different pods.
-				 * This is achieved by sending Gratuitous ARPs and/or Unsolicited Neighbor Advertisements unconditionally.
-				 * Although we set arp_notify and ndisc_notify unconditionally on the interface (please see EnableArpAndNdiscNotify()), the kernel
-				 * only sends GARPs/Unsolicited NA when the interface goes from down to up, or when the link-layer address changes on the interfaces.
-				 * These scenarios are perfectly valid and recommended to be enabled for optimal network performance.
-				 * However for our specific case, which the kernel is unaware of, is the reuse of IP addresses across pods where each pod has a different
-				 * link-layer address for it's SRIOV interface. The ARP/Neighbor cache residing in neighbors would be invalid if an IP address is reused.
-				 * In order to update the cache, the GARP/Unsolicited NA packets should be sent for performance reasons. Otherwise, the neighbors
-				 * may be sending packets with the incorrect link-layer address. Eventually, most network stacks would send ARPs and/or Neighbor
-				 * Solicitation packets when the connection is unreachable. This would correct the invalid cache; however this may take a significant
-				 * amount of time to complete.
-				 *
-				 * The error is ignored here because enabling this feature is only a performance enhancement.
-				 */
-				_ = utils.AnnounceIPs(args.IfName, newResult.IPs)
-				return nil
+				return ipam.ConfigureIface(args.IfName, newResult)
 			})
 			if err != nil {
 				return err
 			}
+			doAnnounce = true
 		}
 		result = newResult
 	}
@@ -207,6 +191,32 @@ func cmdAdd(args *skel.CmdArgs) error {
 	allocator := utils.NewPCIAllocator(config.DefaultCNIDir)
 	if err = allocator.SaveAllocatedPCI(netConf.DeviceID, args.Netns); err != nil {
 		return fmt.Errorf("error saving the pci allocation for vf pci address %s: %v", netConf.DeviceID, err)
+	}
+
+	if doAnnounce {
+		_ = netns.Do(func(_ ns.NetNS) error {
+			/* After IPAM configuration is done, the following needs to handle the case of an IP address being reused by a different pods.
+			 * This is achieved by sending Gratuitous ARPs and/or Unsolicited Neighbor Advertisements unconditionally.
+			 * Although we set arp_notify and ndisc_notify unconditionally on the interface (please see EnableArpAndNdiscNotify()), the kernel
+			 * only sends GARPs/Unsolicited NA when the interface goes from down to up, or when the link-layer address changes on the interfaces.
+			 * These scenarios are perfectly valid and recommended to be enabled for optimal network performance.
+			 * However for our specific case, which the kernel is unaware of, is the reuse of IP addresses across pods where each pod has a different
+			 * link-layer address for it's SRIOV interface. The ARP/Neighbor cache residing in neighbors would be invalid if an IP address is reused.
+			 * In order to update the cache, the GARP/Unsolicited NA packets should be sent for performance reasons. Otherwise, the neighbors
+			 * may be sending packets with the incorrect link-layer address. Eventually, most network stacks would send ARPs and/or Neighbor
+			 * Solicitation packets when the connection is unreachable. This would correct the invalid cache; however this may take a significant
+			 * amount of time to complete.
+			 */
+
+			/* The interface might not yet have carrier. Wait for it for a short time. */
+			hasCarrier := utils.WaitForCarrier(args.IfName, 200*time.Millisecond)
+
+			/* The error is ignored here because enabling this feature is only a performance enhancement. */
+			err = utils.AnnounceIPs(args.IfName, result.IPs)
+
+			logging.Debug("announcing IPs", "hasCarrier", hasCarrier, "IPs", result.IPs, "announceError", err)
+			return nil
+		})
 	}
 
 	return types.PrintResult(result, netConf.CNIVersion)
