@@ -9,7 +9,7 @@ jobs:
   build-test:
     strategy:
       matrix:
-        go-version: [1.21.x]
+        go-version: [1.22.x]
         os: [ubuntu-latest]
         goos: [linux]
         goarch: [amd64, arm64, ppc64le]
@@ -43,7 +43,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: 1.21.x
+          go-version: 1.22.x
 
       - name: Check out code into the Go module directory
         uses: actions/checkout@v2
