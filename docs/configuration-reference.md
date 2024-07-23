@@ -29,7 +29,7 @@ An SR-IOV CNI config with each field filled out looks like:
 {
     "cniVersion": "0.3.1",
     "name": "sriov-dpdk",
-    "type": "sriovi-net",
+    "type": "sriov",
     "deviceID": "0000:03:02.0",
     "mac": "CA:FE:C0:FF:EE:00",
     "vlan": 1000,
