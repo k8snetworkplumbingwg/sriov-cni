@@ -212,7 +212,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 			hasCarrier := utils.WaitForCarrier(args.IfName, 200*time.Millisecond)
 
 			/* The error is ignored here because enabling this feature is only a performance enhancement. */
-			err = utils.AnnounceIPs(args.IfName, result.IPs)
+			err := utils.AnnounceIPs(args.IfName, result.IPs)
 
 			logging.Debug("announcing IPs", "hasCarrier", hasCarrier, "IPs", result.IPs, "announceError", err)
 			return nil
