@@ -3,6 +3,7 @@ package utils
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net"
 	"syscall"
@@ -164,7 +165,11 @@ func SendUnsolicitedNeighborAdvertisement(srcIP net.IP, linkObj netlink.Link) er
 	return nil
 }
 
-// AnnounceIPs sends either a GARP or Unsolicited NA depending on the IP address type (IPv4 vs. IPv6 respectively) configured on the interface.
+// AnnounceIPs sends IPv4 GARP and IPv6 Unsolicited NA for the addresses on the
+// interfaces.  If ifName is not found or has no MAC address, an error is
+// returned. If sending of announcements fail, the returned error is a combined
+// errors.Join() of each failed announcement. Despite such errors, remaining
+// addresses are still attempted to be announced.
 func AnnounceIPs(ifName string, ipConfigs []*current.IPConfig) error {
 	// Retrieve the interface name in the container.
 	linkObj, err := netLinkLib.LinkByName(ifName)
@@ -175,26 +180,27 @@ func AnnounceIPs(ifName string, ipConfigs []*current.IPConfig) error {
 		return fmt.Errorf("invalid Ethernet MAC address: %q", linkObj.Attrs().HardwareAddr)
 	}
 
+	var errResult error
+
 	// For all the IP addresses assigned by IPAM, we will send either a GARP (IPv4) or Unsolicited NA (IPv6).
 	for _, ipc := range ipConfigs {
-		var err error
-		if IsIPv6(ipc.Address.IP) {
+		if IsIPv4(ipc.Address.IP) {
+			err := SendGratuitousArp(ipc.Address.IP, linkObj)
+			if err != nil {
+				errResult = errors.Join(errResult, fmt.Errorf("failed to send GARP message for ip %s on interface %q: %v", ipc.Address.IP.String(), ifName, err))
+			}
+		} else if IsIPv6(ipc.Address.IP) {
 			/* As per RFC 4861, sending unsolicited neighbor advertisements should be considered as a performance
 			* optimization. It does not reliably update caches in all nodes. The Neighbor Unreachability Detection
 			* algorithm is more reliable although it may take slightly longer to update.
 			 */
-			err = SendUnsolicitedNeighborAdvertisement(ipc.Address.IP, linkObj)
-		} else if IsIPv4(ipc.Address.IP) {
-			err = SendGratuitousArp(ipc.Address.IP, linkObj)
-		} else {
-			return fmt.Errorf("the IP %s on interface %q is neither IPv4 or IPv6", ipc.Address.IP.String(), ifName)
-		}
-
-		if err != nil {
-			return fmt.Errorf("failed to send GARP/NA message for ip %s on interface %q: %v", ipc.Address.IP.String(), ifName, err)
+			err := SendUnsolicitedNeighborAdvertisement(ipc.Address.IP, linkObj)
+			if err != nil {
+				errResult = errors.Join(errResult, fmt.Errorf("failed to send NA message for ip %s on interface %q: %v", ipc.Address.IP.String(), ifName, err))
+			}
 		}
 	}
-	return nil
+	return errResult
 }
 
 // Blocking wait for interface ifName to have carrier (!NO_CARRIER flag).
