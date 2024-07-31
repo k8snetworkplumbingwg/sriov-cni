@@ -23,6 +23,20 @@ func (_m *PciUtils) EnableArpAndNdiscNotify(ifName string) error {
 	return r0
 }
 
+// EnableOptimisticDad provides a mock function with given fields: ifName
+func (_m *PciUtils) EnableOptimisticDad(ifName string) error {
+	ret := _m.Called(ifName)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(ifName)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // GetPciAddress provides a mock function with given fields: ifName, vf
 func (_m *PciUtils) GetPciAddress(ifName string, vf int) (string, error) {
 	ret := _m.Called(ifName, vf)
