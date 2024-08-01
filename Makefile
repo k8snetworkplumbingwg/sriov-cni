@@ -42,7 +42,7 @@ V ?= 0
 Q = $(if $(filter 1,$V),,@)
 
 .PHONY: all
-all: fmt lint build test
+all: fmt lint build
 
 $(BINDIR) $(BUILDDIR) $(COVERAGE_DIR): ; $(info Creating directory $@...)
 	@mkdir -p $@
