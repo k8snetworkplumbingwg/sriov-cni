@@ -35,5 +35,5 @@ require (
 replace (
 	github.com/onsi/ginkgo/v2 => github.com/onsi/ginkgo/v2 v2.9.2
 	github.com/onsi/gomega => github.com/onsi/gomega v1.27.5
-	github.com/vishvananda/netlink => github.com/vishvananda/netlink v1.2.1-beta.2.0.20240221172127-ec7bcb248e94
+	github.com/vishvananda/netlink => github.com/vishvananda/netlink v1.2.1-beta.2.0.20240806173335-3b7e16c5f836
 )
