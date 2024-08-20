@@ -51,6 +51,16 @@ func EnableArpAndNdiscNotify(ifName string) error {
 	return nil
 }
 
+// EnableOptimisticDad enables IPv6 /proc/sys/net/ipv6/conf/$ifName/optimistic_dad
+func EnableOptimisticDad(ifName string) error {
+	path := filepath.Join(SysV6NdiscNotify, ifName, "optimistic_dad")
+	err := os.WriteFile(path, []byte("1"), os.ModeAppend)
+	if err != nil {
+		return fmt.Errorf("failed to write optimistic_dad=1 for interface %s: %v", ifName, err)
+	}
+	return nil
+}
+
 // GetSriovNumVfs takes in a PF name(ifName) as string and returns number of VF configured as int
 func GetSriovNumVfs(ifName string) (int, error) {
 	var vfTotal int
