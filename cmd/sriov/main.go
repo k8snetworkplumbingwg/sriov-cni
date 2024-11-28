@@ -270,6 +270,9 @@ func cmdDel(args *skel.CmdArgs) error {
 
 	sm := sriov.NewSriovManager()
 
+	logging.Debug("Reset VF configuration",
+		"func", "cmdDel",
+		"netConf.DeviceID", netConf.DeviceID)
 	/* ResetVFConfig resets a VF administratively. We must run ResetVFConfig
 	   before ReleaseVF because some drivers will error out if we try to
 	   reset netdev VF with trust off. So, reset VF MAC address via PF first.
@@ -288,6 +291,10 @@ func cmdDel(args *skel.CmdArgs) error {
 			// IPAM resources
 			_, ok := err.(ns.NSPathNotExistErr)
 			if ok {
+				logging.Debug("Exiting as the network namespace does not exists anymore",
+					"func", "cmdDel",
+					"netConf.DeviceID", netConf.DeviceID,
+					"args.Netns", args.Netns)
 				return nil
 			}
 
@@ -295,6 +302,11 @@ func cmdDel(args *skel.CmdArgs) error {
 		}
 		defer netns.Close()
 
+		logging.Debug("Release the VF",
+			"func", "cmdDel",
+			"netConf.DeviceID", netConf.DeviceID,
+			"args.Netns", args.Netns,
+			"args.IfName", args.IfName)
 		if err = sm.ReleaseVF(netConf, args.IfName, netns); err != nil {
 			return err
 		}
