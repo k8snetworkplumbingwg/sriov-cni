@@ -58,6 +58,12 @@ GOLANGCI_LINT_VERSION = v1.52.2
 $(GOLANGCI_LINT): | $(BINDIR) ; $(info  Installing golangci-lint...)
 	$Q GOBIN=$(BINDIR) $(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 
+# Tools
+MOCKERY = $(BINDIR)/mockery
+MOCKERY_VERSION = v2.50.2
+$(MOCKERY): | $(BINDIR) ; $(info  Installing mockery...)
+	$Q GOBIN=$(BINDIR) $(GO) install github.com/vektra/mockery/v2@$(MOCKERY_VERSION)
+
 # Tests
 TEST_TARGETS := test-default test-verbose test-race
 .PHONY: $(TEST_TARGETS) test
@@ -75,6 +81,12 @@ test-coverage: | $(COVERAGE_DIR) ; $(info  Running coverage tests...) @ ## Run c
 .PHONY: lint
 lint: $(GOLANGCI_LINT) ; $(info  Running golangci-lint linter...) @ ## Run golangci-lint linter
 	$Q $(GOLANGCI_LINT) run
+
+.PHONY: mock-generate
+mock-generate: $(MOCKERY) ; $(info  Running mockery...) @ ## Run golangci-lint linter
+	$Q $(MOCKERY)  --recursive=true --name=NetlinkManager --output=./pkg/utils/mocks/ --filename=netlink_manager_mock.go --exported --dir pkg/utils
+	$Q $(MOCKERY)  --recursive=true --name=pciUtils --output=./pkg/sriov/mocks/ --filename=pci_utils_mock.go --exported --dir pkg/sriov
+
 
 .PHONY: fmt
 fmt: ; $(info  Running go fmt...) @ ## Run go fmt on all source files
