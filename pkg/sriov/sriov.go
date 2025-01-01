@@ -225,6 +225,19 @@ func (s *sriovManager) ReleaseVF(conf *sriovtypes.NetConf, podifName string, net
 			}
 		}
 
+		// reset MTU for VF device until if the MTU was captured in the cache
+		if conf.OrigVfState.MTU != 0 {
+			logging.Debug("Reset VF device MTU",
+				"func", "ReleaseVF",
+				"linkObj", linkObj,
+				"conf.OrigVfState.HostIFName", conf.OrigVfState.HostIFName,
+				"conf.OrigVfState.MTU", conf.OrigVfState.MTU)
+			err = s.nLink.LinkSetMTU(linkObj, conf.OrigVfState.MTU)
+			if err != nil {
+				return fmt.Errorf("failed to reset MTU for link link %s: %q", conf.OrigVfState.HostIFName, err)
+			}
+		}
+
 		// move VF device to init netns
 		logging.Debug("Move VF device to init netns",
 			"func", "ReleaseVF",
@@ -350,6 +363,15 @@ func (s *sriovManager) FillOriginalVfInfo(conf *sriovtypes.NetConf) error {
 		return fmt.Errorf("failed to find vf %d", conf.VFID)
 	}
 	conf.OrigVfState.FillFromVfInfo(vfState)
+
+	// add also MTU to the vf info in the vf is we have an interface name
+	if conf.OrigVfState.HostIFName != "" {
+		vfLink, err := s.nLink.LinkByName(conf.OrigVfState.HostIFName)
+		if err != nil {
+			return fmt.Errorf("failed to lookup vf %q: %v", conf.OrigVfState.HostIFName, err)
+		}
+		conf.OrigVfState.MTU = vfLink.Attrs().MTU
+	}
 
 	return err
 }
