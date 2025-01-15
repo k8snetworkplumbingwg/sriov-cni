@@ -245,6 +245,17 @@ func cmdDel(args *skel.CmdArgs) error {
 		return nil
 	}
 
+	allocator := utils.NewPCIAllocator(config.DefaultCNIDir)
+
+	err = allocator.Lock(netConf.DeviceID)
+	if err != nil {
+		return fmt.Errorf("cmdDel() error obtaining lock for device [%s]: %w", netConf.DeviceID, err)
+	}
+
+	logging.Debug("Acquired device lock",
+		"func", "cmdDel",
+		"DeviceID", netConf.DeviceID)
+
 	defer func() {
 		if err == nil && cRefPath != "" {
 			_ = utils.CleanCachedNetConf(cRefPath)
@@ -317,7 +328,6 @@ func cmdDel(args *skel.CmdArgs) error {
 		"func", "cmdDel",
 		"config.DefaultCNIDir", config.DefaultCNIDir,
 		"netConf.DeviceID", netConf.DeviceID)
-	allocator := utils.NewPCIAllocator(config.DefaultCNIDir)
 	if err = allocator.DeleteAllocatedPCI(netConf.DeviceID); err != nil {
 		return fmt.Errorf("error cleaning the pci allocation for vf pci address %s: %v", netConf.DeviceID, err)
 	}
