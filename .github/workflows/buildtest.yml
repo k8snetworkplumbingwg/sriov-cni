@@ -33,6 +33,12 @@ jobs:
         if: ${{ matrix.goarch }} == "amd64"
         run: sudo make test-race # sudo needed for netns change in test
 
+      - name: Integration test for ${{ matrix.goarch }}
+        env:
+          GOARCH: ${{ matrix.goarch }}
+          GOOS: ${{ matrix.goos }}
+        run: sudo make test-integration
+
   coverage:
     runs-on: ubuntu-latest
     needs: build-test

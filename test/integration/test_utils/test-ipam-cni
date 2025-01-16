@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# This is a fake implementation of an IP Address Management CNI plugin. This is used in the integration test suite
+# to simulate slow IPAM operations.
+
+if [[ -n "${IPAM_MOCK_SLEEP}" ]]; then
+  sleep "${IPAM_MOCK_SLEEP}"
+fi
+
+if [[ "$CNI_COMMAND" == "DEL" ]]; then
+  # CNI_DEL does not print any output on success
+  exit 0
+fi
+
+cat << EOF
+{
+  "cniVersion": "0.3.1",
+  "interfaces": [{
+    "name": "${CNI_IFNAME}"
+  }],
+  "ips": [{
+    "name": "${CNI_IFNAME}",
+    "address": "192.0.2.1/24"
+  }]
+}
+EOF
