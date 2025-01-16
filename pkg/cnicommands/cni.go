@@ -1,16 +1,14 @@
-package main
+package cnicommands
 
 import (
 	"errors"
 	"fmt"
-	"runtime"
 	"strings"
 	"time"
 
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
 	current "github.com/containernetworking/cni/pkg/types/100"
-	"github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ipam"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/config"
@@ -25,12 +23,6 @@ type envArgs struct {
 	MAC types.UnmarshallableString `json:"mac,omitempty"`
 }
 
-func init() {
-	// this ensures that main runs only on main thread (thread group leader).
-	// since namespace ops (unshare, setns) are done for a single thread, we
-	// must ensure that the goroutine does not jump from OS thread to thread
-	runtime.LockOSThread()
-}
 
 func getEnvArgs(envArgsString string) (*envArgs, error) {
 	if envArgsString != "" {
@@ -44,7 +36,7 @@ func getEnvArgs(envArgsString string) (*envArgs, error) {
 	return nil, nil
 }
 
-func cmdAdd(args *skel.CmdArgs) error {
+func CmdAdd(args *skel.CmdArgs) error {
 	if err := config.SetLogging(args.StdinData, args.ContainerID, args.Netns, args.IfName); err != nil {
 		return err
 	}
@@ -222,7 +214,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 	return types.PrintResult(result, netConf.CNIVersion)
 }
 
-func cmdDel(args *skel.CmdArgs) error {
+func CmdDel(args *skel.CmdArgs) error {
 	if err := config.SetLogging(args.StdinData, args.ContainerID, args.Netns, args.IfName); err != nil {
 		return err
 	}
@@ -335,15 +327,6 @@ func cmdDel(args *skel.CmdArgs) error {
 	return nil
 }
 
-func cmdCheck(_ *skel.CmdArgs) error {
+func CmdCheck(_ *skel.CmdArgs) error {
 	return nil
-}
-
-func main() {
-	cniFuncs := skel.CNIFuncs{
-		Add:   cmdAdd,
-		Del:   cmdDel,
-		Check: cmdCheck,
-	}
-	skel.PluginMainFuncs(cniFuncs, version.All, "")
 }
