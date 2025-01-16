@@ -83,6 +83,80 @@ EOM
   assert_file_contains "${DEFAULT_CNI_DIR}/enp175s0f1.calls" "LinkSetVfVlanQosProto enp175s0f1 0 0 0 33024"
 }
 
+
+# This test simulates a heavy load on the IPAM plugin, which takes a long time to finish. In this case, 
+# the Kubelet can decide to remove the container with its network namespace while a CNI DEL command is still running.
+test_long_running_ipam() {
+
+  make_container "container_1"
+  export CNI_CONTAINERID=container_1
+  export CNI_NETNS=/run/netns/container_1_netns
+  export CNI_IFNAME=net1
+
+  read -r -d '' CNI_INPUT <<- EOM
+  {
+    "type": "sriov",
+    "cniVersion": "0.3.1",
+    "name": "sriov-network",
+    "ipam": {
+      "type": "test-ipam-cni"
+    },
+    "deviceID": "0000:af:06.0",
+    "vlan": 0,
+    "logLevel": "debug",
+    "logFile": "${DEFAULT_CNI_DIR}/sriov.log"
+  }
+EOM
+
+  export CNI_COMMAND=ADD
+  assert invoke_sriov_cni
+
+  # Start a long live CNI delete
+  IPAM_MOCK_SLEEP=3 CNI_COMMAND=DEL invoke_sriov_cni &
+
+  # Simulate the kubelet deleting the container and the network namespace after a timeout
+  # The VF goes back to the root network namespace
+  sleep 1
+  ip netns exec container_1_netns ip link set net1 netns test_root_ns name enp175s6
+  delete_container container_1
+
+  # Spawn a new container that tries to use the same device
+  make_container "container_2"
+  export CNI_CONTAINERID=container_2
+  export CNI_NETNS=/run/netns/container_2_netns
+  export CNI_IFNAME=net1
+
+  read -r -d '' CNI_INPUT <<- EOM
+  {
+    "type": "sriov",
+    "cniVersion": "0.3.1",
+    "name": "sriov-network",
+    "vlan": 1234,
+    "ipam": {
+      "type": "test-ipam-cni"
+    },
+    "deviceID": "0000:af:06.0",
+    "logLevel": "debug",
+    "logFile": "${DEFAULT_CNI_DIR}/sriov.log"
+  }
+EOM
+
+  export CNI_COMMAND=ADD
+  assert invoke_sriov_cni
+  assert_file_contains "${DEFAULT_CNI_DIR}/enp175s0f1.calls" "LinkSetVfVlanQosProto enp175s0f1 0 1234 0 33024"
+
+  wait
+
+  expected_vlan_set_calls=$(cat <<EOM
+LinkSetVfVlanQosProto enp175s0f1 0 0 0 33024
+LinkSetVfVlanQosProto enp175s0f1 0 0 0 33024
+LinkSetVfVlanQosProto enp175s0f1 0 1234 0 33024
+EOM
+)
+  
+  assert_equals "$expected_vlan_set_calls" "$(grep LinkSetVfVlanQosProto "${DEFAULT_CNI_DIR}/enp175s0f1.calls")"
+}
+
 invoke_sriov_cni() {
   echo "$CNI_INPUT" | ip netns exec test_root_ns go run "${this_folder}/sriov-mocked.go"
 }
