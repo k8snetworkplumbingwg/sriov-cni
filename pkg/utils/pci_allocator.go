@@ -4,10 +4,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/logging"
+	"golang.org/x/sys/unix"
 )
+
+const pciLockAcquireTimeout = 60 * time.Second
 
 type PCIAllocation interface {
 	SaveAllocatedPCI(string, string) error
@@ -23,6 +27,40 @@ type PCIAllocator struct {
 // it will use the <dataDir>/pci folder to store the information about allocated PCI addresses
 func NewPCIAllocator(dataDir string) *PCIAllocator {
 	return &PCIAllocator{dataDir: filepath.Join(dataDir, "pci")}
+}
+
+// Lock gets an exclusive lock on the given PCI address, ensuring there is no other process configuring / or de-configuring the same device.
+func (p *PCIAllocator) Lock(pciAddress string) error {
+	if err := os.MkdirAll(p.dataDir, 0600); err != nil {
+		return fmt.Errorf("failed to create the sriov data directory(%q): %v", p.dataDir, err)
+	}
+
+	path := filepath.Join(p.dataDir, pciAddress)
+
+	// unix.O_CREAT - Create the file if it doesn't exist
+	// unix.O_RDWR - Open the file for read/write
+	// unix.O_CLOEXEC - Automatically close the file on exit. This is useful to keep the flock until the process exits
+	fd, err := unix.Open(path, unix.O_CREAT|unix.O_RDWR|unix.O_CLOEXEC, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to open PCI file [%s] for locking: %w", path, err)
+	}
+
+	errCh := make(chan error)
+	go func() {
+		// unix.LOCK_EX - Exclusive lock
+		errCh <- unix.Flock(fd, unix.LOCK_EX)
+	}()
+
+	select {
+	case err = <-errCh:
+		if err != nil {
+			return fmt.Errorf("failed to flock PCI file [%s]: %w", path, err)
+		}
+		return nil
+
+	case <-time.After(pciLockAcquireTimeout):
+		return fmt.Errorf("time out while waiting to acquire exclusive lock on [%s]", path)
+	}
 }
 
 // SaveAllocatedPCI creates a file with the pci address as a name and the network namespace as the content
