@@ -48,6 +48,15 @@ func LoadConf(bytes []byte) (*sriovtypes.NetConf, error) {
 		return nil, fmt.Errorf("LoadConf(): VF pci addr is required")
 	}
 
+	allocator := utils.NewPCIAllocator(DefaultCNIDir)
+	err := allocator.Lock(n.DeviceID)
+	if err != nil {
+		return nil, err
+	}
+	logging.Debug("Acquired device lock",
+		"func", "LoadConf",
+		"DeviceID", n.DeviceID)
+	
 	// Check if the device is already allocated.
 	// This is to prevent issues where kubelet request to delete a pod and in the same time a new pod using the same
 	// vf is started. we can have an issue where the cmdDel of the old pod is called AFTER the cmdAdd of the new one
@@ -56,7 +65,6 @@ func LoadConf(bytes []byte) (*sriovtypes.NetConf, error) {
 		"func", "LoadConf",
 		"DefaultCNIDir", DefaultCNIDir,
 		"n.DeviceID", n.DeviceID)
-	allocator := utils.NewPCIAllocator(DefaultCNIDir)
 	isAllocated, err := allocator.IsAllocated(n.DeviceID)
 	if err != nil {
 		return n, err
