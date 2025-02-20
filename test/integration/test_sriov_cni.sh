@@ -1,8 +1,9 @@
 #!/bin/bash
 
-test_image="docker.io/library/busybox:1.36"
 this_folder="$(dirname "$(readlink --canonicalize "${BASH_SOURCE[0]}")")"
 export CNI_PATH=${this_folder}
+export CNI_CONTAINERID=container_x
+
 
 setup() {
   ip netns del test_root_ns || true
@@ -17,13 +18,17 @@ setup() {
   export DEFAULT_CNI_DIR
 }
 
+teardown() {
+  # Double check the variable points to something created by the setup() function.
+  if [[ $DEFAULT_CNI_DIR == "/tmp/tmp."* ]]; then
+    rm -rf "$DEFAULT_CNI_DIR"
+  fi
+}
 
 test_macaddress() {
 
   make_container "container_1"
 
-  export CNI_CONTAINERID=container_1
-  export CNI_NETNS=/run/netns/container_1_netns
   export CNI_IFNAME=net1
 
   read -r -d '' CNI_INPUT <<- EOM
@@ -36,7 +41,9 @@ test_macaddress() {
     },
     "deviceID": "0000:af:06.0",
     "mac": "60:00:00:00:00:E1",
+    "logFile": "${DEFAULT_CNI_DIR}/sriov.log",
     "logLevel": "debug"
+    
   }
 EOM
 
@@ -54,8 +61,6 @@ test_vlan() {
 
   make_container "container_1"
 
-  export CNI_CONTAINERID=container_1
-  export CNI_NETNS=/run/netns/container_1_netns
   export CNI_IFNAME=net1
 
   read -r -d '' CNI_INPUT <<- EOM
@@ -82,7 +87,6 @@ EOM
   assert 'ip netns exec test_root_ns ip link show enp175s6'
   assert_file_contains "${DEFAULT_CNI_DIR}/enp175s0f1.calls" "LinkSetVfVlanQosProto enp175s0f1 0 0 0 33024"
 }
-
 
 # This test simulates a heavy load on the IPAM plugin, which takes a long time to finish. In this case, 
 # the Kubelet can decide to remove the container with its network namespace while a CNI DEL command is still running.
@@ -143,10 +147,8 @@ EOM
 
   export CNI_COMMAND=ADD
   assert invoke_sriov_cni
-  assert_file_contains "${DEFAULT_CNI_DIR}/enp175s0f1.calls" "LinkSetVfVlanQosProto enp175s0f1 0 1234 0 33024"
 
-  wait
-
+  #LinkSetVfVlanQosProto linkName vfIndex vlan vlanQos vlanProto
   expected_vlan_set_calls=$(cat <<EOM
 LinkSetVfVlanQosProto enp175s0f1 0 0 0 33024
 LinkSetVfVlanQosProto enp175s0f1 0 0 0 33024
@@ -155,6 +157,51 @@ EOM
 )
   
   assert_equals "$expected_vlan_set_calls" "$(grep LinkSetVfVlanQosProto "${DEFAULT_CNI_DIR}/enp175s0f1.calls")"
+
+  wait
+}
+
+test_concurrent_add_calls() {
+  export CNI_IFNAME=net1
+
+  make_container "container_1"
+  read -r -d '' CNI_INPUT <<- EOM
+  {
+    "type": "sriov",
+    "cniVersion": "0.3.1",
+    "name": "sriov-network",
+    "ipam": { "type": "test-ipam-cni" },
+    "deviceID": "0000:af:06.0",
+    "logFile": "${DEFAULT_CNI_DIR}/sriov.log",
+    "logLevel": "debug"
+  }
+EOM
+
+  # Simulate a long CNI Add operation
+  IPAM_MOCK_SLEEP=3 CNI_COMMAND=ADD invoke_sriov_cni > /dev/null &
+  sleep 1
+
+  # Call CNI Add on the same PCI address
+  make_container "container_2"
+  read -r -d '' CNI_INPUT <<- EOM
+  {
+    "type": "sriov",
+    "cniVersion": "0.3.1",
+    "name": "sriov-network",
+    "ipam": { "type": "test-ipam-cni" },
+    "deviceID": "0000:af:06.0",
+    "logFile": "${DEFAULT_CNI_DIR}/sriov.log",
+    "logLevel": "debug"
+  }
+EOM
+
+  export CNI_COMMAND=ADD
+  output=$(invoke_sriov_cni 2>/dev/null)
+  assert_matches ".*pci address 0000:af:06.0 is already allocated.*" "$output"
+  wait
+
+  # Verify all .lock files are deleted after CNI calls
+  assert_file_does_not_exists "${DEFAULT_CNI_DIR}"/pci/0000:af:06.0.lock
 }
 
 invoke_sriov_cni() {
@@ -168,15 +215,13 @@ make_container() {
   delete_container "$container_name"
 
   ip netns add "${container_name}_netns"
-  assert "podman run -d --network ns:/run/netns/${container_name}_netns --name ${container_name} ${test_image} sleep inf"
+
+  export CNI_NETNS=/run/netns/${container_name}_netns
 }
 
 delete_container() {
   container_name=$1
   ip netns del "${container_name}_netns" 2>/dev/null
-
-  podman kill "${container_name}" >/dev/null 2>/dev/null
-  podman rm -f "${container_name}" >/dev/null 2>/dev/null
 }
 
 assert_file_contains() {
@@ -184,5 +229,13 @@ assert_file_contains() {
   substr=$2
   if ! grep -q "$substr" "$file"; then
     fail "File [$file] does not contains [$substr], contents: \n $(cat "$file")"
+  fi
+}
+
+
+assert_file_does_not_exists() {
+  file=$1
+  if [ -f "$file" ]; then
+    fail "File [$file] exists"
   fi
 }

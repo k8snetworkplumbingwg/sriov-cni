@@ -35,7 +35,7 @@ func (p *PCIAllocator) Lock(pciAddress string) error {
 		return fmt.Errorf("failed to create the sriov data directory(%q): %v", p.dataDir, err)
 	}
 
-	path := filepath.Join(p.dataDir, pciAddress)
+	path := filepath.Join(p.dataDir, pciAddress+".lock")
 
 	// unix.O_CREAT - Create the file if it doesn't exist
 	// unix.O_RDWR - Open the file for read/write
