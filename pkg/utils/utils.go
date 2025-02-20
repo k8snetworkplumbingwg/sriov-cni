@@ -199,11 +199,14 @@ func GetVFLinkName(pciAddr string) (string, error) {
 		return "", fmt.Errorf("VF device %s sysfs path (%s) has no entries", pciAddr, vfDir)
 	}
 
-	names = make([]string, 0)
-	for _, f := range fInfos {
-		names = append(names, f.Name())
+	names = make([]string, len(fInfos))
+	for idx, f := range fInfos {
+		names[idx] = f.Name()
 	}
 
+	if len(names) < 1 {
+		return "", fmt.Errorf("VF device %s has no entries", pciAddr)
+	}
 	return names[0], nil
 }
 

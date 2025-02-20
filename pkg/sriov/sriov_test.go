@@ -38,6 +38,7 @@ var _ = Describe("Sriov", func() {
 				VFID:     0,
 				OrigVfState: sriovtypes.VfState{
 					HostIFName: "enp175s6",
+					MTU:        1500,
 				}},
 			}
 			t = GinkgoT()
@@ -310,6 +311,7 @@ var _ = Describe("Sriov", func() {
 				OrigVfState: sriovtypes.VfState{
 					HostIFName:   "enp175s6",
 					EffectiveMAC: "6e:16:06:0e:b7:e9",
+					MTU:          1500,
 				}},
 			}
 		})
@@ -331,6 +333,7 @@ var _ = Describe("Sriov", func() {
 			mocked.On("LinkByName", podifName).Return(fakeLink, nil)
 			mocked.On("LinkSetDown", fakeLink).Return(nil)
 			mocked.On("LinkSetName", fakeLink, netconf.OrigVfState.HostIFName).Return(nil)
+			mocked.On("LinkSetMTU", fakeLink, 1500).Return(nil)
 			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
 			sm := sriovManager{nLink: mocked}
 			err = sm.ReleaseVF(netconf, podifName, targetNetNS)
@@ -434,7 +437,7 @@ var _ = Describe("Sriov", func() {
 
 			fakeLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
 				Index:        1000,
-				Name:         "dummylink",
+				Name:         netconf.Name,
 				HardwareAddr: fakeMac,
 				Vfs: []netlink.VfInfo{
 					{
@@ -443,10 +446,19 @@ var _ = Describe("Sriov", func() {
 					},
 				},
 			}}
+
+			fakeVFLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
+				Index: 1001,
+				Name:  netconf.OrigVfState.HostIFName,
+				MTU:   1500,
+			}}
+
 			mocked.On("LinkByName", netconf.Master).Return(fakeLink, nil)
+			mocked.On("LinkByName", netconf.OrigVfState.HostIFName).Return(fakeVFLink, nil)
 			sm := sriovManager{nLink: mocked}
 			err = sm.FillOriginalVfInfo(netconf)
 			Expect(err).NotTo(HaveOccurred())
+			Expect(netconf.OrigVfState.MTU).To(Equal(1500))
 			mocked.AssertExpectations(t)
 		})
 	})
@@ -509,6 +521,7 @@ var _ = Describe("Sriov", func() {
 					MinTxRate:    0,
 					MaxTxRate:    0,
 					LinkState:    2, // disable
+					MTU:          1500,
 				}},
 			}
 		})

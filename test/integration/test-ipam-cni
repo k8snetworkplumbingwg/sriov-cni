@@ -1,0 +1,18 @@
+#!/bin/bash
+
+if [[ -n "${IPAM_MOCK_SLEEP}" ]]; then
+  sleep "${IPAM_MOCK_SLEEP}"
+fi
+
+cat << EOF
+{
+  "cniVersion": "0.3.1",
+  "interfaces": [{
+    "name": "${CNI_IFNAME}"
+  }],
+  "ips": [{
+    "name": "${CNI_IFNAME}",
+    "address": "192.0.2.1/24"
+  }]
+}
+EOF

@@ -27,6 +27,7 @@ type VfState struct {
 	MinTxRate    int
 	MaxTxRate    int
 	LinkState    uint32
+	MTU          int
 }
 
 // FillFromVfInfo - Fill attributes according to the provided netlink.VfInfo struct
