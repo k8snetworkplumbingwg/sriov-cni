@@ -13,6 +13,11 @@ import (
 )
 
 var _ = Describe("Config", func() {
+	BeforeEach(func() {
+		DeferCleanup(func(x string) { DefaultCNIDir = x }, DefaultCNIDir)
+		DefaultCNIDir = GinkgoT().TempDir()
+	})
+
 	Context("Checking LoadConf function", func() {
 		It("Assuming correct config file - existing DeviceID", func() {
 			conf := []byte(`{
@@ -80,6 +85,7 @@ var _ = Describe("Config", func() {
 		invalidProto := "802"
 		DescribeTable("Vlan ID, QoS and Proto",
 			func(vlanID *int, vlanQoS *int, vlanProto *string, failure bool) {
+
 				s := `{
         "name": "mynet",
         "type": "sriov",
