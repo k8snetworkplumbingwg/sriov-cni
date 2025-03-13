@@ -1,6 +1,7 @@
 module github.com/k8snetworkplumbingwg/sriov-cni
 
 go 1.22.4
+toolchain go1.23.7
 
 require (
 	github.com/containernetworking/cni v1.2.0-rc0.0.20240317203738-a448e71e9867
@@ -10,8 +11,8 @@ require (
 	github.com/onsi/gomega v1.31.1
 	github.com/stretchr/testify v1.8.2
 	github.com/vishvananda/netlink v1.2.1-beta.2.0.20240221172127-ec7bcb248e94
-	golang.org/x/net v0.33.0
-	golang.org/x/sys v0.28.0
+	golang.org/x/net v0.36.0
+	golang.org/x/sys v0.30.0
 )
 
 require (
@@ -25,7 +26,7 @@ require (
 	github.com/safchain/ethtool v0.3.0 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/vishvananda/netns v0.0.4 // indirect
-	golang.org/x/text v0.21.0 // indirect
+	golang.org/x/text v0.22.0 // indirect
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
