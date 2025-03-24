@@ -31,7 +31,7 @@ var _ = Describe("Packets", func() {
 				RawFlags: atomic.LoadUint32(rawFlagsAtomic),
 			}}
 
-			mockedNetLink.On("LinkByName", "dummylink").Return(fakeLink, nil).Run(func(args mock.Arguments) {
+			mockedNetLink.On("LinkByName", "dummylink").Return(fakeLink, nil).Run(func(_ mock.Arguments) {
 				fakeLink.RawFlags = atomic.LoadUint32(rawFlagsAtomic)
 			})
 

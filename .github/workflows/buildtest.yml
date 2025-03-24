@@ -9,7 +9,7 @@ jobs:
   build-test:
     strategy:
       matrix:
-        go-version: [1.22.x]
+        go-version: [1.23.x]
         os: [ubuntu-latest]
         goos: [linux]
         goarch: [amd64, arm64, ppc64le]
@@ -41,7 +41,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: 1.22.x
+          go-version: 1.23.x
 
       - name: Check out code
         uses: actions/checkout@v3
@@ -69,7 +69,7 @@ jobs:
         run: podman build -t ghaction-sriov-cni:pr-${{github.event.pull_request.number}} .
   
       - name: Check out sriov operator's code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: k8snetworkplumbingwg/sriov-network-operator
           path: sriov-network-operator-wc
