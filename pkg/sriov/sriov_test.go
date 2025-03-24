@@ -1,6 +1,8 @@
 package sriov
 
 import (
+	"errors"
+	"fmt"
 	"net"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -46,7 +48,6 @@ var _ = Describe("Sriov", func() {
 		})
 
 		It("Assuming existing interface", func() {
-			var targetNetNS ns.NetNS
 			targetNetNS, err := testutils.NewNS()
 			defer func() {
 				if targetNetNS != nil {
@@ -67,7 +68,6 @@ var _ = Describe("Sriov", func() {
 			}}
 
 			mocked.On("LinkByName", mock.AnythingOfType("string")).Return(fakeLink, nil)
-			mocked.On("LinkSetDown", fakeLink).Return(nil)
 			mocked.On("LinkSetName", fakeLink, mock.Anything).Return(nil)
 			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
 			mocked.On("LinkSetUp", fakeLink).Return(nil)
@@ -78,8 +78,8 @@ var _ = Describe("Sriov", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(netconf.OrigVfState.EffectiveMAC).To(Equal("6e:16:06:0e:b7:e9"))
 		})
+
 		It("Setting VF's MAC address", func() {
-			var targetNetNS ns.NetNS
 			targetNetNS, err := testutils.NewNS()
 			defer func() {
 				if targetNetNS != nil {
@@ -108,30 +108,64 @@ var _ = Describe("Sriov", func() {
 				HardwareAddr: expMac,
 			}}
 
-			net2Link := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
-				Index:        1000,
-				Name:         "temp_1000",
-				HardwareAddr: expMac,
-			}}
-
 			mocked.On("LinkByName", "enp175s6").Return(fakeLink, nil)
-			mocked.On("LinkByName", "temp_1000").Return(net2Link, nil)
 			mocked.On("LinkByName", "net1").Return(net1Link, nil)
-			mocked.On("LinkSetDown", fakeLink).Return(nil)
 			mocked.On("LinkSetName", fakeLink, mock.Anything).Return(nil)
-			mocked.On("LinkSetName", net2Link, mock.Anything).Return(nil)
 			mocked.On("LinkSetHardwareAddr", net1Link, expMac).Return(nil)
-			mocked.On("LinkSetNsFd", net2Link, mock.AnythingOfType("int")).Return(nil)
-			mocked.On("LinkSetUp", net2Link).Return(nil)
+			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
 			mockedPciUtils.On("EnableArpAndNdiscNotify", mock.AnythingOfType("string")).Return(nil)
+			mocked.On("LinkSetUp", net1Link).Return(nil)
 			mockedPciUtils.On("EnableOptimisticDad", mock.AnythingOfType("string")).Return(nil)
 			sm := sriovManager{nLink: mocked, utils: mockedPciUtils}
 			err = sm.SetupVF(netconf, podifName, targetNetNS)
 			Expect(err).NotTo(HaveOccurred())
 			mocked.AssertExpectations(t)
 		})
+
+		It("Setting VF's MAC address failed", func() {
+			targetNetNS, err := testutils.NewNS()
+			defer func() {
+				if targetNetNS != nil {
+					targetNetNS.Close()
+				}
+			}()
+			Expect(err).NotTo(HaveOccurred())
+			mocked := &mocks_utils.NetlinkManager{}
+			mockedPciUtils := &mocks.PciUtils{}
+			fakeMac, err := net.ParseMAC("6e:16:06:0e:b7:e9")
+			Expect(err).NotTo(HaveOccurred())
+
+			netconf.MAC = "e4:11:22:33:44:55"
+			expMac, err := net.ParseMAC(netconf.MAC)
+			Expect(err).NotTo(HaveOccurred())
+
+			fakeLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
+				Index:        1000,
+				Name:         "dummylink",
+				HardwareAddr: fakeMac,
+			}}
+
+			net1Link := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
+				Index:        1000,
+				Name:         "net1",
+				HardwareAddr: expMac,
+			}}
+
+			mocked.On("LinkByName", "enp175s6").Return(fakeLink, nil)
+			mocked.On("LinkSetName", fakeLink, podifName).Return(nil)
+			mocked.On("LinkByName", "net1").Return(net1Link, nil)
+			mocked.On("LinkSetHardwareAddr", net1Link, expMac).Return(errors.New("LinkSetHardwareAddr failed"))
+			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
+			mockedPciUtils.On("EnableArpAndNdiscNotify", mock.AnythingOfType("string")).Return(nil)
+			mockedPciUtils.On("EnableOptimisticDad", mock.AnythingOfType("string")).Return(nil)
+			sm := sriovManager{nLink: mocked, utils: mockedPciUtils}
+			err = sm.SetupVF(netconf, podifName, targetNetNS)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("failed to set netlink MAC address to %s: LinkSetHardwareAddr failed", expMac.String())))
+			mocked.AssertExpectations(t)
+		})
+
 		It("Remove altName", func() {
-			var targetNetNS ns.NetNS
 			targetNetNS, err := testutils.NewNS()
 			defer func() {
 				if targetNetNS != nil {
@@ -160,23 +194,12 @@ var _ = Describe("Sriov", func() {
 				HardwareAddr: expMac,
 			}}
 
-			net2Link := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
-				Index:        1000,
-				Name:         "temp_1000",
-				HardwareAddr: expMac,
-				AltNames:     []string{"enp175s6"},
-			}}
-
 			mocked.On("LinkByName", "enp175s6").Return(fakeLink, nil)
-			mocked.On("LinkByName", "temp_1000").Return(net2Link, nil)
 			mocked.On("LinkByName", "net1").Return(net1Link, nil)
-			mocked.On("LinkSetDown", fakeLink).Return(nil)
 			mocked.On("LinkSetName", fakeLink, mock.Anything).Return(nil)
-			mocked.On("LinkSetName", net2Link, mock.Anything).Return(nil)
-			mocked.On("LinkDelAltName", net2Link, "enp175s6").Return(nil)
 			mocked.On("LinkSetHardwareAddr", net1Link, expMac).Return(nil)
-			mocked.On("LinkSetNsFd", net2Link, mock.AnythingOfType("int")).Return(nil)
-			mocked.On("LinkSetUp", net2Link).Return(nil)
+			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
+			mocked.On("LinkSetUp", net1Link).Return(nil)
 			mockedPciUtils.On("EnableArpAndNdiscNotify", mock.AnythingOfType("string")).Return(nil)
 			mockedPciUtils.On("EnableOptimisticDad", mock.AnythingOfType("string")).Return(nil)
 			sm := sriovManager{nLink: mocked, utils: mockedPciUtils}
@@ -184,8 +207,8 @@ var _ = Describe("Sriov", func() {
 			Expect(err).NotTo(HaveOccurred())
 			mocked.AssertExpectations(t)
 		})
+
 		It("Return MTU from PF", func() {
-			var targetNetNS ns.NetNS
 			targetNetNS, err := testutils.NewNS()
 			defer func() {
 				if targetNetNS != nil {
@@ -216,22 +239,12 @@ var _ = Describe("Sriov", func() {
 				MTU:          1500,
 			}}
 
-			net2Link := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
-				Index:        1000,
-				Name:         "temp_1000",
-				HardwareAddr: expMac,
-				MTU:          1500,
-			}}
-
 			mocked.On("LinkByName", "enp175s6").Return(fakeLink, nil)
-			mocked.On("LinkByName", "temp_1000").Return(net2Link, nil)
 			mocked.On("LinkByName", "net1").Return(net1Link, nil)
-			mocked.On("LinkSetDown", fakeLink).Return(nil)
 			mocked.On("LinkSetName", fakeLink, mock.Anything).Return(nil)
-			mocked.On("LinkSetName", net2Link, mock.Anything).Return(nil)
 			mocked.On("LinkSetHardwareAddr", net1Link, expMac).Return(nil)
-			mocked.On("LinkSetNsFd", net2Link, mock.AnythingOfType("int")).Return(nil)
-			mocked.On("LinkSetUp", net2Link).Return(nil)
+			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
+			mocked.On("LinkSetUp", net1Link).Return(nil)
 			mockedPciUtils.On("EnableArpAndNdiscNotify", mock.AnythingOfType("string")).Return(nil)
 			mockedPciUtils.On("EnableOptimisticDad", mock.AnythingOfType("string")).Return(nil)
 			sm := sriovManager{nLink: mocked, utils: mockedPciUtils}
@@ -240,7 +253,119 @@ var _ = Describe("Sriov", func() {
 			Expect(*netconf.MTU).To(Equal(1500))
 			mocked.AssertExpectations(t)
 		})
+
+		It("Bring IF up in Pod netns fails", func() {
+			targetNetNS, err := testutils.NewNS()
+			defer func() {
+				if targetNetNS != nil {
+					targetNetNS.Close()
+				}
+			}()
+			Expect(err).NotTo(HaveOccurred())
+			mocked := &mocks_utils.NetlinkManager{}
+			mockedPciUtils := &mocks.PciUtils{}
+			fakeMac, err := net.ParseMAC("6e:16:06:0e:b7:e9")
+			Expect(err).NotTo(HaveOccurred())
+
+			netconf.MAC = "e4:11:22:33:44:55"
+			expMac, err := net.ParseMAC(netconf.MAC)
+			Expect(err).NotTo(HaveOccurred())
+
+			fakeLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
+				Index:        1000,
+				Name:         "dummylink",
+				HardwareAddr: fakeMac,
+				MTU:          1500,
+			}}
+
+			net1Link := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
+				Index:        1000,
+				Name:         "net1",
+				HardwareAddr: expMac,
+				MTU:          1500,
+			}}
+
+			mocked.On("LinkByName", "enp175s6").Return(fakeLink, nil)
+			mocked.On("LinkByName", "net1").Return(net1Link, nil)
+			mocked.On("LinkSetName", fakeLink, podifName).Return(nil)
+			mocked.On("LinkSetHardwareAddr", net1Link, expMac).Return(nil)
+			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
+			mocked.On("LinkSetUp", net1Link).Return(errors.New("failed to set link up"))
+			mockedPciUtils.On("EnableArpAndNdiscNotify", mock.AnythingOfType("string")).Return(nil)
+			mockedPciUtils.On("EnableOptimisticDad", mock.AnythingOfType("string")).Return(nil)
+			sm := sriovManager{nLink: mocked, utils: mockedPciUtils}
+			err = sm.SetupVF(netconf, podifName, targetNetNS)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("error bringing interface up in container ns:"))
+			Expect(err.Error()).To(ContainSubstring("failed to set link up"))
+			mocked.AssertExpectations(t)
+		})
+
+		It("LinkSetNsFd fails link not moved to targetNetNS", func() {
+			targetNetNS, err := testutils.NewNS()
+			defer func() {
+				if targetNetNS != nil {
+					targetNetNS.Close()
+				}
+			}()
+			Expect(err).NotTo(HaveOccurred())
+
+			tempNS, err := ns.TempNetNS()
+			defer func() {
+				if tempNS != nil {
+					tempNS.Close()
+				}
+			}()
+			Expect(err).NotTo(HaveOccurred())
+			mocked := &mocks_utils.NetlinkManager{}
+			mockedPciUtils := &mocks.PciUtils{}
+			fakeMac, err := net.ParseMAC("6e:16:06:0e:b7:e9")
+			Expect(err).NotTo(HaveOccurred())
+
+			netconf.MAC = "e4:11:22:33:44:55"
+			// expMac, err := net.ParseMAC(netconf.MAC)
+			Expect(err).NotTo(HaveOccurred())
+
+			initns, err := ns.GetCurrentNS()
+			Expect(err).NotTo(HaveOccurred())
+
+			fakeLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
+				Index:        1000,
+				Name:         "dummylink",
+				HardwareAddr: fakeMac,
+				Namespace:    initns.Fd(),
+			}}
+
+			mocked.On("LinkByName", "enp175s6").Return(fakeLink, nil)
+			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(errors.New("move to netns failed"))
+			sm := sriovManager{nLink: mocked, utils: mockedPciUtils}
+			err = sm.SetupVF(netconf, podifName, targetNetNS)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to move \"enp175s6\" to tempNS: move to netns failed"))
+			mocked.AssertExpectations(t)
+		})
+
+		It("returns error when LinkByName fails", func() {
+			targetNetNS, err := testutils.NewNS()
+			defer func() {
+				if targetNetNS != nil {
+					targetNetNS.Close()
+				}
+			}()
+			Expect(err).NotTo(HaveOccurred())
+			mocked := &mocks_utils.NetlinkManager{}
+			mockedPciUtils := &mocks.PciUtils{}
+
+			// Simulate LinkByName failure
+			mocked.On("LinkByName", mock.AnythingOfType("string")).Return(nil, errors.New("device not found"))
+
+			sm := sriovManager{nLink: mocked, utils: mockedPciUtils}
+			err = sm.SetupVF(netconf, podifName, targetNetNS)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("error: device not found. Failed to get VF netdevice with name"))
+		})
 	})
+
 	Context("Checking ApplyVFConfig function", func() {
 		var (
 			netconf  *sriovtypes.NetConf
@@ -317,7 +442,6 @@ var _ = Describe("Sriov", func() {
 			}
 		})
 		It("Assuming existing interface", func() {
-			var targetNetNS ns.NetNS
 			targetNetNS, err := testutils.NewNS()
 			defer func() {
 				if targetNetNS != nil {
@@ -334,8 +458,8 @@ var _ = Describe("Sriov", func() {
 			mocked.On("LinkByName", podifName).Return(fakeLink, nil)
 			mocked.On("LinkSetDown", fakeLink).Return(nil)
 			mocked.On("LinkSetName", fakeLink, netconf.OrigVfState.HostIFName).Return(nil)
-			mocked.On("LinkSetMTU", fakeLink, 1500).Return(nil)
 			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
+			mocked.On("LinkSetMTU", fakeLink, 1500).Return(nil)
 			sm := sriovManager{nLink: mocked}
 			err = sm.ReleaseVF(netconf, podifName, targetNetNS)
 			Expect(err).NotTo(HaveOccurred())
@@ -361,7 +485,6 @@ var _ = Describe("Sriov", func() {
 			}
 		})
 		It("Should not restores Effective MAC address when it is not provided in netconf", func() {
-			var targetNetNS ns.NetNS
 			targetNetNS, err := testutils.NewNS()
 			defer func() {
 				if targetNetNS != nil {
@@ -384,7 +507,6 @@ var _ = Describe("Sriov", func() {
 
 		It("Restores Effective MAC address when provided in netconf", func() {
 			netconf.MAC = "aa:f3:8d:65:1b:d4"
-			var targetNetNS ns.NetNS
 			targetNetNS, err := testutils.NewNS()
 			defer func() {
 				if targetNetNS != nil {
