@@ -37,7 +37,20 @@ jobs:
         env:
           GOARCH: ${{ matrix.goarch }}
           GOOS: ${{ matrix.goos }}
-        run: sudo make test-integration
+        run: sudo FORCE_COLOR=true INT_TEST_SKIP_CLEANUP=true make test-integration
+
+      - name: Prepare integration-test archive
+        if: always()
+        # `actions/upload-artifact` step need the files to be readable and files can't have Colon (:)
+        run: |
+          sudo chmod -R a+rwx test/integration/tmp/*
+          find test/integration/tmp -name "*:*" -exec bash -c 'mv $0 ${0//:/_}' {} \;
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-integration- ${{ matrix.goarch }}
+          path: ./test/integration/tmp/
 
   coverage:
     runs-on: ubuntu-24.04
