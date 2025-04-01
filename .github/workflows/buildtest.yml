@@ -53,13 +53,14 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Go test with coverage
-        run: sudo make test-coverage # sudo needed for netns change in test
-      
+        run: sudo make test-coverage test-integration merge-test-coverage
+
       - name: Coveralls
         uses: coverallsapp/github-action@v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           file: test/coverage/cover.out
+          format: golang
 
   sriov-operator-e2e-test:
     name: SR-IOV operator e2e tests

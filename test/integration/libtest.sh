@@ -32,7 +32,7 @@ assert_file_does_not_exists() {
 }
 
 invoke_sriov_cni() {
-  echo "$CNI_INPUT" | ip netns exec test_root_ns go run "${this_folder}/sriov_mocked.go"
+  echo "$CNI_INPUT" | ip netns exec test_root_ns go run -cover -covermode atomic "${this_folder}/sriov_mocked.go"
 }
 
 create_network_ns() {
