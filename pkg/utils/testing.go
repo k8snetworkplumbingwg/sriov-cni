@@ -298,15 +298,16 @@ func (p *pfMockNetlinkLib) LinkDelAltName(link netlink.Link, name string) error 
 }
 
 func (p *pfMockNetlinkLib) recordMethodCall(format string, a ...any) {
+	message := fmt.Sprintf(format+"\n", a...)
 	f, err := os.OpenFile(p.methodCallsRecordingFilePath,
 		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		log.Println(err)
+		log.Printf("Can't open file to record method call [%s]: %v\n", message, err)
 		return
 	}
 	defer f.Close()
-	if _, err := f.WriteString(fmt.Sprintf(format+"\n", a...)); err != nil {
-		log.Println(err)
+	if _, err := f.WriteString(message); err != nil {
+		log.Printf("Can't write on file [%s] to record method call [%s]: %v\n", p.methodCallsRecordingFilePath, message, err)
 	}
 }
 
