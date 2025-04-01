@@ -1,28 +1,7 @@
 #!/bin/bash
 
-this_folder="$(dirname "$(readlink --canonicalize "${BASH_SOURCE[0]}")")"
-export CNI_PATH="${this_folder}/test_utils"
-export CNI_CONTAINERID=stub_container
-
-setup() {
-  ip netns del test_root_ns || true
-  ip netns add test_root_ns
-
-  # See pkg/utils/testing.go
-  ip netns exec test_root_ns ip link add enp175s0f1 type dummy
-  ip netns exec test_root_ns ip link add enp175s6 type dummy
-  ip netns exec test_root_ns ip link add enp175s7 type dummy
-
-  DEFAULT_CNI_DIR=$(mktemp -d)
-  export DEFAULT_CNI_DIR
-}
-
-teardown() {
-  # Double check the variable points to something created by the setup() function.
-  if [[ $DEFAULT_CNI_DIR == "/tmp/tmp."* ]]; then
-    rm -rf "$DEFAULT_CNI_DIR"
-  fi
-}
+# shellcheck source-path=test/integration
+. libtest.sh
 
 test_macaddress() {
 
@@ -86,28 +65,42 @@ EOM
   assert_file_contains "${DEFAULT_CNI_DIR}/enp175s0f1.calls" "LinkSetVfVlanQosProto enp175s0f1 0 0 0 33024"
 }
 
-invoke_sriov_cni() {
-  echo "$CNI_INPUT" | ip netns exec test_root_ns go run "${this_folder}/sriov_mocked.go"
-}
 
-create_network_ns() {
-  name=$1
-  delete_network_ns "$name"
+test_mtu_reset() {
 
-  ip netns add "${name}"
+  create_network_ns "container_1"
 
-  export CNI_NETNS=/run/netns/${name}
-}
+  assert 'ip netns exec test_root_ns ip link set mtu 3333 dev enp175s6'
 
-delete_network_ns() {
-  name=$1
-  ip netns del "${name}" 2>/dev/null
-}
+  export CNI_IFNAME=net1
 
-assert_file_contains() {
-  file=$1
-  substr=$2
-  if ! grep -q "$substr" "$file"; then
-    fail "File [$file] does not contains [$substr], contents: \n $(cat "$file")"
-  fi
+  read -r -d '' CNI_INPUT <<- EOM
+  {
+    "type": "sriov",
+    "cniVersion": "0.3.1",
+    "name": "sriov-network",
+    "vlan": 1234,
+    "ipam": {
+      "type": "test-ipam-cni"
+    },
+    "deviceID": "0000:af:06.0",
+    "mac": "60:00:00:00:00:E1",
+    "logFile": "${DEFAULT_CNI_DIR}/sriov.log",
+    "logLevel": "debug"
+  }
+EOM
+
+  export CNI_COMMAND=ADD
+  assert invoke_sriov_cni
+
+  # Verify the VF has the correct MTU inside the container
+  assert 'ip netns exec container_1 ip link | grep -i 3333'
+
+  # Simulate an application modifying the MTU value
+  assert 'ip netns exec container_1 ip link set mtu 4444 dev net1'
+  assert 'ip netns exec container_1 ip link | grep -i 4444'
+
+  export CNI_COMMAND=DEL
+  assert invoke_sriov_cni
+  assert 'ip netns exec test_root_ns ip link show enp175s6 | grep 3333'
 }

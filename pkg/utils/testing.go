@@ -9,6 +9,7 @@ package utils
 import (
 	"fmt"
 	"log"
+	"math"
 	"net"
 	"os"
 	"path/filepath"
@@ -158,7 +159,6 @@ func (l *FakeLink) Type() string {
 	return "FakeLink"
 }
 
-
 func MockNetlinkLib(methodCallRecordingDir string) (func(), error) {
 	var err error
 	oldnetlinkLib := netLinkLib
@@ -183,14 +183,14 @@ func newPFMockNetlinkLib(recordDir, pfName string, numvfs int) (*pfMockNetlinkLi
 		pf: &netlink.Dummy{
 			LinkAttrs: netlink.LinkAttrs{
 				Name: pfName,
-				Vfs: []netlink.VfInfo{},
+				Vfs:  []netlink.VfInfo{},
 			},
 		},
 	}
 
-	for i := 0; i<numvfs; i++ {
+	for i := 0; i < numvfs; i++ {
 		ret.pf.Attrs().Vfs = append(ret.pf.Attrs().Vfs, netlink.VfInfo{
-			ID: i,
+			ID:  i,
 			Mac: mustParseMAC(fmt.Sprintf("ab:cd:ef:ab:cd:%02x", i)),
 		})
 	}
@@ -249,7 +249,17 @@ func (p *pfMockNetlinkLib) LinkSetName(link netlink.Link, name string) error {
 
 func (p *pfMockNetlinkLib) LinkSetVfRate(pfLink netlink.Link, vfIndex int, minRate int, maxRate int) error {
 	p.recordMethodCall("LinkSetVfRate %s %d %d %d", pfLink.Attrs().Name, vfIndex, minRate, maxRate)
+
+	if maxRate > math.MaxUint32 {
+		maxRate = math.MaxUint32
+	}
+	//nolint:gosec
 	pfLink.Attrs().Vfs[vfIndex].MaxTxRate = uint32(maxRate)
+
+	if minRate > math.MaxUint32 {
+		minRate = math.MaxUint32
+	}
+	//nolint:gosec
 	pfLink.Attrs().Vfs[vfIndex].MinTxRate = uint32(minRate)
 	return nil
 }
@@ -282,22 +292,22 @@ func (p *pfMockNetlinkLib) LinkSetMTU(link netlink.Link, mtu int) error {
 	return netlink.LinkSetMTU(link, mtu)
 }
 
-
 func (p *pfMockNetlinkLib) LinkDelAltName(link netlink.Link, name string) error {
 	p.recordMethodCall("LinkDelAltName %s %s", link.Attrs().Name, name)
 	return netlink.LinkDelAltName(link, name)
 }
 
 func (p *pfMockNetlinkLib) recordMethodCall(format string, a ...any) {
+	message := fmt.Sprintf(format+"\n", a...)
 	f, err := os.OpenFile(p.methodCallsRecordingFilePath,
 		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		log.Println(err)
+		log.Printf("Can't open file to record method call [%s]: %v\n", message, err)
 		return
 	}
 	defer f.Close()
-	if _, err := f.WriteString(fmt.Sprintf(format+"\n", a...)); err != nil {
-		log.Println(err)
+	if _, err := f.WriteString(message); err != nil {
+		log.Printf("Can't write on file [%s] to record method call [%s]: %v\n", p.methodCallsRecordingFilePath, message, err)
 	}
 }
 
