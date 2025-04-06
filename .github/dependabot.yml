@@ -1,0 +1,31 @@
+version: 2
+updates:
+  # Docker images
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    commit-message:
+      prefix: "chore:"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+    groups:
+      kubernetes:
+        patterns: [ "k8s.io/*" ]
+    ignore:
+      # Ignore controller-runtime, and Kubernetes major and minor updates. These should be done manually.
+      - dependency-name: "sigs.k8s.io/controller-runtime"
+        update-types: [ "version-update:semver-major", "version-update:semver-minor" ]
+      - dependency-name: "k8s.io/*"
+        update-types: [ "version-update:semver-major", "version-update:semver-minor" ]
