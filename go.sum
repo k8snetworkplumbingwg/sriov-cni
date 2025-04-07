@@ -1,7 +1,7 @@
 github.com/BurntSushi/toml v1.1.0 h1:ksErzDEI1khOiGPgpwuI7x2ebx/uXQNw7xJpn9Eq1+I=
 github.com/BurntSushi/toml v1.1.0/go.mod h1:CxXYINrC8qIiEnFrOxCa7Jy5BFHlXnUU2pbicEuybxQ=
-github.com/containernetworking/cni v1.2.0-rc0.0.20240317203738-a448e71e9867 h1:DQ9iOvlXFOn+sJfbdvXyGISf/4xHNFGxJltq4mixK00=
-github.com/containernetworking/cni v1.2.0-rc0.0.20240317203738-a448e71e9867/go.mod h1:Lt0TQcZQVDju64fYxUhDziTgXCDe3Olzi9I4zZJLWHg=
+github.com/containernetworking/cni v1.2.3 h1:hhOcjNVUQTnzdRJ6alC5XF+wd9mfGIUaj8FuJbEslXM=
+github.com/containernetworking/cni v1.2.3/go.mod h1:DuLgF+aPd3DzcTQTtp/Nvl1Kim23oFKdm2okJzBQA5M=
 github.com/containernetworking/plugins v1.4.2-0.20240312120516-c860b78de419 h1:mvCb6RL9/tZwgXnkYNQQk6JDtLgHdtFde8uVm7VKg04=
 github.com/containernetworking/plugins v1.4.2-0.20240312120516-c860b78de419/go.mod h1:n6FFGKcaY4o2o5msgu/UImtoC+fpQXM3076VHfHbj60=
 github.com/coreos/go-iptables v0.7.0 h1:XWM3V+MPRr5/q51NuWSgU0fqMad64Zyxs8ZUoMsamr8=
