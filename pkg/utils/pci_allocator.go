@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/containernetworking/plugins/pkg/ns"
-	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/logging"
-
 	"golang.org/x/sys/unix"
+
+	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/logging"
 )
 
 const pciLockAcquireTimeout = 60 * time.Second
