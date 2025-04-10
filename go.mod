@@ -5,7 +5,7 @@ go 1.23.0
 toolchain go1.23.6
 
 require (
-	github.com/containernetworking/cni v1.2.0-rc0.0.20240317203738-a448e71e9867
+	github.com/containernetworking/cni v1.3.0
 	github.com/containernetworking/plugins v1.4.2-0.20240312120516-c860b78de419
 	github.com/k8snetworkplumbingwg/cni-log v0.0.0-20230801160229-b6e062c9e0f2
 	github.com/onsi/ginkgo/v2 v2.23.0
