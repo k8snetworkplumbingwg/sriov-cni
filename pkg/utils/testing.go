@@ -81,7 +81,6 @@ func CreateTmpSysFs() error {
 	}
 
 	ts.dirRoot = tmpdir
-	//syscall.Chroot(ts.dirRoot)
 
 	for _, dir := range ts.dirList {
 		if err := os.MkdirAll(filepath.Join(ts.dirRoot, dir), 0755); err != nil {
@@ -128,14 +127,13 @@ func createSymlinks(link, target string) error {
 
 // RemoveTmpSysFs removes mocked sysfs
 func RemoveTmpSysFs() error {
-	err := ts.originalRoot.Chdir()
-	if err != nil {
+	if err := ts.originalRoot.Chdir(); err != nil {
 		return err
 	}
-	if err = syscall.Chroot("."); err != nil {
+	if err := syscall.Chroot("."); err != nil {
 		return err
 	}
-	if err = ts.originalRoot.Close(); err != nil {
+	if err := ts.originalRoot.Close(); err != nil {
 		return err
 	}
 
@@ -159,16 +157,15 @@ func (l *FakeLink) Type() string {
 	return "FakeLink"
 }
 
-func MockNetlinkLib(methodCallRecordingDir string) (func(), error) {
-	var err error
+func MockNetlinkLib(methodCallRecordingDir string) func() {
 	oldnetlinkLib := netLinkLib
 	// see `ts` variable in this file
 	// "sys/devices/pci0000:ae/0000:ae:00.0/0000:af:00.1/sriov_numvfs": []byte("2"),
-	netLinkLib, err = newPFMockNetlinkLib(methodCallRecordingDir, "enp175s0f1", 2)
+	netLinkLib = newPFMockNetlinkLib(methodCallRecordingDir, "enp175s0f1", 2)
 
 	return func() {
 		netLinkLib = oldnetlinkLib
-	}, err
+	}
 }
 
 // pfMockNetlinkLib creates dummy interfaces for Physical and Virtual functions, recording method calls on a log file in the form
@@ -178,7 +175,7 @@ type pfMockNetlinkLib struct {
 	methodCallsRecordingFilePath string
 }
 
-func newPFMockNetlinkLib(recordDir, pfName string, numvfs int) (*pfMockNetlinkLib, error) {
+func newPFMockNetlinkLib(recordDir, pfName string, numvfs int) *pfMockNetlinkLib {
 	ret := &pfMockNetlinkLib{
 		pf: &netlink.Dummy{
 			LinkAttrs: netlink.LinkAttrs{
@@ -199,7 +196,7 @@ func newPFMockNetlinkLib(recordDir, pfName string, numvfs int) (*pfMockNetlinkLi
 
 	ret.recordMethodCall("---")
 
-	return ret, nil
+	return ret
 }
 
 func (p *pfMockNetlinkLib) LinkByName(name string) (netlink.Link, error) {
@@ -210,7 +207,7 @@ func (p *pfMockNetlinkLib) LinkByName(name string) (netlink.Link, error) {
 	return netlink.LinkByName(name)
 }
 
-func (p *pfMockNetlinkLib) LinkSetVfVlanQosProto(link netlink.Link, vfIndex int, vlan int, vlanQos int, vlanProto int) error {
+func (p *pfMockNetlinkLib) LinkSetVfVlanQosProto(link netlink.Link, vfIndex, vlan, vlanQos, vlanProto int) error {
 	p.recordMethodCall("LinkSetVfVlanQosProto %s %d %d %d %d", link.Attrs().Name, vfIndex, vlan, vlanQos, vlanProto)
 	return nil
 }
@@ -248,7 +245,7 @@ func (p *pfMockNetlinkLib) LinkSetName(link netlink.Link, name string) error {
 }
 
 //nolint:gosec
-func (p *pfMockNetlinkLib) LinkSetVfRate(pfLink netlink.Link, vfIndex int, minRate int, maxRate int) error {
+func (p *pfMockNetlinkLib) LinkSetVfRate(pfLink netlink.Link, vfIndex, minRate, maxRate int) error {
 	p.recordMethodCall("LinkSetVfRate %s %d %d %d", pfLink.Attrs().Name, vfIndex, minRate, maxRate)
 
 	if maxRate > math.MaxUint32 {

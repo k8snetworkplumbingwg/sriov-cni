@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/containernetworking/cni/pkg/types"
 	"github.com/vishvananda/netlink"
 )

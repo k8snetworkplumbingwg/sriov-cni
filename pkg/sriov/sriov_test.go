@@ -3,17 +3,18 @@ package sriov
 import (
 	"net"
 
-	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/utils"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/testutils"
-	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/sriov/mocks"
-	sriovtypes "github.com/k8snetworkplumbingwg/sriov-cni/pkg/types"
-	mocks_utils "github.com/k8snetworkplumbingwg/sriov-cni/pkg/utils/mocks"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/mock"
 	"github.com/vishvananda/netlink"
+
+	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/sriov/mocks"
+	sriovtypes "github.com/k8snetworkplumbingwg/sriov-cni/pkg/types"
+	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/utils"
+	mocks_utils "github.com/k8snetworkplumbingwg/sriov-cni/pkg/utils/mocks"
 )
 
 var _ = Describe("Sriov", func() {
@@ -431,7 +432,6 @@ var _ = Describe("Sriov", func() {
 		})
 		It("Saves the current VF state", func() {
 			mocked := &mocks_utils.NetlinkManager{}
-			//fakeLink := &FakeLink{netlink.LinkAttrs{Index: 1000, Name: "dummylink"}}
 			fakeMac, err := net.ParseMAC("6e:16:06:0e:b7:e9")
 			Expect(err).NotTo(HaveOccurred())
 
@@ -442,7 +442,7 @@ var _ = Describe("Sriov", func() {
 				Vfs: []netlink.VfInfo{
 					{
 						ID:  0,
-						Mac: net.HardwareAddr(fakeMac),
+						Mac: fakeMac,
 					},
 				},
 			}}

@@ -89,7 +89,7 @@ func GetSriovNumVfs(ifName string) (int, error) {
 }
 
 // GetVfid takes in VF's PCI address(addr) and pfName as string and returns VF's ID as int
-func GetVfid(addr string, pfName string) (int, error) {
+func GetVfid(addr, pfName string) (int, error) {
 	var id int
 	vfTotal, err := GetSriovNumVfs(pfName)
 	if err != nil {
@@ -143,7 +143,7 @@ func GetPciAddress(ifName string, vf int) (string, error) {
 	}
 
 	if (dirInfo.Mode() & os.ModeSymlink) == 0 {
-		return pciaddr, fmt.Errorf("No symbolic link for the virtfn%d dir of the device %q", vf, ifName)
+		return pciaddr, fmt.Errorf("no symbolic link for the virtfn%d dir of the device %q", vf, ifName)
 	}
 
 	pciinfo, err := os.Readlink(vfDir)
@@ -165,7 +165,7 @@ func GetSharedPF(ifName string) (string, error) {
 	}
 
 	if (dirInfo.Mode() & os.ModeSymlink) == 0 {
-		return pfName, fmt.Errorf("No symbolic link for dir of the device %q", ifName)
+		return pfName, fmt.Errorf("no symbolic link for dir of the device %q", ifName)
 	}
 
 	fullpath, _ := filepath.EvalSymlinks(pfDir)
@@ -179,7 +179,7 @@ func GetSharedPF(ifName string) (string, error) {
 		}
 	}
 
-	return pfName, fmt.Errorf("Shared PF not found")
+	return pfName, fmt.Errorf("shared PF not found")
 }
 
 // GetVFLinkName returns VF's network interface name given it's PCI addr
@@ -212,7 +212,6 @@ func GetVFLinkName(pciAddr string) (string, error) {
 
 // GetVFLinkNamesFromVFID returns VF's network interface name given it's PF name as string and VF id as int
 func GetVFLinkNamesFromVFID(pfName string, vfID int) ([]string, error) {
-	var names []string
 	vfDir := filepath.Join(NetDirectory, pfName, "device", fmt.Sprintf("virtfn%d", vfID), "net")
 	if _, err := os.Lstat(vfDir); err != nil {
 		return nil, err
@@ -223,7 +222,7 @@ func GetVFLinkNamesFromVFID(pfName string, vfID int) ([]string, error) {
 		return nil, fmt.Errorf("failed to read the virtfn%d dir of the device %q: %v", vfID, pfName, err)
 	}
 
-	names = make([]string, 0)
+	names := make([]string, 0)
 	for _, f := range fInfos {
 		names = append(names, f.Name())
 	}
@@ -314,7 +313,7 @@ func CleanCachedNetConf(cRefPath string) error {
 // Other NICs (Mellanox) require explicit netdev VF MAC address so we
 // cannot skip this part.
 // Retry up to 5 times; wait 200 milliseconds between retries
-func SetVFEffectiveMAC(netLinkManager NetlinkManager, netDeviceName string, macAddress string) error {
+func SetVFEffectiveMAC(netLinkManager NetlinkManager, netDeviceName, macAddress string) error {
 	hwaddr, err := net.ParseMAC(macAddress)
 	if err != nil {
 		return fmt.Errorf("failed to parse MAC address %s: %v", macAddress, err)

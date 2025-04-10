@@ -27,7 +27,7 @@ func htons(i uint16) uint16 {
 }
 
 // formatPacketFieldWriteError builds an error string for the cases when writing to a field of a packet fails.
-func formatPacketFieldWriteError(field string, packetType string, writeErr error) error {
+func formatPacketFieldWriteError(field, packetType string, writeErr error) error {
 	return fmt.Errorf("failed to write the %s field in the %s packet: %v", field, packetType, writeErr)
 }
 

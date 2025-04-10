@@ -38,6 +38,7 @@ var _ = g.Describe("Logging", func() {
 				_, _ = stderrFile.Seek(0, 0)
 				out, err := io.ReadAll(stderrFile)
 				o.Expect(err).NotTo(o.HaveOccurred())
+				//nolint:gocritic
 				o.Expect(out).Should(o.ContainSubstring(fmt.Sprintf(`%s="%s"`, labelCNIName, cniName)))
 				o.Expect(out).ShouldNot(o.ContainSubstring(labelContainerID))
 				o.Expect(out).ShouldNot(o.ContainSubstring(labelNetNS))
@@ -61,9 +62,13 @@ var _ = g.Describe("Logging", func() {
 				_, _ = stderrFile.Seek(0, 0)
 				out, err := io.ReadAll(stderrFile)
 				o.Expect(err).NotTo(o.HaveOccurred())
+				//nolint:gocritic
 				o.Expect(out).Should(o.ContainSubstring(fmt.Sprintf(`%s="%s"`, labelCNIName, cniName)))
+				//nolint:gocritic
 				o.Expect(out).Should(o.ContainSubstring(fmt.Sprintf(`%s="%s"`, labelContainerID, testContainerID)))
+				//nolint:gocritic
 				o.Expect(out).Should(o.ContainSubstring(fmt.Sprintf(`%s="%s"`, labelNetNS, testNetNS)))
+				//nolint:gocritic
 				o.Expect(out).Should(o.ContainSubstring(fmt.Sprintf(`%s="%s"`, labelIFName, testIFName)))
 			})
 		})

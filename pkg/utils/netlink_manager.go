@@ -78,7 +78,7 @@ func (n *MyNetlink) LinkSetName(link netlink.Link, name string) error {
 }
 
 // LinkSetVfRate using NetlinkManager
-func (n *MyNetlink) LinkSetVfRate(link netlink.Link, vf int, minRate int, maxRate int) error {
+func (n *MyNetlink) LinkSetVfRate(link netlink.Link, vf, minRate, maxRate int) error {
 	return netlink.LinkSetVfRate(link, vf, minRate, maxRate)
 }
 

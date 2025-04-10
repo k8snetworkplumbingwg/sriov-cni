@@ -11,18 +11,18 @@ import (
 	current "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/containernetworking/plugins/pkg/ipam"
 	"github.com/containernetworking/plugins/pkg/ns"
+	"github.com/vishvananda/netlink"
+
 	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/config"
 	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/logging"
 	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/sriov"
 	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/utils"
-	"github.com/vishvananda/netlink"
 )
 
 type envArgs struct {
 	types.CommonArgs
 	MAC types.UnmarshallableString `json:"mac,omitempty"`
 }
-
 
 func getEnvArgs(envArgsString string) (*envArgs, error) {
 	if envArgsString != "" {
@@ -310,7 +310,7 @@ func CmdDel(args *skel.CmdArgs) error {
 			"netConf.DeviceID", netConf.DeviceID,
 			"args.Netns", args.Netns,
 			"args.IfName", args.IfName)
-		if err = sm.ReleaseVF(netConf, args.IfName, netns); err != nil {
+		if err := sm.ReleaseVF(netConf, args.IfName, netns); err != nil {
 			return err
 		}
 	}

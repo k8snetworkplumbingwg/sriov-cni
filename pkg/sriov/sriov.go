@@ -4,11 +4,11 @@ import (
 	"fmt"
 
 	"github.com/containernetworking/plugins/pkg/ns"
+	"github.com/vishvananda/netlink"
 
 	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/logging"
 	sriovtypes "github.com/k8snetworkplumbingwg/sriov-cni/pkg/types"
 	"github.com/k8snetworkplumbingwg/sriov-cni/pkg/utils"
-	"github.com/vishvananda/netlink"
 )
 
 type pciUtils interface {
@@ -305,6 +305,7 @@ func (s *sriovManager) ApplyVFConfig(conf *sriovtypes.NetConf) error {
 	// 4. Set spoofchk flag
 	if conf.SpoofChk != "" {
 		spoofChk := false
+		//nolint:goconst
 		if conf.SpoofChk == "on" {
 			spoofChk = true
 		}
@@ -328,10 +329,13 @@ func (s *sriovManager) ApplyVFConfig(conf *sriovtypes.NetConf) error {
 	if conf.LinkState != "" {
 		var state uint32
 		switch conf.LinkState {
+		//nolint:goconst
 		case "auto":
 			state = netlink.VF_LINK_STATE_AUTO
+		//nolint:goconst
 		case "enable":
 			state = netlink.VF_LINK_STATE_ENABLE
+		//nolint:goconst
 		case "disable":
 			state = netlink.VF_LINK_STATE_DISABLE
 		default:
