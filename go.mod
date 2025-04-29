@@ -9,7 +9,7 @@ require (
 	github.com/containernetworking/plugins v1.4.2-0.20240312120516-c860b78de419
 	github.com/k8snetworkplumbingwg/cni-log v0.0.0-20230801160229-b6e062c9e0f2
 	github.com/onsi/ginkgo/v2 v2.23.4
-	github.com/onsi/gomega v1.36.3
+	github.com/onsi/gomega v1.37.0
 	github.com/stretchr/testify v1.10.0
 	github.com/vishvananda/netlink v1.2.1-beta.2.0.20240221172127-ec7bcb248e94
 	golang.org/x/net v0.39.0
