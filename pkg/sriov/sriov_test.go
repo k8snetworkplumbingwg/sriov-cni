@@ -108,21 +108,12 @@ var _ = Describe("Sriov", func() {
 				HardwareAddr: expMac,
 			}}
 
-			net2Link := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
-				Index:        1000,
-				Name:         "temp_1000",
-				HardwareAddr: expMac,
-			}}
-
 			mocked.On("LinkByName", "enp175s6").Return(fakeLink, nil)
-			mocked.On("LinkByName", "temp_1000").Return(net2Link, nil)
 			mocked.On("LinkByName", "net1").Return(net1Link, nil)
-			mocked.On("LinkSetDown", fakeLink).Return(nil)
 			mocked.On("LinkSetName", fakeLink, mock.Anything).Return(nil)
-			mocked.On("LinkSetName", net2Link, mock.Anything).Return(nil)
 			mocked.On("LinkSetHardwareAddr", net1Link, expMac).Return(nil)
-			mocked.On("LinkSetNsFd", net2Link, mock.AnythingOfType("int")).Return(nil)
-			mocked.On("LinkSetUp", net2Link).Return(nil)
+			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
+			mocked.On("LinkSetUp", fakeLink).Return(nil)
 			mockedPciUtils.On("EnableArpAndNdiscNotify", mock.AnythingOfType("string")).Return(nil)
 			mockedPciUtils.On("EnableOptimisticDad", mock.AnythingOfType("string")).Return(nil)
 			sm := sriovManager{nLink: mocked, utils: mockedPciUtils}
@@ -160,23 +151,12 @@ var _ = Describe("Sriov", func() {
 				HardwareAddr: expMac,
 			}}
 
-			net2Link := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
-				Index:        1000,
-				Name:         "temp_1000",
-				HardwareAddr: expMac,
-				AltNames:     []string{"enp175s6"},
-			}}
-
 			mocked.On("LinkByName", "enp175s6").Return(fakeLink, nil)
-			mocked.On("LinkByName", "temp_1000").Return(net2Link, nil)
 			mocked.On("LinkByName", "net1").Return(net1Link, nil)
-			mocked.On("LinkSetDown", fakeLink).Return(nil)
 			mocked.On("LinkSetName", fakeLink, mock.Anything).Return(nil)
-			mocked.On("LinkSetName", net2Link, mock.Anything).Return(nil)
-			mocked.On("LinkDelAltName", net2Link, "enp175s6").Return(nil)
 			mocked.On("LinkSetHardwareAddr", net1Link, expMac).Return(nil)
-			mocked.On("LinkSetNsFd", net2Link, mock.AnythingOfType("int")).Return(nil)
-			mocked.On("LinkSetUp", net2Link).Return(nil)
+			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
+			mocked.On("LinkSetUp", fakeLink).Return(nil)
 			mockedPciUtils.On("EnableArpAndNdiscNotify", mock.AnythingOfType("string")).Return(nil)
 			mockedPciUtils.On("EnableOptimisticDad", mock.AnythingOfType("string")).Return(nil)
 			sm := sriovManager{nLink: mocked, utils: mockedPciUtils}
@@ -216,22 +196,12 @@ var _ = Describe("Sriov", func() {
 				MTU:          1500,
 			}}
 
-			net2Link := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
-				Index:        1000,
-				Name:         "temp_1000",
-				HardwareAddr: expMac,
-				MTU:          1500,
-			}}
-
 			mocked.On("LinkByName", "enp175s6").Return(fakeLink, nil)
-			mocked.On("LinkByName", "temp_1000").Return(net2Link, nil)
 			mocked.On("LinkByName", "net1").Return(net1Link, nil)
-			mocked.On("LinkSetDown", fakeLink).Return(nil)
 			mocked.On("LinkSetName", fakeLink, mock.Anything).Return(nil)
-			mocked.On("LinkSetName", net2Link, mock.Anything).Return(nil)
 			mocked.On("LinkSetHardwareAddr", net1Link, expMac).Return(nil)
-			mocked.On("LinkSetNsFd", net2Link, mock.AnythingOfType("int")).Return(nil)
-			mocked.On("LinkSetUp", net2Link).Return(nil)
+			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
+			mocked.On("LinkSetUp", fakeLink).Return(nil)
 			mockedPciUtils.On("EnableArpAndNdiscNotify", mock.AnythingOfType("string")).Return(nil)
 			mockedPciUtils.On("EnableOptimisticDad", mock.AnythingOfType("string")).Return(nil)
 			sm := sriovManager{nLink: mocked, utils: mockedPciUtils}
@@ -334,8 +304,8 @@ var _ = Describe("Sriov", func() {
 			mocked.On("LinkByName", podifName).Return(fakeLink, nil)
 			mocked.On("LinkSetDown", fakeLink).Return(nil)
 			mocked.On("LinkSetName", fakeLink, netconf.OrigVfState.HostIFName).Return(nil)
-			mocked.On("LinkSetMTU", fakeLink, 1500).Return(nil)
 			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
+			mocked.On("LinkSetMTU", fakeLink, 1500).Return(nil)
 			sm := sriovManager{nLink: mocked}
 			err = sm.ReleaseVF(netconf, podifName, targetNetNS)
 			Expect(err).NotTo(HaveOccurred())
