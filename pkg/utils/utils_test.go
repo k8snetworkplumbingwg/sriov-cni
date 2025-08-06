@@ -206,11 +206,15 @@ var _ = Describe("Utils", func() {
 
 			data, err := os.ReadFile(filepath.Join(tmpDir, "test-net1"))
 			Expect(err).ToNot(HaveOccurred())
-			Expect(data).ToNot(ContainSubstring("dns"))
 
 			newNetConf := &sriovtypes.NetConf{}
 			err = json.Unmarshal(data, newNetConf)
 			Expect(err).ToNot(HaveOccurred())
+
+			Expect(newNetConf.NetConf.DNS.Nameservers).To(BeNil())
+			Expect(newNetConf.NetConf.DNS.Domain).To(BeEmpty())
+			Expect(newNetConf.NetConf.DNS.Search).To(BeNil())
+			Expect(newNetConf.NetConf.DNS.Options).To(BeNil())
 
 			Expect(netconf.DeviceID).To(Equal(newNetConf.DeviceID))
 			Expect(netconf.CNIVersion).To(Equal(newNetConf.CNIVersion))
