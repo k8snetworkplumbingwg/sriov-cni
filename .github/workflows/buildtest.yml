@@ -9,7 +9,7 @@ jobs:
   build-test:
     strategy:
       matrix:
-        go-version: [1.23.x]
+        go-version: [1.24.x]
         os: [ubuntu-24.04]
         goos: [linux]
         goarch: [amd64, arm64, ppc64le]
@@ -60,7 +60,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: 1.23.x
+          go-version: 1.24.x
 
       - name: Check out code
         uses: actions/checkout@v4
