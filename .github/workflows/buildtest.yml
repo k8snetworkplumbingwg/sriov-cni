@@ -46,7 +46,7 @@ jobs:
           sudo chmod -R a+rwx test/integration/tmp/*
           find test/integration/tmp -name "*:*" -exec bash -c 'mv $0 ${0//:/_}' {} \;
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: always()
         with:
           name: test-integration- ${{ matrix.goarch }}
@@ -101,7 +101,7 @@ jobs:
         env:
           LOCAL_SRIOV_CNI_IMAGE: ghaction-sriov-cni:pr-${{github.event.pull_request.number}}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: always()
         with:
           name: ${{ env.TEST_REPORT_PATH }}
