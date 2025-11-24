@@ -21,7 +21,7 @@ jobs:
           go-version: ${{ matrix.go-version }}
 
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Build test for ${{ matrix.goarch }}
         env:
@@ -63,7 +63,7 @@ jobs:
           go-version: 1.24.x
 
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Go test with coverage
         run: sudo make test-coverage test-integration merge-test-coverage
@@ -83,13 +83,13 @@ jobs:
       TEST_REPORT_PATH: k8s-artifacts
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: build sriov-cni image
         run: podman build -t ghaction-sriov-cni:pr-${{github.event.pull_request.number}} .
   
       - name: Check out sriov operator's code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: k8snetworkplumbingwg/sriov-network-operator
           path: sriov-network-operator-wc
