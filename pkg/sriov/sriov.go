@@ -66,82 +66,100 @@ func NewSriovManager() Manager {
 // SetupVF sets up a VF in Pod netns
 func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, netns ns.NetNS) error {
 	linkName := conf.OrigVfState.HostIFName
+	// Save the original NS in case we need to restore it
+	// after an error occurs
+	initns, err := ns.GetCurrentNS()
+	if err != nil {
+		return fmt.Errorf("failed to get current NS: %v", err)
+	}
+	tempNS, err := ns.TempNetNS()
+	if err != nil {
+		return fmt.Errorf("failed to create tempNS: %v", err)
+	}
+
+	defer func() {
+		if cerr := tempNS.Close(); cerr != nil {
+			logging.Warning("failed to close temporary netns; VF may remain accessible in temp namespace",
+				"func", "SetupVF",
+				"linkName", linkName,
+				"error", cerr)
+		}
+	}()
 
 	linkObj, err := s.nLink.LinkByName(linkName)
 	if err != nil {
-		return fmt.Errorf("error getting VF netdevice with name %s", linkName)
+		return fmt.Errorf("error: %v. Failed to get VF netdevice with name %s", err, linkName)
 	}
 
 	// Save the original effective MAC address before overriding it
 	conf.OrigVfState.EffectiveMAC = linkObj.Attrs().HardwareAddr.String()
 
-	// tempName used as intermediary name to avoid name conflicts
-	tempName := fmt.Sprintf("%s%d", "temp_", linkObj.Attrs().Index)
-
-	// 1. Set link down
-	logging.Debug("1. Set link down",
+	// 1.Move interface to tempNS
+	logging.Debug("1. Move the interface to tempNS",
 		"func", "SetupVF",
 		"linkObj", linkObj)
-	if err := s.nLink.LinkSetDown(linkObj); err != nil {
-		return fmt.Errorf("failed to down vf device %q: %v", linkName, err)
+	if err = s.nLink.LinkSetNsFd(linkObj, int(tempNS.Fd())); err != nil {
+		return fmt.Errorf("failed to move %q to tempNS: %v", linkName, err)
 	}
+	err = tempNS.Do(func(linkNS ns.NetNS) error {
+		// lookup the device in tempNS (index might have changed)
+		tempNSLinkObj, err := s.nLink.LinkByName(linkName)
+		if err != nil {
+			return fmt.Errorf("failed to find %q in tempNS: %v", linkName, err)
+		}
+		// Rename the interface to pod interface name
+		if err = s.nLink.LinkSetName(tempNSLinkObj, podifName); err != nil {
+			return fmt.Errorf("failed to rename host device %q to %q: %v", linkName, podifName, err)
+		}
 
-	// 2. Set temp name
-	logging.Debug("2. Set temp name",
-		"func", "SetupVF",
-		"linkObj", linkObj,
-		"tempName", tempName)
-	if err := s.nLink.LinkSetName(linkObj, tempName); err != nil {
-		return fmt.Errorf("error setting temp IF name %s for %s", tempName, linkName)
-	}
-
-	// 3. Remove alt name from the nic
-	logging.Debug("3. Remove interface original name from alt names",
-		"func", "SetupVF",
-		"linkObj", linkObj,
-		"OriginalLinkName", linkName,
-		"tempName", tempName)
-	linkObj, err = s.nLink.LinkByName(tempName)
-	if err != nil {
-		return fmt.Errorf("error getting VF netdevice with name %s: %v", tempName, err)
-	}
-	for _, altName := range linkObj.Attrs().AltNames {
-		if altName == linkName {
-			if err := s.nLink.LinkDelAltName(linkObj, linkName); err != nil {
-				return fmt.Errorf("error removing VF altname %s: %v", linkName, err)
+		// 3. Remove alt name from the nic
+		logging.Debug("3. Remove interface original name from alt names",
+			"func", "SetupVF",
+			"tempNSObj", tempNSLinkObj,
+			"OriginalLinkName", linkName)
+		for _, altName := range tempNSLinkObj.Attrs().AltNames {
+			if altName == linkName {
+				if err = s.nLink.LinkDelAltName(tempNSLinkObj, linkName); err != nil {
+					return fmt.Errorf("error removing VF altname %s: %v", linkName, err)
+				}
 			}
 		}
-	}
 
-	// 4. Change netns
-	logging.Debug("4. Change netns",
-		"func", "SetupVF",
-		"linkObj", linkObj,
-		"netns.Fd()", int(netns.Fd()))
-	if err := s.nLink.LinkSetNsFd(linkObj, int(netns.Fd())); err != nil {
-		return fmt.Errorf("failed to move IF %s to netns: %q", tempName, err)
-	}
-
-	if err := netns.Do(func(_ ns.NetNS) error {
-		// 5. Set Pod IF name
-		logging.Debug("5. Set Pod IF name",
+		// 4. Change netns
+		logging.Debug("4. Change netns",
 			"func", "SetupVF",
-			"linkObj", linkObj,
-			"podifName", podifName)
-		if err := s.nLink.LinkSetName(linkObj, podifName); err != nil {
-			return fmt.Errorf("error setting container interface name %s for %s", linkName, tempName)
+			"tempNSObj", tempNSLinkObj,
+			"netns.Fd()", int(netns.Fd()))
+		if err = s.nLink.LinkSetNsFd(tempNSLinkObj, int(netns.Fd())); err != nil {
+			return fmt.Errorf("failed to move IF %s to netns: %w", podifName, err)
+		}
+		return nil
+	})
+	if err != nil {
+		logging.Error("Move the interface back to initNS because of ", "error", err)
+		moveAndRenameLinkErr := s.moveAndRenameLink(tempNS, podifName, linkName, initns)
+		if moveAndRenameLinkErr != nil {
+			return fmt.Errorf("setupVF failed: %v; rollback failed: %v", err, moveAndRenameLinkErr)
+		}
+		return fmt.Errorf("setupVF failed: %v", err)
+	}
+
+	err = netns.Do(func(_ ns.NetNS) error {
+		netNSLinkObj, err := s.nLink.LinkByName(podifName)
+		if err != nil {
+			return fmt.Errorf("error: %v. Failed to get VF netdevice with name %s", err, podifName)
 		}
 
-		// 6. Enable IPv4 ARP notify and IPv6 Network Discovery notify
+		// 5. Enable IPv4 ARP notify and IPv6 Network Discovery notify
 		// Error is ignored here because enabling this feature is only a performance enhancement.
-		logging.Debug("6. Enable IPv4 ARP notify and IPv6 Network Discovery notify",
+		logging.Debug("5. Enable IPv4 ARP notify and IPv6 Network Discovery notify",
 			"func", "SetupVF",
 			"podifName", podifName)
 		_ = s.utils.EnableArpAndNdiscNotify(podifName)
 
-		// 7. Set MAC address
+		// 6. Set MAC address
 		if conf.MAC != "" {
-			logging.Debug("7. Set MAC address",
+			logging.Debug("6. Set MAC address",
 				"func", "SetupVF",
 				"s.nLink", s.nLink,
 				"podifName", podifName,
@@ -152,20 +170,21 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, netns
 			}
 		}
 
-		logging.Debug("8. Enable Optimistic DAD for IPv6 addresses", "func", "SetupVF",
-			"linkObj", linkObj)
+		logging.Debug("7. Enable Optimistic DAD for IPv6 addresses", "func", "SetupVF",
+			"linkObj", netNSLinkObj)
 		_ = s.utils.EnableOptimisticDad(podifName)
 
-		// 9. Bring IF up in Pod netns
-		logging.Debug("9. Bring IF up in Pod netns",
+		// 8. Bring IF up in Pod netns
+		logging.Debug("8. Bring IF up in Pod netns",
 			"func", "SetupVF",
-			"linkObj", linkObj)
-		if err := s.nLink.LinkSetUp(linkObj); err != nil {
+			"linkObj", netNSLinkObj)
+		if err = s.nLink.LinkSetUp(netNSLinkObj); err != nil {
 			return fmt.Errorf("error bringing interface up in container ns: %q", err)
 		}
 
 		return nil
-	}); err != nil {
+	})
+	if err != nil {
 		return fmt.Errorf("error setting up interface in container namespace: %q", err)
 	}
 
@@ -173,8 +192,31 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, netns
 	// and use it as a pointer
 	vfMTU := linkObj.Attrs().MTU
 	conf.MTU = &vfMTU
-
 	return nil
+}
+
+// moveAndRenameLink restores the original link name and moves it back to initns
+func (s *sriovManager) moveAndRenameLink(sourceNM ns.NetNS, podifName, linkName string, initns ns.NetNS) error {
+	err := sourceNM.Do(func(_ ns.NetNS) error {
+		// Restore the original link name in case of error in renaming
+		if nsLinkObj, err := s.nLink.LinkByName(podifName); err == nil {
+			linkSetNameError := s.nLink.LinkSetName(nsLinkObj, linkName)
+			if linkSetNameError != nil {
+				logging.Warning("LinkSetName failed when trying to restore original name", "error", linkSetNameError)
+				return fmt.Errorf("error bringing interface up in container ns: %q", linkSetNameError)
+			}
+			// Try to move interface back to initns
+			if nsLinkObj, err := s.nLink.LinkByName(linkName); err == nil {
+				linkSetNsFdError := s.nLink.LinkSetNsFd(nsLinkObj, int(initns.Fd()))
+				if linkSetNsFdError != nil {
+					logging.Warning("LinkSetNsFd failed when trying to move back to initns in case of an error", "error", linkSetNsFdError)
+					return fmt.Errorf("failed to move IF %s back to initns: %w", linkName, linkSetNsFdError)
+				}
+			}
+		}
+		return nil
+	})
+	return err
 }
 
 // ReleaseVF reset a VF from Pod netns and return it to init netns
@@ -273,7 +315,6 @@ func (s *sriovManager) ApplyVFConfig(conf *sriovtypes.NetConf) error {
 			return fmt.Errorf("failed to set vf %d vlan configuration - id %d, qos %d and proto %s: %v", conf.VFID, *conf.Vlan, *conf.VlanQoS, *conf.VlanProto, err)
 		}
 	}
-
 	// 2. Set mac address
 	if conf.MAC != "" {
 		// when we restore the original hardware mac address we may get a device or resource busy. so we introduce retry
