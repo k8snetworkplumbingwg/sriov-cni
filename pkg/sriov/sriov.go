@@ -268,7 +268,7 @@ func (s *sriovManager) ApplyVFConfig(conf *sriovtypes.NetConf) error {
 		return fmt.Errorf("failed to lookup master %q: %v", conf.Master, err)
 	}
 	// 1. Set vlan
-	if conf.Vlan != nil {
+	if conf.Vlan != nil && *conf.Vlan > 0 {
 		if err = s.nLink.LinkSetVfVlanQosProto(pfLink, conf.VFID, *conf.Vlan, *conf.VlanQoS, sriovtypes.VlanProtoInt[*conf.VlanProto]); err != nil {
 			return fmt.Errorf("failed to set vf %d vlan configuration - id %d, qos %d and proto %s: %v", conf.VFID, *conf.Vlan, *conf.VlanQoS, *conf.VlanProto, err)
 		}
@@ -392,7 +392,7 @@ func (s *sriovManager) ResetVFConfig(conf *sriovtypes.NetConf) error {
 		conf.OrigVfState.VlanProto = sriovtypes.VlanProtoInt[sriovtypes.Proto8021q]
 	}
 
-	if conf.Vlan != nil {
+	if conf.Vlan != nil && conf.OrigVfState.Vlan > 0 {
 		if err = s.nLink.LinkSetVfVlanQosProto(pfLink, conf.VFID, conf.OrigVfState.Vlan, conf.OrigVfState.VlanQoS, conf.OrigVfState.VlanProto); err != nil {
 			return fmt.Errorf("failed to set vf %d vlan configuration - id %d, qos %d and proto %d: %v", conf.VFID, conf.OrigVfState.Vlan, conf.OrigVfState.VlanQoS, conf.OrigVfState.VlanProto, err)
 		}
