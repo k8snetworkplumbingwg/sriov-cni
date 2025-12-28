@@ -1,102 +1,122 @@
-run:
-  timeout: 3m
+# Tested with golangci-lint ver. 2.x
+version: "2"
 
-linters-settings:
-  dupl:
-    threshold: 100
-  funlen:
-    lines: 100
-    statements: 50
-  goconst:
-    min-len: 2
-    min-occurrences: 2
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - experimental
-      - opinionated
-      - performance
-      - style
-    disabled-checks:
-      - dupImport # https://github.com/go-critic/go-critic/issues/845
-      - ifElseChain
-      - octalLiteral
-      - whyNoLint
-      - wrapperFunc
-      - unnamedResult
-    settings:
-      hugeParam:
-        sizeThreshold: 512
-      rangeValCopy:
-        sizeThreshold: 512
-  gocyclo:
-    min-complexity: 15
-  goimports:
-    local-prefixes: github.com/k8snetworkplumbingwg/sriov-cni
-  gomnd:
-    settings:
-      mnd:
-        # don't include the "operation" and "assign"
-        checks: argument,case,condition,return
-  lll:
-    line-length: 140
-  misspell:
-    locale: US
-  prealloc:
-    # Report preallocation suggestions only on simple loops that have no returns/breaks/continues/gotos in them.
-    # True by default.
-    simple: true
-    range-loops: true # Report preallocation suggestions on range loops, true by default
-    for-loops: false # Report preallocation suggestions on for loops, false by default
+run:
+  timeout: 10m
 
 linters:
-  # please, do not use `enable-all`: it's deprecated and will be removed soon.
-  # inverted configuration with `enable-all` and `disable` is not scalable during updates of golangci-lint
-  disable-all: true
+  default: none
   enable:
+    - asciicheck        # checks for non-ASCII identifiers
+    - bidichk           # checks for dangerous unicode sequences (security)
     - bodyclose
+    - copyloopvar
+    - depguard
     - dogsled
     - dupl
     - errcheck
-    - copyloopvar
+    - errname           # checks error naming conventions
     - exhaustive
-#    - funlen
+    - gocheckcompilerdirectives  # validates go compiler directives
     - goconst
     - gocritic
-#    - gocyclo
-    - gofmt
-    - goimports
-#    - mnd
     - goprintffuncname
     - gosec
-    - gosimple
+    - staticcheck
     - govet
     - ineffassign
-#    - lll
+    - makezero          # finds slice declarations with non-zero initial length
     - misspell
     - nakedret
     - prealloc
-    - rowserrcheck
-    - staticcheck
-    - stylecheck
-    - typecheck
+    - reassign          # checks package variable reassignment
     - unconvert
     - unparam
     - unused
     - whitespace
 
-issues:
-  # Excluding configuration per-path, per-linter, per-text and per-source
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - gomnd
-        - gosec
-        - dupl
-        - lll
-        - stylecheck
-        - goconst
-  exclude-dirs:
-    - .github/
-    - docs/
-    - images/
+  settings:
+    depguard:
+      rules:
+        main:
+          deny:
+            - pkg: github.com/sirupsen/logrus
+              desc: "logging is allowed only by logutils.Log"
+    dupl:
+      threshold: 100
+    funlen:
+      lines: 100
+      statements: 50
+    goconst:
+      min-len: 2
+      min-occurrences: 2
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - experimental
+        - opinionated
+        - performance
+        - style
+      disabled-checks:
+        - ifElseChain
+        - whyNoLint
+        - unnamedResult
+      settings:
+        hugeParam:
+          sizeThreshold: 512
+        rangeValCopy:
+          sizeThreshold: 512
+    gocyclo:
+      min-complexity: 15
+    mnd:
+      checks:
+        - argument
+        - case
+        - condition
+        - return
+    lll:
+      line-length: 140
+    misspell:
+      locale: US
+    prealloc:
+      simple: true
+      range-loops: true
+      for-loops: false
+    staticcheck:
+      checks:
+        - all
+        - -QF1001
+        - -QF1003
+        - -QF1008
+      dot-import-whitelist:
+        - github.com/onsi/ginkgo/v2
+        - github.com/onsi/gomega
+        - github.com/onsi/gomega/gstruct
+
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - std-error-handling
+    paths:
+      - vendor/
+      - .github/
+      - docs/
+      - images/
+    rules:
+      - path: _test\.go
+        linters:
+          - mnd
+          - gosec
+          - dupl
+          - lll
+          - goconst
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/k8snetworkplumbingwg/sriov-cni
