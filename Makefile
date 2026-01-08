@@ -54,9 +54,9 @@ build: | $(BUILDDIR) ; $(info Building $(BINARY_NAME)...) @ ## Build SR-IOV CNI 
 
 # Tools
 GOLANGCI_LINT = $(BINDIR)/golangci-lint
-GOLANGCI_LINT_VERSION = v1.64.7
+GOLANGCI_LINT_VERSION = v2.7.2
 $(GOLANGCI_LINT): | $(BINDIR) ; $(info  Installing golangci-lint...)
-	$Q GOBIN=$(BINDIR) $(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+	$Q GOBIN=$(BINDIR) $(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 
 # Tools
 MOCKERY = $(BINDIR)/mockery
