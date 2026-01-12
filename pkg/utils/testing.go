@@ -83,13 +83,13 @@ func CreateTmpSysFs() error {
 	ts.dirRoot = tmpdir
 
 	for _, dir := range ts.dirList {
-		if err := os.MkdirAll(filepath.Join(ts.dirRoot, dir), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Join(ts.dirRoot, dir), 0o755); err != nil { //nolint:gosec
 			return err
 		}
 	}
 
 	for filename, body := range ts.fileList {
-		if err := os.WriteFile(filepath.Join(ts.dirRoot, filename), body, 0600); err != nil {
+		if err := os.WriteFile(filepath.Join(ts.dirRoot, filename), body, 0o600); err != nil {
 			return err
 		}
 	}
@@ -118,7 +118,7 @@ func CreateTmpSysFs() error {
 }
 
 func createSymlinks(link, target string) error {
-	if err := os.MkdirAll(target, 0755); err != nil {
+	if err := os.MkdirAll(target, 0o755); err != nil { //nolint:gosec
 		return err
 	}
 
@@ -194,13 +194,13 @@ func newPFMockNetlinkLib(recordDir, pfName string, numvfs int) *pfMockNetlinkLib
 
 	ret.methodCallsRecordingFilePath = filepath.Join(recordDir, pfName+".calls")
 
-	ret.recordMethodCall("---")
+	ret.recordMethodCallf("---")
 
 	return ret
 }
 
 func (p *pfMockNetlinkLib) LinkByName(name string) (netlink.Link, error) {
-	p.recordMethodCall("LinkByName %s", name)
+	p.recordMethodCallf("LinkByName %s", name)
 	if name == p.pf.Attrs().Name {
 		return p.pf, nil
 	}
@@ -208,45 +208,45 @@ func (p *pfMockNetlinkLib) LinkByName(name string) (netlink.Link, error) {
 }
 
 func (p *pfMockNetlinkLib) LinkSetVfVlanQosProto(link netlink.Link, vfIndex, vlan, vlanQos, vlanProto int) error {
-	p.recordMethodCall("LinkSetVfVlanQosProto %s %d %d %d %d", link.Attrs().Name, vfIndex, vlan, vlanQos, vlanProto)
+	p.recordMethodCallf("LinkSetVfVlanQosProto %s %d %d %d %d", link.Attrs().Name, vfIndex, vlan, vlanQos, vlanProto)
 	return nil
 }
 
 func (p *pfMockNetlinkLib) LinkSetVfHardwareAddr(pfLink netlink.Link, vfIndex int, hwaddr net.HardwareAddr) error {
-	p.recordMethodCall("LinkSetVfHardwareAddr %s %d %s", pfLink.Attrs().Name, vfIndex, hwaddr.String())
+	p.recordMethodCallf("LinkSetVfHardwareAddr %s %d %s", pfLink.Attrs().Name, vfIndex, hwaddr.String())
 	pfLink.Attrs().Vfs[vfIndex].Mac = hwaddr
 	return nil
 }
 
 func (p *pfMockNetlinkLib) LinkSetHardwareAddr(link netlink.Link, hwaddr net.HardwareAddr) error {
-	p.recordMethodCall("LinkSetHardwareAddr %s %s", link.Attrs().Name, hwaddr.String())
+	p.recordMethodCallf("LinkSetHardwareAddr %s %s", link.Attrs().Name, hwaddr.String())
 	return netlink.LinkSetHardwareAddr(link, hwaddr)
 }
 
 func (p *pfMockNetlinkLib) LinkSetUp(link netlink.Link) error {
-	p.recordMethodCall("LinkSetUp %s", link.Attrs().Name)
+	p.recordMethodCallf("LinkSetUp %s", link.Attrs().Name)
 	return netlink.LinkSetUp(link)
 }
 
 func (p *pfMockNetlinkLib) LinkSetDown(link netlink.Link) error {
-	p.recordMethodCall("LinkSetDown %s", link.Attrs().Name)
+	p.recordMethodCallf("LinkSetDown %s", link.Attrs().Name)
 	return netlink.LinkSetDown(link)
 }
 
 func (p *pfMockNetlinkLib) LinkSetNsFd(link netlink.Link, nsFd int) error {
-	p.recordMethodCall("LinkSetNsFd %s %d", link.Attrs().Name, nsFd)
+	p.recordMethodCallf("LinkSetNsFd %s %d", link.Attrs().Name, nsFd)
 	return netlink.LinkSetNsFd(link, nsFd)
 }
 
 func (p *pfMockNetlinkLib) LinkSetName(link netlink.Link, name string) error {
-	p.recordMethodCall("LinkSetName %s %s", link.Attrs().Name, name)
+	p.recordMethodCallf("LinkSetName %s %s", link.Attrs().Name, name)
 	link.Attrs().Name = name
 	return netlink.LinkSetName(link, name)
 }
 
 //nolint:gosec
 func (p *pfMockNetlinkLib) LinkSetVfRate(pfLink netlink.Link, vfIndex, minRate, maxRate int) error {
-	p.recordMethodCall("LinkSetVfRate %s %d %d %d", pfLink.Attrs().Name, vfIndex, minRate, maxRate)
+	p.recordMethodCallf("LinkSetVfRate %s %d %d %d", pfLink.Attrs().Name, vfIndex, minRate, maxRate)
 
 	if maxRate > math.MaxUint32 {
 		maxRate = math.MaxUint32
@@ -263,13 +263,13 @@ func (p *pfMockNetlinkLib) LinkSetVfRate(pfLink netlink.Link, vfIndex, minRate, 
 }
 
 func (p *pfMockNetlinkLib) LinkSetVfSpoofchk(pfLink netlink.Link, vfIndex int, spoofChk bool) error {
-	p.recordMethodCall("LinkSetVfRate %s %d %t", pfLink.Attrs().Name, vfIndex, spoofChk)
+	p.recordMethodCallf("LinkSetVfRate %s %d %t", pfLink.Attrs().Name, vfIndex, spoofChk)
 	pfLink.Attrs().Vfs[vfIndex].Spoofchk = spoofChk
 	return nil
 }
 
 func (p *pfMockNetlinkLib) LinkSetVfTrust(pfLink netlink.Link, vfIndex int, trust bool) error {
-	p.recordMethodCall("LinkSetVfTrust %s %d %d", pfLink.Attrs().Name, vfIndex, trust)
+	p.recordMethodCallf("LinkSetVfTrust %s %d %d", pfLink.Attrs().Name, vfIndex, trust)
 	if trust {
 		pfLink.Attrs().Vfs[vfIndex].Trust = 1
 	} else {
@@ -280,25 +280,26 @@ func (p *pfMockNetlinkLib) LinkSetVfTrust(pfLink netlink.Link, vfIndex int, trus
 }
 
 func (p *pfMockNetlinkLib) LinkSetVfState(pfLink netlink.Link, vfIndex int, state uint32) error {
-	p.recordMethodCall("LinkSetVfState %s %d %d", pfLink.Attrs().Name, vfIndex, state)
+	p.recordMethodCallf("LinkSetVfState %s %d %d", pfLink.Attrs().Name, vfIndex, state)
 	pfLink.Attrs().Vfs[vfIndex].LinkState = state
 	return nil
 }
 
 func (p *pfMockNetlinkLib) LinkSetMTU(link netlink.Link, mtu int) error {
-	p.recordMethodCall("LinkSetMTU %s %d", link.Attrs().Name, mtu)
+	p.recordMethodCallf("LinkSetMTU %s %d", link.Attrs().Name, mtu)
 	return netlink.LinkSetMTU(link, mtu)
 }
 
 func (p *pfMockNetlinkLib) LinkDelAltName(link netlink.Link, name string) error {
-	p.recordMethodCall("LinkDelAltName %s %s", link.Attrs().Name, name)
+	p.recordMethodCallf("LinkDelAltName %s %s", link.Attrs().Name, name)
 	return netlink.LinkDelAltName(link, name)
 }
 
-func (p *pfMockNetlinkLib) recordMethodCall(format string, a ...any) {
+func (p *pfMockNetlinkLib) recordMethodCallf(format string, a ...any) {
 	message := fmt.Sprintf(format+"\n", a...)
+	//nolint:gosec
 	f, err := os.OpenFile(p.methodCallsRecordingFilePath,
-		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		log.Printf("Can't open file to record method call [%s]: %v\n", message, err)
 		return

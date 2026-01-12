@@ -70,7 +70,7 @@ func GetSriovNumVfs(ifName string) (int, error) {
 		return vfTotal, fmt.Errorf("failed to open the sriov_numfs of device %q: %v", ifName, err)
 	}
 
-	data, err := os.ReadFile(sriovFile)
+	data, err := os.ReadFile(sriovFile) //nolint:gosec
 	if err != nil {
 		return vfTotal, fmt.Errorf("failed to read the sriov_numfs of device %q: %v", ifName, err)
 	}
@@ -266,13 +266,13 @@ func SaveNetConf(cid, dataDir, podIfName string, netConf *sriovtypes.NetConf) er
 }
 
 func saveScratchNetConf(containerID, dataDir string, netconf []byte) error {
-	if err := os.MkdirAll(dataDir, 0700); err != nil {
+	if err := os.MkdirAll(dataDir, 0o700); err != nil {
 		return fmt.Errorf("failed to create the sriov data directory(%q): %v", dataDir, err)
 	}
 
 	path := filepath.Join(dataDir, containerID)
 
-	err := os.WriteFile(path, netconf, 0600)
+	err := os.WriteFile(path, netconf, 0o600)
 	if err != nil {
 		return fmt.Errorf("failed to write container data in the path(%q): %v", path, err)
 	}
@@ -282,7 +282,7 @@ func saveScratchNetConf(containerID, dataDir string, netconf []byte) error {
 
 // ReadScratchNetConf takes in container ID, Pod interface name and data dir as string and returns a pointer to Conf
 func ReadScratchNetConf(cRefPath string) ([]byte, error) {
-	data, err := os.ReadFile(cRefPath)
+	data, err := os.ReadFile(cRefPath) //nolint:gosec
 	if err != nil {
 		return nil, fmt.Errorf("failed to read container data in the path(%q): %v", cRefPath, err)
 	}
