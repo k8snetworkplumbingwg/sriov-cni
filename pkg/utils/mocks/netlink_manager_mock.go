@@ -279,6 +279,24 @@ func (_m *NetlinkManager) LinkSetVfVlanQosProto(_a0 netlink.Link, _a1 int, _a2 i
 	return r0
 }
 
+// LinkSetVfVlanQos provides a mock function with given fields: _a0, _a1, _a2, _a3
+func (_m *NetlinkManager) LinkSetVfVlanQos(_a0 netlink.Link, _a1 int, _a2 int, _a3 int) error {
+	ret := _m.Called(_a0, _a1, _a2, _a3)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LinkSetVfVlanQos")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(netlink.Link, int, int, int) error); ok {
+		r0 = rf(_a0, _a1, _a2, _a3)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // NewNetlinkManager creates a new instance of NetlinkManager. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewNetlinkManager(t interface {
