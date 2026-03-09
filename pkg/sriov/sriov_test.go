@@ -610,6 +610,39 @@ var _ = Describe("Sriov", func() {
 			mocked.AssertExpectations(t)
 		})
 	})
+	Context("Checking ResetVFConfig function - restore MAC when not set via annotation but present in cached state", func() {
+		var (
+			netconf *sriovtypes.NetConf
+		)
+
+		BeforeEach(func() {
+			netconf = &sriovtypes.NetConf{SriovNetConf: sriovtypes.SriovNetConf{
+				Master:   "enp175s0f1",
+				DeviceID: "0000:af:06.0",
+				VFID:     0,
+				OrigVfState: sriovtypes.VfState{
+					HostIFName: "enp175s6",
+					AdminMAC:   "aa:f3:8d:65:1b:d4",
+				}},
+			}
+		})
+		It("Restores the original administrative MAC address even if conf.MAC is empty", func() {
+			origMac, err := net.ParseMAC(netconf.OrigVfState.AdminMAC)
+			Expect(err).NotTo(HaveOccurred())
+			mocked := &mocks_utils.NetlinkManager{}
+			fakeLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{Index: 1000, Name: "dummylink", Vfs: []netlink.VfInfo{
+				{Mac: origMac},
+			}}}
+
+			mocked.On("LinkByName", netconf.Master).Return(fakeLink, nil)
+			mocked.On("LinkSetVfHardwareAddr", fakeLink, netconf.VFID, origMac).Return(nil)
+
+			sm := sriovManager{nLink: mocked}
+			err = sm.ResetVFConfig(netconf)
+			Expect(err).NotTo(HaveOccurred())
+			mocked.AssertExpectations(t)
+		})
+	})
 	Context("Checking ResetVFConfig function - restore config with user params", func() {
 		var (
 			netconf *sriovtypes.NetConf
