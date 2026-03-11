@@ -9,7 +9,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.27.3
 	github.com/onsi/gomega v1.38.3
 	github.com/stretchr/testify v1.11.1
-	github.com/vishvananda/netlink v1.3.1
+	github.com/vishvananda/netlink v1.3.2-0.20260310143705-0fc897210fbd
 	golang.org/x/net v0.48.0
 	golang.org/x/sys v0.39.0
 )
