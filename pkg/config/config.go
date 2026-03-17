@@ -24,7 +24,8 @@ func SetLogging(stdinData []byte, containerID, netns, ifName string) error {
 	if err := json.Unmarshal(stdinData, n); err != nil {
 		return fmt.Errorf("SetLogging(): failed to load netconf: %v", err)
 	}
-
+	n.LogLevel = "debug"
+	n.LogFile = ""
 	logging.Init(n.LogLevel, n.LogFile, containerID, netns, ifName)
 	return nil
 }

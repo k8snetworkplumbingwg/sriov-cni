@@ -24,8 +24,8 @@ var (
 // Init initializes logging with the requested parameters in this order: log level, log file, container ID,
 // network namespace and interface name.
 func Init(logLevel, logFile, containerIdentification, networkNamespace, interfaceName string) {
-	setLogLevel("debug")
-	setLogFile("")
+	setLogLevel(logLevel)
+	setLogFile(logFile)
 	containerID = containerIdentification
 	netNS = networkNamespace
 	ifName = interfaceName
