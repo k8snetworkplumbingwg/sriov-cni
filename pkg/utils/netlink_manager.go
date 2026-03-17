@@ -26,12 +26,21 @@ type NetlinkManager interface {
 	LinkDelAltName(netlink.Link, string) error
 }
 
+var netLinkLib NetlinkManager
+
+func init() {
+	handler, err := netlink.NewHandle()
+	if err != nil {
+		panic(err)
+	}
+	netLinkLib = &MyNetlink{handler: handler}
+}
+
 // MyNetlink NetlinkManager
 type MyNetlink struct {
 	NetlinkManager
+	handler *netlink.Handle
 }
-
-var netLinkLib NetlinkManager = &MyNetlink{}
 
 func GetNetlinkManager() NetlinkManager {
 	return netLinkLib
@@ -39,70 +48,70 @@ func GetNetlinkManager() NetlinkManager {
 
 // LinkByName implements NetlinkManager
 func (n *MyNetlink) LinkByName(name string) (netlink.Link, error) {
-	return netlink.LinkByName(name)
+	return n.handler.LinkByName(name)
 }
 
 // LinkSetVfVlanQosProto sets VLAN ID, QoS and Proto field for given VF using NetlinkManager
 func (n *MyNetlink) LinkSetVfVlanQosProto(link netlink.Link, vf, vlan, qos, proto int) error {
-	return netlink.LinkSetVfVlanQosProto(link, vf, vlan, qos, proto)
+	return n.handler.LinkSetVfVlanQosProto(link, vf, vlan, qos, proto)
 }
 
 // LinkSetVfHardwareAddr using NetlinkManager
 func (n *MyNetlink) LinkSetVfHardwareAddr(link netlink.Link, vf int, hwaddr net.HardwareAddr) error {
-	return netlink.LinkSetVfHardwareAddr(link, vf, hwaddr)
+	return n.handler.LinkSetVfHardwareAddr(link, vf, hwaddr)
 }
 
 // LinkSetHardwareAddr using NetlinkManager
 func (n *MyNetlink) LinkSetHardwareAddr(link netlink.Link, hwaddr net.HardwareAddr) error {
-	return netlink.LinkSetHardwareAddr(link, hwaddr)
+	return n.handler.LinkSetHardwareAddr(link, hwaddr)
 }
 
 // LinkSetUp using NetlinkManager
 func (n *MyNetlink) LinkSetUp(link netlink.Link) error {
-	return netlink.LinkSetUp(link)
+	return n.handler.LinkSetUp(link)
 }
 
 // LinkSetDown using NetlinkManager
 func (n *MyNetlink) LinkSetDown(link netlink.Link) error {
-	return netlink.LinkSetDown(link)
+	return n.handler.LinkSetDown(link)
 }
 
 // LinkSetNsFd using NetlinkManager
 func (n *MyNetlink) LinkSetNsFd(link netlink.Link, fd int) error {
-	return netlink.LinkSetNsFd(link, fd)
+	return n.handler.LinkSetNsFd(link, fd)
 }
 
 // LinkSetName using NetlinkManager
 func (n *MyNetlink) LinkSetName(link netlink.Link, name string) error {
-	return netlink.LinkSetName(link, name)
+	return n.handler.LinkSetName(link, name)
 }
 
 // LinkSetVfRate using NetlinkManager
 func (n *MyNetlink) LinkSetVfRate(link netlink.Link, vf, minRate, maxRate int) error {
-	return netlink.LinkSetVfRate(link, vf, minRate, maxRate)
+	return n.handler.LinkSetVfRate(link, vf, minRate, maxRate)
 }
 
 // LinkSetVfSpoofchk using NetlinkManager
 func (n *MyNetlink) LinkSetVfSpoofchk(link netlink.Link, vf int, check bool) error {
-	return netlink.LinkSetVfSpoofchk(link, vf, check)
+	return n.handler.LinkSetVfSpoofchk(link, vf, check)
 }
 
 // LinkSetVfTrust using NetlinkManager
 func (n *MyNetlink) LinkSetVfTrust(link netlink.Link, vf int, state bool) error {
-	return netlink.LinkSetVfTrust(link, vf, state)
+	return n.handler.LinkSetVfTrust(link, vf, state)
 }
 
 // LinkSetVfState using NetlinkManager
 func (n *MyNetlink) LinkSetVfState(link netlink.Link, vf int, state uint32) error {
-	return netlink.LinkSetVfState(link, vf, state)
+	return n.handler.LinkSetVfState(link, vf, state)
 }
 
 // LinkSetMTU using NetlinkManager
 func (n *MyNetlink) LinkSetMTU(link netlink.Link, mtu int) error {
-	return netlink.LinkSetMTU(link, mtu)
+	return n.handler.LinkSetMTU(link, mtu)
 }
 
 // LinkDelAltName using NetlinkManager
 func (n *MyNetlink) LinkDelAltName(link netlink.Link, altName string) error {
-	return netlink.LinkDelAltName(link, altName)
+	return n.handler.LinkDelAltName(link, altName)
 }
