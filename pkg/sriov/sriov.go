@@ -2,6 +2,7 @@ package sriov
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
@@ -335,7 +336,12 @@ func (s *sriovManager) ApplyVFConfig(conf *sriovtypes.NetConf) error {
 	}
 	// 1. Set vlan
 	if conf.Vlan != nil {
-		if err = s.nLink.LinkSetVfVlanQosProto(pfLink, conf.VFID, *conf.Vlan, *conf.VlanQoS, sriovtypes.VlanProtoInt[*conf.VlanProto]); err != nil {
+		err = s.nLink.LinkSetVfVlanQosProto(pfLink, conf.VFID, *conf.Vlan, *conf.VlanQoS, sriovtypes.VlanProtoInt[*conf.VlanProto])
+		if err != nil && strings.Contains(err.Error(), "protocol not supported") {
+			logging.Debug("VLAN proto not supported, retrying without proto", "vf", conf.VFID, "vlan", *conf.Vlan, "err", err)
+			err = s.nLink.LinkSetVfVlanQos(pfLink, conf.VFID, *conf.Vlan, *conf.VlanQoS)
+		}
+		if err != nil {
 			return fmt.Errorf("failed to set vf %d vlan configuration - id %d, qos %d and proto %s: %v", conf.VFID, *conf.Vlan, *conf.VlanQoS, *conf.VlanProto, err)
 		}
 	}
@@ -458,7 +464,11 @@ func (s *sriovManager) ResetVFConfig(conf *sriovtypes.NetConf) error {
 	}
 
 	if conf.Vlan != nil {
-		if err = s.nLink.LinkSetVfVlanQosProto(pfLink, conf.VFID, conf.OrigVfState.Vlan, conf.OrigVfState.VlanQoS, conf.OrigVfState.VlanProto); err != nil {
+		err = s.nLink.LinkSetVfVlanQosProto(pfLink, conf.VFID, conf.OrigVfState.Vlan, conf.OrigVfState.VlanQoS, conf.OrigVfState.VlanProto)
+		if err != nil && strings.Contains(err.Error(), "protocol not supported") {
+			err = s.nLink.LinkSetVfVlanQos(pfLink, conf.VFID, conf.OrigVfState.Vlan, conf.OrigVfState.VlanQoS)
+		}
+		if err != nil {
 			return fmt.Errorf("failed to set vf %d vlan configuration - id %d, qos %d and proto %d: %v", conf.VFID, conf.OrigVfState.Vlan, conf.OrigVfState.VlanQoS, conf.OrigVfState.VlanProto, err)
 		}
 	}
