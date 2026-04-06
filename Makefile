@@ -48,9 +48,13 @@ $(BINDIR) $(BUILDDIR) $(COVERAGE_DIR): ; $(info Creating directory $@...)
 	@mkdir -p $@
 
 .PHONY: build
-build: | $(BUILDDIR) ; $(info Building $(BINARY_NAME)...) @ ## Build SR-IOV CNI plugin
+build: build-entrypoint | $(BUILDDIR) ; $(info Building $(BINARY_NAME)...) @ ## Build SR-IOV CNI plugin
 	$Q cd $(CURDIR)/cmd/$(BINARY_NAME) && $(GO_BUILD_OPTS) go build -ldflags '$(GO_LDFLAGS)' $(GO_FLAGS) -o $(BUILDDIR)/$(BINARY_NAME) $(GO_TAGS) -v
 	$(info Done!)
+
+.PHONY: build-entrypoint
+build-entrypoint: | $(BUILDDIR) ; $(info Building entrypoint...) @ ## Build entrypoint binary
+	$Q $(GO_BUILD_OPTS) go build -o $(BUILDDIR)/entrypoint $(GO_TAGS) ./cmd/entrypoint/
 
 # Tools
 GOLANGCI_LINT = $(BINDIR)/golangci-lint
