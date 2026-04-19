@@ -455,9 +455,17 @@ var _ = Describe("Sriov", func() {
 
 			fakeLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{Index: 1000, Name: "dummylink", HardwareAddr: fakeMac}}
 
+			hostLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
+				Index:        1000,
+				Name:         "enp175s6",
+				HardwareAddr: fakeMac,
+			}}
+
 			mocked.On("LinkByName", podifName).Return(fakeLink, nil)
+			mocked.On("LinkByName", netconf.OrigVfState.HostIFName).Return(hostLink, nil)
 			mocked.On("LinkSetDown", fakeLink).Return(nil)
 			mocked.On("LinkSetName", fakeLink, netconf.OrigVfState.HostIFName).Return(nil)
+			mocked.On("LinkSetHardwareAddr", hostLink, fakeMac).Return(nil)
 			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
 			mocked.On("LinkSetMTU", fakeLink, 1500).Return(nil)
 			sm := sriovManager{nLink: mocked}
@@ -484,7 +492,8 @@ var _ = Describe("Sriov", func() {
 				}},
 			}
 		})
-		It("Should not restores Effective MAC address when it is not provided in netconf", func() {
+		It("Should not restore Effective MAC address when EffectiveMAC is not in cached state", func() {
+			netconf.OrigVfState.EffectiveMAC = ""
 			targetNetNS, err := testutils.NewNS()
 			defer func() {
 				if targetNetNS != nil {
