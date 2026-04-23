@@ -319,9 +319,9 @@ func (s *sriovManager) ReleaseVF(conf *sriovtypes.NetConf, podifName string, net
 
 func getVfInfo(link netlink.Link, id int) *netlink.VfInfo {
 	attrs := link.Attrs()
-	for _, vf := range attrs.Vfs {
-		if vf.ID == id {
-			return &vf
+	for i := range attrs.Vfs {
+		if attrs.Vfs[i].ID == id {
+			return &attrs.Vfs[i]
 		}
 	}
 	return nil
