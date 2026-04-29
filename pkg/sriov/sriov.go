@@ -72,6 +72,12 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, netns
 	if err != nil {
 		return fmt.Errorf("failed to get current NS: %v", err)
 	}
+	defer func() {
+		if err := initns.Close(); err != nil {
+			logging.Warning("failed to close init netns", "error", err)
+		}
+	}()
+
 	tempNS, err := ns.TempNetNS()
 	if err != nil {
 		return fmt.Errorf("failed to create tempNS: %v", err)
@@ -249,6 +255,11 @@ func (s *sriovManager) ReleaseVF(conf *sriovtypes.NetConf, podifName string, net
 	if err != nil {
 		return fmt.Errorf("failed to get init netns: %v", err)
 	}
+	defer func() {
+		if err := initns.Close(); err != nil {
+			logging.Warning("failed to close init netns", "error", err)
+		}
+	}()
 
 	return netns.Do(func(_ ns.NetNS) error {
 		// get VF device
