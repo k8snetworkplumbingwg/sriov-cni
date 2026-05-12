@@ -455,9 +455,17 @@ var _ = Describe("Sriov", func() {
 
 			fakeLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{Index: 1000, Name: "dummylink", HardwareAddr: fakeMac}}
 
+			hostLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
+				Index:        1000,
+				Name:         "enp175s6",
+				HardwareAddr: fakeMac,
+			}}
+
 			mocked.On("LinkByName", podifName).Return(fakeLink, nil)
+			mocked.On("LinkByName", netconf.OrigVfState.HostIFName).Return(hostLink, nil)
 			mocked.On("LinkSetDown", fakeLink).Return(nil)
 			mocked.On("LinkSetName", fakeLink, netconf.OrigVfState.HostIFName).Return(nil)
+			mocked.On("LinkSetHardwareAddr", hostLink, fakeMac).Return(nil)
 			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
 			mocked.On("LinkSetMTU", fakeLink, 1500).Return(nil)
 			sm := sriovManager{nLink: mocked}
@@ -484,7 +492,8 @@ var _ = Describe("Sriov", func() {
 				}},
 			}
 		})
-		It("Should not restores Effective MAC address when it is not provided in netconf", func() {
+		It("Should not restore Effective MAC address when EffectiveMAC is not in cached state", func() {
+			netconf.OrigVfState.EffectiveMAC = ""
 			targetNetNS, err := testutils.NewNS()
 			defer func() {
 				if targetNetNS != nil {
@@ -505,8 +514,8 @@ var _ = Describe("Sriov", func() {
 			mocked.AssertExpectations(t)
 		})
 
-		It("Restores Effective MAC address when provided in netconf", func() {
-			netconf.MAC = "aa:f3:8d:65:1b:d4"
+		It("Restores Effective MAC address when present in cached state", func() {
+			netconf.OrigVfState.EffectiveMAC = "aa:f3:8d:65:1b:d4"
 			targetNetNS, err := testutils.NewNS()
 			defer func() {
 				if targetNetNS != nil {
@@ -517,18 +526,18 @@ var _ = Describe("Sriov", func() {
 			fakeLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{Index: 1000, Name: "dummylink"}}
 			mocked := &mocks_utils.NetlinkManager{}
 
-			fakeMac, err := net.ParseMAC("c6:c8:7f:1f:21:90")
+			restoreMac, err := net.ParseMAC(netconf.OrigVfState.EffectiveMAC)
 			Expect(err).NotTo(HaveOccurred())
 			tempLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
 				Index:        1000,
 				Name:         "enp175s6",
-				HardwareAddr: fakeMac,
+				HardwareAddr: restoreMac,
 			}}
 
 			mocked.On("LinkByName", podifName).Return(fakeLink, nil)
 			mocked.On("LinkByName", netconf.OrigVfState.HostIFName).Return(tempLink, nil)
 			mocked.On("LinkSetDown", fakeLink).Return(nil)
-			mocked.On("LinkSetHardwareAddr", tempLink, fakeMac).Return(nil)
+			mocked.On("LinkSetHardwareAddr", tempLink, restoreMac).Return(nil)
 			mocked.On("LinkSetName", fakeLink, netconf.OrigVfState.HostIFName).Return(nil)
 			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
 			sm := sriovManager{nLink: mocked}

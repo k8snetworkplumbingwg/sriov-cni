@@ -278,7 +278,7 @@ func (s *sriovManager) ReleaseVF(conf *sriovtypes.NetConf, podifName string, net
 			return fmt.Errorf("failed to rename link %s to host name %s: %q", podifName, conf.OrigVfState.HostIFName, err)
 		}
 
-		if conf.MAC != "" {
+		if conf.OrigVfState.EffectiveMAC != "" {
 			// reset effective MAC address
 			logging.Debug("Reset effective MAC address",
 				"func", "ReleaseVF",
