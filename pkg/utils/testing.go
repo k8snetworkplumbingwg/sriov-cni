@@ -212,6 +212,11 @@ func (p *pfMockNetlinkLib) LinkSetVfVlanQosProto(link netlink.Link, vfIndex, vla
 	return nil
 }
 
+func (p *pfMockNetlinkLib) LinkSetVfVlanQos(link netlink.Link, vfIndex, vlan, vlanQos int) error {
+	p.recordMethodCall("LinkSetVfVlanQos %s %d %d %d", link.Attrs().Name, vfIndex, vlan, vlanQos)
+	return nil
+}
+
 func (p *pfMockNetlinkLib) LinkSetVfHardwareAddr(pfLink netlink.Link, vfIndex int, hwaddr net.HardwareAddr) error {
 	p.recordMethodCallf("LinkSetVfHardwareAddr %s %d %s", pfLink.Attrs().Name, vfIndex, hwaddr.String())
 	pfLink.Attrs().Vfs[vfIndex].Mac = hwaddr
