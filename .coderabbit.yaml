@@ -1,0 +1,271 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: en-US
+early_access: false
+enable_free_tier: true
+
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  in_progress_fortune: false
+  review_status: true
+  collapse_walkthrough: false
+
+  path_filters:
+    - "!**/vendor/**"
+    - "!vendor/**"
+    - "!go.sum"
+
+  auto_review:
+    enabled: true
+    drafts: true
+
+  # ── Path instructions ────────────────────────────────────────
+  path_instructions:
+
+    # ── Go code — general ────────────────────────────────────────
+    - path: "**/*.go"
+      instructions: |
+        Go security and best practices:
+        - Never ignore error returns; wrap errors with context using fmt.Errorf("...: %w", err)
+        - Use stdlib crypto/* and golang.org/x/crypto; avoid third-party crypto libraries
+        - Integer overflow: bounds-check user-supplied sizes
+        - context.Context for cancellation and timeouts on all network/hardware operations
+        - Nil pointer checks on hardware info structs (PciAddress, DeviceInfo, VfInfo)
+          before accessing fields — SR-IOV hardware discovery can return incomplete data
+        - Use structured logging with appropriate verbosity levels
+        - Netlink operations must handle partial failures and clean up on error
+        - Network namespace switches must always restore the original namespace
+          using a deferred function, even on error paths
+
+    # ── CNI plugin entry point ───────────────────────────────────
+    - path: "cmd/sriov/**/*.go"
+      instructions: |
+        CNI plugin binary review:
+        - Verify CNI spec compliance for cmdAdd, cmdDel, and cmdCheck operations
+        - cmdAdd must return a valid CNI Result on success; clean up all resources
+          (VF config, network namespace moves) on any failure before returning error
+        - cmdDel must be idempotent — calling it twice should not return an error
+        - IPAM delegation: verify that IPAM is called correctly and IPAM results
+          are included in the returned CNI Result
+        - Network namespace handling: the plugin receives a netns path from the
+          runtime — validate the path before use and handle missing netns gracefully
+        - Stdin CNI config parsing: validate that the config is parsed correctly
+          and unknown fields do not cause errors (forward compatibility)
+        - Verify that CNI_ARGS and CNI_NETNS environment variables are handled properly
+
+    # ── NetConf parsing and config ───────────────────────────────
+    - path: "pkg/config/**/*.go"
+      instructions: |
+        CNI NetConf parsing review:
+        - Validate JSON tag correctness on all NetConf struct fields
+        - Ensure default values are applied for optional fields when not specified
+        - Backward compatibility: new config fields must not break existing
+          CNI configurations that omit them
+        - Config cache: verify that LoadConfFromCache correctly restores the
+          full configuration including IPAM and device info
+        - Validate that VF device information (PCI address, GUID, etc.)
+          is parsed and validated before use
+        - Error messages for invalid config should be clear and include
+          the problematic field name and value
+
+    # ── SR-IOV VF management ─────────────────────────────────────
+    - path: "pkg/sriov/**/*.go"
+      instructions: |
+        SR-IOV VF management review:
+        - VF setup/release safety: verify that VF configuration (MAC, VLAN,
+          link state, spoofchk, trust, min_tx_rate, max_tx_rate) is applied
+          atomically where possible and rolled back on failure
+        - Network namespace operations: moving a VF to a container namespace
+          must be paired with a restore on teardown — verify cleanup paths
+        - Netlink operations: handle ENODEV, EBUSY, and other transient errors
+          that can occur when the VF driver is rebinding
+        - VF state save/restore: verify that the original VF state is correctly
+          captured before modification and restored on release
+        - Link state changes: verify proper handling of admin vs operational
+          link state for VFs
+
+    # ── Type definitions ─────────────────────────────────────────
+    - path: "pkg/types/**/*.go"
+      instructions: |
+        Type definitions review:
+        - NetConf struct: verify JSON tags match the expected CNI config field names
+        - VfState struct: ensure all hardware state fields are captured for
+          save/restore operations
+        - Interface definitions: verify mock implementations stay in sync with
+          interface changes
+        - New fields should have appropriate zero values that maintain backward
+          compatibility
+
+    # ── Utilities ────────────────────────────────────────────────
+    - path: "pkg/utils/**/*.go"
+      instructions: |
+        Utility functions review:
+        - Sysfs/procfs operations: validate all paths before reading/writing;
+          never construct paths from unvalidated user input
+        - Network namespace utilities: ensure proper cleanup and restoration
+          of the original namespace on all code paths
+        - Netlink manager: verify proper resource cleanup for netlink sockets
+        - PCI allocator: validate PCI address format and handle allocation failures
+        - Test utilities (testing.go): verify mock implementations
+          are kept in sync with the interfaces they mock
+
+    # ── Logging ──────────────────────────────────────────────────
+    - path: "pkg/logging/**/*.go"
+      instructions: |
+        Logging review:
+        - Verify log levels are appropriate (debug for verbose, info for
+          operational, error for failures)
+        - No sensitive data (PCI addresses are OK, but secrets/tokens are not)
+          should appear in log output
+        - Structured logging fields should be consistent across the codebase
+        - CNI plugins write to stderr — verify logging does not write to stdout
+          which would corrupt the CNI result JSON
+
+    # ── CNI commands ─────────────────────────────────────────────
+    - path: "pkg/cnicommands/**/*.go"
+      instructions: |
+        CNI command implementation review:
+        - Verify CNI spec compliance for Add, Del, and Check operations
+        - All resource allocations in Add must be fully cleaned up on failure
+        - Del must be idempotent — handle missing resources without error
+        - Check must validate the current state against expected state from prevResult
+        - Ensure proper delegation to IPAM plugin for IP address management
+        - Verify correct handling of prevResult for chained CNI plugins
+
+    # ── Kubernetes/OpenShift manifests ────────────────────────────
+    - path: "**/*.{yaml,yml}"
+      instructions: |
+        If this is a Kubernetes/OpenShift manifest:
+        - securityContext: runAsNonRoot, readOnlyRootFilesystem,
+          allowPrivilegeEscalation: false where applicable
+        - Drop ALL capabilities, add only what is required
+        - Resource limits (cpu, memory) on every container
+        - RBAC: least privilege; no cluster-admin for workloads
+        - Liveness + readiness probes defined
+        - automountServiceAccountToken: false unless needed
+
+        SR-IOV CNI specifics:
+        - DaemonSet manifests: the CNI plugin DaemonSet needs hostNetwork access
+          and volume mounts to the host CNI bin directory — verify the scope is
+          minimal and justified
+        - Verify image references and tag conventions
+        - Init containers or entrypoint scripts that copy the CNI binary to the
+          host must set correct permissions (0755)
+
+    # ── Dockerfiles / container images ───────────────────────────
+    - path: "**/{Dockerfile,Containerfile}*"
+      instructions: |
+        Container image security:
+        - Multi-stage builds preferred; no build tools in final image
+        - USER non-root where possible
+        - COPY specific files, not entire context
+        - No secrets in ENV, ARG, or COPY
+        - No package manager cache in final layer
+        - The CNI binary should be installed to /usr/bin/sriov or /opt/cni/bin/sriov
+        - Entrypoint script copies the CNI binary to the host — verify correct
+          destination path and permissions
+
+    # ── Entrypoint script ────────────────────────────────────────
+    - path: "images/entrypoint.sh"
+      instructions: |
+        CNI entrypoint script review:
+        - Verify the CNI binary is copied to the correct host path
+          (typically /opt/cni/bin/ or /host/opt/cni/bin/)
+        - File permissions: the CNI binary must be executable (0755)
+        - Error handling: the script should exit with a non-zero code on failure
+        - Signal handling: the container should handle SIGTERM gracefully
+          for clean shutdown during DaemonSet rolling updates
+        - Avoid race conditions with other CNI plugins being installed concurrently
+
+    # ── Unit tests ───────────────────────────────────────────────
+    - path: "{pkg,cmd}/**/*_test.go"
+      instructions: |
+        Unit test quality:
+        - Use table-driven tests for validation logic with multiple cases
+        - Mock external dependencies (hardware access, netlink calls,
+          network namespace operations) rather than requiring real hardware
+        - Test error paths, not just happy paths
+        - For CNI operations: test cmdAdd/cmdDel/cmdCheck with various
+          valid and invalid NetConf inputs
+        - Assertions should include descriptive failure messages
+
+    # ── Integration tests ────────────────────────────────────────
+    - path: "test/**/*.go"
+      instructions: |
+        Integration/E2E test review:
+        - Tests should be hermetic — no dependency on host SR-IOV hardware
+          for mocked integration tests
+        - Verify proper test setup and teardown (network namespaces,
+          temporary files, mock devices)
+        - Test timeout values should be reasonable and documented
+        - Shared test fixtures should be clearly documented
+
+    # ── Supply chain & dependencies ──────────────────────────────
+    - path: "go.mod"
+      instructions: |
+        Supply chain security:
+        - New dependencies: justify the need, check license compatibility
+        - Pin exact versions; avoid floating references
+        - Flag known CVEs (cross-ref osv.dev)
+        - Verify no unnecessary transitive dependencies are pulled in
+        - Key dependencies for this project: containernetworking/cni,
+          containernetworking/plugins, vishvananda/netlink, vishvananda/netns
+
+    # ── CI/CD — GitHub Actions ───────────────────────────────────
+    - path: ".github/workflows/**"
+      instructions: |
+        CI/CD configuration review:
+        - No secrets in logs; mask sensitive outputs
+        - Pin third-party actions to a full-length commit SHA
+        - Verify the CI pipeline runs the full validation suite
+          (lint, test, build, image build)
+        - Check that Go version is up to date and matches the project's
+          minimum supported version
+        - Verify Docker image builds are tested in CI
+        - Use least-privilege permissions on workflow GITHUB_TOKEN
+
+    # ── Cryptography files ───────────────────────────────────────
+    - path: "**/*{crypt,cipher,sign,hash,tls,ssl,cert,key,token}*"
+      instructions: |
+        Cryptographic security:
+        - Banned: MD5, SHA1, DES, RC4, 3DES, Blowfish, ECB mode
+        - Symmetric: AES-256-GCM or ChaCha20-Poly1305
+        - Signing: Ed25519 or ECDSA P-256+
+        - Constant-time comparison for all secret/token data
+        - No custom crypto; use vetted libraries only
+
+  # ── Security scanners ────────────────────────────────────────
+  tools:
+    gitleaks:
+      enabled: true
+    semgrep:
+      enabled: true
+    checkov:
+      enabled: true
+    hadolint:
+      enabled: true
+    trivy:
+      enabled: true
+    osvScanner:
+      enabled: true
+    actionlint:
+      enabled: true
+    ast-grep:
+      essential_rules: true
+
+# ── Knowledge base ───────────────────────────────────────────
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "**/CONTRIBUTING.md"
+  issues:
+    scope: "auto"
+  pull_requests:
+    scope: "auto"
+
+chat:
+  auto_reply: true
+  art: false
