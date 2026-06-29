@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
+	cnilog "github.com/k8snetworkplumbingwg/cni-log"
 	g "github.com/onsi/ginkgo/v2"
 	o "github.com/onsi/gomega"
 )
@@ -177,27 +179,28 @@ var _ = g.Describe("Logging", func() {
 	})
 
 	g.Context("log files", func() {
-		var logFile *os.File
+		var logDir string
+		var logFileName string
+		var logFilePath string
 
 		g.BeforeEach(func() {
-			var err error
-			logFile, err = os.CreateTemp("", "")
-			o.Expect(err).NotTo(o.HaveOccurred())
-		})
-
-		g.AfterEach(func() {
-			o.Expect(logFile.Close()).To(o.Succeed())
-			o.Expect(os.RemoveAll(logFile.Name())).To(o.Succeed())
+			logDir = g.GinkgoT().TempDir()
+			logFileName = "test.log"
+			logFilePath = filepath.Join(logDir, logFileName)
+			cnilog.SetLogFileBaseDir(logDir)
 		})
 
 		g.When("the log file is set", func() {
 			g.BeforeEach(func() {
-				Init("", logFile.Name(), "", "", "")
+				Init("", logFileName, "", "", "")
 			})
 
 			g.It("error messages are logged to log file but not to stderr", func() {
 				Error("test message", "a", "b")
 				_, _ = stderrFile.Seek(0, 0)
+				logFile, err := os.Open(logFilePath)
+				o.Expect(err).NotTo(o.HaveOccurred())
+				defer logFile.Close()
 				out, err := io.ReadAll(logFile)
 				o.Expect(err).NotTo(o.HaveOccurred())
 				o.Expect(out).Should(o.ContainSubstring("test message"))
@@ -214,19 +217,22 @@ var _ = g.Describe("Logging", func() {
 				// TODO: This triggers a data race in github.com/k8snetworkplumbingwg/cni-log; fix the datarace in the
 				// logging component and then remove the skip.
 				g.Skip("https://github.com/k8snetworkplumbingwg/cni-log/issues/15")
-				Init("", logFile.Name(), "", "", "")
+				Init("", logFileName, "", "", "")
 				setLogFile("")
 			})
 
 			g.It("logs to stderr but not to file", func() {
 				Error("test message", "a", "b")
-				_, _ = stderrFile.Seek(0, 0)
-				out, err := io.ReadAll(logFile)
-				o.Expect(err).NotTo(o.HaveOccurred())
-				o.Expect(out).ShouldNot(o.ContainSubstring("test message"))
+				logFile, err := os.Open(logFilePath)
+				if err == nil {
+					defer logFile.Close()
+					out, err := io.ReadAll(logFile)
+					o.Expect(err).NotTo(o.HaveOccurred())
+					o.Expect(out).ShouldNot(o.ContainSubstring("test message"))
+				}
 
 				_, _ = stderrFile.Seek(0, 0)
-				out, err = io.ReadAll(stderrFile)
+				out, err := io.ReadAll(stderrFile)
 				o.Expect(err).NotTo(o.HaveOccurred())
 				o.Expect(out).Should(o.ContainSubstring("test message"))
 			})
