@@ -14,6 +14,10 @@ const (
 	cniName          = "sriov-cni"
 )
 
+func init() {
+	cnilog.SetLogFileBaseDir("/var/log/cni-log/sriov-cni")
+}
+
 var (
 	logLevelDefault = cnilog.InfoLevel
 	containerID     = ""
