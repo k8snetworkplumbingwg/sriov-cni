@@ -5,7 +5,7 @@ go 1.25.3
 require (
 	github.com/containernetworking/cni v1.3.0
 	github.com/containernetworking/plugins v1.9.1
-	github.com/k8snetworkplumbingwg/cni-log v0.0.0-20230801160229-b6e062c9e0f2
+	github.com/k8snetworkplumbingwg/cni-log v0.0.0-20260713133559-c473b802cf27
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.41.0
 	github.com/stretchr/testify v1.11.1

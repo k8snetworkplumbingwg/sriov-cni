@@ -28,8 +28,8 @@ github.com/google/pprof v0.0.0-20260115054156-294ebfa9ad83 h1:z2ogiKUYzX5Is6zr/v
 github.com/google/pprof v0.0.0-20260115054156-294ebfa9ad83/go.mod h1:MxpfABSjhmINe3F1It9d+8exIHFvUqtLIRCdOGNXqiI=
 github.com/joshdk/go-junit v1.0.0 h1:S86cUKIdwBHWwA6xCmFlf3RTLfVXYQfvanM5Uh+K6GE=
 github.com/joshdk/go-junit v1.0.0/go.mod h1:TiiV0PqkaNfFXjEiyjWM3XXrhVyCa1K4Zfga6W52ung=
-github.com/k8snetworkplumbingwg/cni-log v0.0.0-20230801160229-b6e062c9e0f2 h1:KB8UPZQwLge4Abuk9tNmvzffdCJgqXSN341BX98QTHg=
-github.com/k8snetworkplumbingwg/cni-log v0.0.0-20230801160229-b6e062c9e0f2/go.mod h1:/x45AlZDoJVSSV4ECDb5TcHLzrVRDllsCMDzMrtHKwk=
+github.com/k8snetworkplumbingwg/cni-log v0.0.0-20260713133559-c473b802cf27 h1:RWfBMWUddsbH1y1bBp17vy2U3ImKSiVOogfNFbbTD7k=
+github.com/k8snetworkplumbingwg/cni-log v0.0.0-20260713133559-c473b802cf27/go.mod h1:njANWoZSpyAQPn3OjzooIuQVxJKQiOMr0/8HACHfMag=
 github.com/kr/pretty v0.3.1 h1:flRD4NNwYAUpkphVc1HcthR4KEIFJ65n8Mw5qdRn3LE=
 github.com/kr/pretty v0.3.1/go.mod h1:hoEshYVHaxMs3cyo3Yncou5ZscifuDolrwPKZanG3xk=
 github.com/kr/text v0.2.0 h1:5Nx0Ya0ZqY2ygV366QzturHI13Jq95ApcVaJBhpS+AY=
