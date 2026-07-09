@@ -38,6 +38,10 @@ func LoadConf(bytes []byte) (*sriovtypes.NetConf, error) {
 
 	// DeviceID takes precedence; if we are given a VF pciaddr then work from there
 	if n.DeviceID != "" {
+		if err := utils.ValidatePCIAddress(n.DeviceID); err != nil {
+			return nil, fmt.Errorf("LoadConf(): %v", err)
+		}
+
 		// Get rest of the VF information
 		pfName, vfID, err := getVfInfo(n.DeviceID)
 		if err != nil {
@@ -167,6 +171,13 @@ func getVfInfo(vfPci string) (string, int, error) {
 
 // LoadConfFromCache retrieves cached NetConf returns it along with a handle for removal
 func LoadConfFromCache(args *skel.CmdArgs) (*sriovtypes.NetConf, string, error) {
+	if err := utils.ValidateCachePathComponent(args.ContainerID); err != nil {
+		return nil, "", err
+	}
+	if err := utils.ValidateCachePathComponent(args.IfName); err != nil {
+		return nil, "", err
+	}
+
 	netConf := &sriovtypes.NetConf{}
 
 	s := []string{args.ContainerID, args.IfName}
