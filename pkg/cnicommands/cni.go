@@ -73,7 +73,7 @@ func CmdAdd(args *skel.CmdArgs) error {
 
 	netns, err := ns.GetNS(args.Netns)
 	if err != nil {
-		return fmt.Errorf("failed to open netns %q: %v", netns, err)
+		return fmt.Errorf("failed to open netns %q: %v", args.Netns, err)
 	}
 	defer netns.Close()
 
@@ -301,7 +301,7 @@ func CmdDel(args *skel.CmdArgs) error {
 				return nil
 			}
 
-			return fmt.Errorf("failed to open netns %s: %q", netns, err)
+			return fmt.Errorf("failed to open netns %q: %v", args.Netns, err)
 		}
 		defer netns.Close()
 
