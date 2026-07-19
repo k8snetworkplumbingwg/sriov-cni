@@ -7,12 +7,35 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	sriovtypes "github.com/k8snetworkplumbingwg/sriov-cni/pkg/types"
 )
+
+var pciBDFRegex = regexp.MustCompile(`^[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-7]$`)
+
+// ValidatePCIAddress checks that pciAddress is in standard BDF format (DDDD:BB:DD.F).
+func ValidatePCIAddress(pciAddress string) error {
+	if !pciBDFRegex.MatchString(pciAddress) {
+		return fmt.Errorf("invalid PCI address format: %s", pciAddress)
+	}
+	return nil
+}
+
+// ValidateCachePathComponent rejects values that could cause path traversal when
+// used as a filename component in the CNI cache directory.
+func ValidateCachePathComponent(value string) error {
+	if value == "" {
+		return fmt.Errorf("cache path component must not be empty")
+	}
+	if strings.Contains(value, "/") || strings.Contains(value, "..") {
+		return fmt.Errorf("cache path component contains invalid characters: %s", value)
+	}
+	return nil
+}
 
 var (
 	sriovConfigured = "/sriov_numvfs"
@@ -253,6 +276,13 @@ func HasDpdkDriver(pciAddr string) (bool, error) {
 // SaveNetConf takes in container ID, data dir and Pod interface name as string and a json encoded struct Conf
 // and save this Conf in data dir
 func SaveNetConf(cid, dataDir, podIfName string, netConf *sriovtypes.NetConf) error {
+	if err := ValidateCachePathComponent(cid); err != nil {
+		return err
+	}
+	if err := ValidateCachePathComponent(podIfName); err != nil {
+		return err
+	}
+
 	netConfBytes, err := json.Marshal(netConf)
 	if err != nil {
 		return fmt.Errorf("error serializing delegate netConf: %v", err)

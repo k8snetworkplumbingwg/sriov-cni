@@ -32,6 +32,10 @@ func NewPCIAllocator(dataDir string) *PCIAllocator {
 
 // Lock gets an exclusive lock on the given PCI address, ensuring there is no other process configuring / or de-configuring the same device.
 func (p *PCIAllocator) Lock(pciAddress string) error {
+	if err := ValidatePCIAddress(pciAddress); err != nil {
+		return err
+	}
+
 	lockDir := filepath.Join(p.dataDir, "vf_lock")
 	if err := os.MkdirAll(lockDir, 0o600); err != nil {
 		return fmt.Errorf("failed to create the sriov lock directory(%q): %v", lockDir, err)
@@ -68,6 +72,10 @@ func (p *PCIAllocator) Lock(pciAddress string) error {
 // SaveAllocatedPCI creates a file with the pci address as a name and the network namespace as the content
 // return error if the file was not created
 func (p *PCIAllocator) SaveAllocatedPCI(pciAddress, netNS string) error {
+	if err := ValidatePCIAddress(pciAddress); err != nil {
+		return err
+	}
+
 	if err := os.MkdirAll(p.dataDir, 0o600); err != nil {
 		return fmt.Errorf("failed to create the sriov data directory(%q): %v", p.dataDir, err)
 	}
@@ -84,6 +92,10 @@ func (p *PCIAllocator) SaveAllocatedPCI(pciAddress, netNS string) error {
 // DeleteAllocatedPCI Remove the allocated PCI file
 // return error if the file doesn't exist
 func (p *PCIAllocator) DeleteAllocatedPCI(pciAddress string) error {
+	if err := ValidatePCIAddress(pciAddress); err != nil {
+		return err
+	}
+
 	pciPath := filepath.Join(p.dataDir, pciAddress)
 	if err := os.Remove(pciPath); err != nil {
 		return fmt.Errorf("error removing PCI address lock file %s: %v", pciPath, err)
@@ -95,6 +107,10 @@ func (p *PCIAllocator) DeleteAllocatedPCI(pciAddress string) error {
 // if it exists we also check the network namespace still exist if not we delete the allocation
 // The function will return an error if the pci is still allocated to a running pod
 func (p *PCIAllocator) IsAllocated(pciAddress string) (bool, error) {
+	if err := ValidatePCIAddress(pciAddress); err != nil {
+		return false, err
+	}
+
 	pciPath := filepath.Join(p.dataDir, pciAddress)
 	_, err := os.Stat(pciPath)
 	if err != nil {
