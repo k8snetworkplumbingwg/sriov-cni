@@ -545,6 +545,117 @@ var _ = Describe("Sriov", func() {
 			Expect(err).NotTo(HaveOccurred())
 			mocked.AssertExpectations(t)
 		})
+
+		It("Restores original promiscuous mode when raised inside the pod", func() {
+			netconf.OrigVfState.Promisc = 0
+			netconf.OrigVfState.EffectiveMAC = ""
+			targetNetNS, err := testutils.NewNS()
+			defer func() {
+				if targetNetNS != nil {
+					targetNetNS.Close()
+				}
+			}()
+			Expect(err).NotTo(HaveOccurred())
+			fakeLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
+				Index:   1000,
+				Name:    "dummylink",
+				Promisc: 1,
+			}}
+			mocked := &mocks_utils.NetlinkManager{}
+
+			mocked.On("LinkByName", podifName).Return(fakeLink, nil)
+			mocked.On("LinkSetDown", fakeLink).Return(nil)
+			mocked.On("LinkSetName", fakeLink, netconf.OrigVfState.HostIFName).Return(nil)
+			mocked.On("SetPromiscOff", fakeLink).Return(nil)
+			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
+			sm := sriovManager{nLink: mocked}
+			err = sm.ReleaseVF(netconf, podifName, targetNetNS)
+			Expect(err).NotTo(HaveOccurred())
+			mocked.AssertExpectations(t)
+		})
+
+		It("Does not call SetPromiscOff when promiscuity is already at original value", func() {
+			netconf.OrigVfState.Promisc = 0
+			netconf.OrigVfState.EffectiveMAC = ""
+			targetNetNS, err := testutils.NewNS()
+			defer func() {
+				if targetNetNS != nil {
+					targetNetNS.Close()
+				}
+			}()
+			Expect(err).NotTo(HaveOccurred())
+			fakeLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
+				Index:   1000,
+				Name:    "dummylink",
+				Promisc: 0,
+			}}
+			mocked := &mocks_utils.NetlinkManager{}
+
+			mocked.On("LinkByName", podifName).Return(fakeLink, nil)
+			mocked.On("LinkSetDown", fakeLink).Return(nil)
+			mocked.On("LinkSetName", fakeLink, netconf.OrigVfState.HostIFName).Return(nil)
+			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
+			sm := sriovManager{nLink: mocked}
+			err = sm.ReleaseVF(netconf, podifName, targetNetNS)
+			Expect(err).NotTo(HaveOccurred())
+			mocked.AssertNotCalled(t, "SetPromiscOff", mock.Anything)
+			mocked.AssertNotCalled(t, "SetPromiscOn", mock.Anything)
+		})
+
+		It("Calls SetPromiscOff multiple times when promiscuity count is greater than 1", func() {
+			netconf.OrigVfState.Promisc = 0
+			netconf.OrigVfState.EffectiveMAC = ""
+			targetNetNS, err := testutils.NewNS()
+			defer func() {
+				if targetNetNS != nil {
+					targetNetNS.Close()
+				}
+			}()
+			Expect(err).NotTo(HaveOccurred())
+			fakeLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
+				Index:   1000,
+				Name:    "dummylink",
+				Promisc: 2,
+			}}
+			mocked := &mocks_utils.NetlinkManager{}
+
+			mocked.On("LinkByName", podifName).Return(fakeLink, nil)
+			mocked.On("LinkSetDown", fakeLink).Return(nil)
+			mocked.On("LinkSetName", fakeLink, netconf.OrigVfState.HostIFName).Return(nil)
+			mocked.On("SetPromiscOff", fakeLink).Return(nil)
+			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
+			sm := sriovManager{nLink: mocked}
+			err = sm.ReleaseVF(netconf, podifName, targetNetNS)
+			Expect(err).NotTo(HaveOccurred())
+			mocked.AssertNumberOfCalls(t, "SetPromiscOff", 2)
+		})
+
+		It("Returns error when SetPromiscOff fails", func() {
+			netconf.OrigVfState.Promisc = 0
+			netconf.OrigVfState.EffectiveMAC = ""
+			targetNetNS, err := testutils.NewNS()
+			defer func() {
+				if targetNetNS != nil {
+					targetNetNS.Close()
+				}
+			}()
+			Expect(err).NotTo(HaveOccurred())
+			fakeLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
+				Index:   1000,
+				Name:    "dummylink",
+				Promisc: 1,
+			}}
+			mocked := &mocks_utils.NetlinkManager{}
+
+			mocked.On("LinkByName", podifName).Return(fakeLink, nil)
+			mocked.On("LinkSetDown", fakeLink).Return(nil)
+			mocked.On("LinkSetName", fakeLink, netconf.OrigVfState.HostIFName).Return(nil)
+			mocked.On("SetPromiscOff", fakeLink).Return(fmt.Errorf("device busy"))
+			sm := sriovManager{nLink: mocked}
+			err = sm.ReleaseVF(netconf, podifName, targetNetNS)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to restore promiscuous mode"))
+		})
 	})
 	Context("Checking FillOriginalVfInfo function", func() {
 		var (
@@ -579,9 +690,10 @@ var _ = Describe("Sriov", func() {
 			}}
 
 			fakeVFLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
-				Index: 1001,
-				Name:  netconf.OrigVfState.HostIFName,
-				MTU:   1500,
+				Index:   1001,
+				Name:    netconf.OrigVfState.HostIFName,
+				MTU:     1500,
+				Promisc: 0,
 			}}
 
 			mocked.On("LinkByName", netconf.Master).Return(fakeLink, nil)
@@ -590,6 +702,40 @@ var _ = Describe("Sriov", func() {
 			err = sm.FillOriginalVfInfo(netconf)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(netconf.OrigVfState.MTU).To(Equal(1500))
+			Expect(netconf.OrigVfState.Promisc).To(Equal(0))
+			mocked.AssertExpectations(t)
+		})
+
+		It("Saves the current VF promiscuity", func() {
+			mocked := &mocks_utils.NetlinkManager{}
+			fakeMac, err := net.ParseMAC("6e:16:06:0e:b7:e9")
+			Expect(err).NotTo(HaveOccurred())
+
+			fakeLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
+				Index:        1000,
+				Name:         netconf.Name,
+				HardwareAddr: fakeMac,
+				Vfs: []netlink.VfInfo{
+					{
+						ID:  0,
+						Mac: fakeMac,
+					},
+				},
+			}}
+
+			fakeVFLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
+				Index:   1001,
+				Name:    netconf.OrigVfState.HostIFName,
+				MTU:     1500,
+				Promisc: 1,
+			}}
+
+			mocked.On("LinkByName", netconf.Master).Return(fakeLink, nil)
+			mocked.On("LinkByName", netconf.OrigVfState.HostIFName).Return(fakeVFLink, nil)
+			sm := sriovManager{nLink: mocked}
+			err = sm.FillOriginalVfInfo(netconf)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(netconf.OrigVfState.Promisc).To(Equal(1))
 			mocked.AssertExpectations(t)
 		})
 	})

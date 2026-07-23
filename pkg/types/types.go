@@ -38,6 +38,8 @@ type VfState struct {
 	MaxTxRate    int
 	LinkState    uint32
 	MTU          int
+	// Promisc is the netdev promiscuity reference count prior to SetupVF.
+	Promisc int
 }
 
 // FillFromVfInfo - Fill attributes according to the provided netlink.VfInfo struct

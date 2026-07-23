@@ -315,6 +315,18 @@ func (s *sriovManager) ReleaseVF(conf *sriovtypes.NetConf, podifName string, net
 			}
 		}
 
+		// Restore original promiscuity. Applications inside the pod may raise the
+		// netdev promiscuity reference count; that flag persists across netns moves.
+		logging.Debug("Reset VF device promiscuous mode",
+			"func", "ReleaseVF",
+			"linkObj", linkObj,
+			"conf.OrigVfState.HostIFName", conf.OrigVfState.HostIFName,
+			"conf.OrigVfState.Promisc", conf.OrigVfState.Promisc,
+			"currentPromisc", linkObj.Attrs().Promisc)
+		if err = s.restorePromisc(linkObj, conf.OrigVfState.Promisc); err != nil {
+			return fmt.Errorf("failed to restore promiscuous mode for link %s: %v", conf.OrigVfState.HostIFName, err)
+		}
+
 		// move VF device to init netns
 		logging.Debug("Move VF device to init netns",
 			"func", "ReleaseVF",
@@ -444,16 +456,34 @@ func (s *sriovManager) FillOriginalVfInfo(conf *sriovtypes.NetConf) error {
 	}
 	conf.OrigVfState.FillFromVfInfo(vfState)
 
-	// add also MTU to the vf info in the vf is we have an interface name
+	// Capture netdev attributes (MTU, promiscuity) when the VF has an interface name
 	if conf.OrigVfState.HostIFName != "" {
 		vfLink, err := s.nLink.LinkByName(conf.OrigVfState.HostIFName)
 		if err != nil {
 			return fmt.Errorf("failed to lookup vf %q: %v", conf.OrigVfState.HostIFName, err)
 		}
 		conf.OrigVfState.MTU = vfLink.Attrs().MTU
+		conf.OrigVfState.Promisc = vfLink.Attrs().Promisc
 	}
 
 	return err
+}
+
+// restorePromisc adjusts the netdev promiscuity reference count back to original.
+// Promiscuity is a reference count; SetPromiscOn/Off increment/decrement by one.
+func (s *sriovManager) restorePromisc(linkObj netlink.Link, original int) error {
+	current := linkObj.Attrs().Promisc
+	for ; current > original; current-- {
+		if err := s.nLink.SetPromiscOff(linkObj); err != nil {
+			return fmt.Errorf("failed to disable promiscuous mode for link %s: %q", linkObj.Attrs().Name, err)
+		}
+	}
+	for ; current < original; current++ {
+		if err := s.nLink.SetPromiscOn(linkObj); err != nil {
+			return fmt.Errorf("failed to enable promiscuous mode for link %s: %q", linkObj.Attrs().Name, err)
+		}
+	}
+	return nil
 }
 
 // ResetVFConfig reset a VF to its original state
