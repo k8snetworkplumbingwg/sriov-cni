@@ -279,6 +279,42 @@ func (_m *NetlinkManager) LinkSetVfVlanQosProto(_a0 netlink.Link, _a1 int, _a2 i
 	return r0
 }
 
+// SetPromiscOff provides a mock function with given fields: _a0
+func (_m *NetlinkManager) SetPromiscOff(_a0 netlink.Link) error {
+	ret := _m.Called(_a0)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetPromiscOff")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(netlink.Link) error); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetPromiscOn provides a mock function with given fields: _a0
+func (_m *NetlinkManager) SetPromiscOn(_a0 netlink.Link) error {
+	ret := _m.Called(_a0)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetPromiscOn")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(netlink.Link) error); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // NewNetlinkManager creates a new instance of NetlinkManager. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewNetlinkManager(t interface {
