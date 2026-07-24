@@ -191,6 +191,30 @@ var _ = Describe("Utils", func() {
 		})
 	})
 
+	Context("Checking PCIeFLR function", func() {
+		It("should write '1' to the sysfs reset file for an existing VF", func() {
+			resetPath := filepath.Join(SysBusPci, "0000:af:06.0", "reset")
+			err := os.WriteFile(resetPath, []byte(""), 0o600)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = PCIeFLR("0000:af:06.0")
+			Expect(err).NotTo(HaveOccurred())
+
+			data, err := os.ReadFile(resetPath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(data)).To(Equal("1"))
+		})
+		It("should return an error for a non-existing VF PCI address", func() {
+			err := PCIeFLR("0000:ff:00.0")
+			Expect(err).To(HaveOccurred())
+		})
+		It("should reject non-canonical PCI addresses", func() {
+			err := PCIeFLR("../af:06.0")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("invalid PCI address"))
+		})
+	})
+
 	Context("Checking SaveNetConf function", func() {
 		var tmpDir string
 
