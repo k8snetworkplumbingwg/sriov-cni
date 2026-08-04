@@ -3,7 +3,6 @@ package types
 import (
 	"encoding/json"
 	"fmt"
-	"runtime"
 
 	"github.com/containernetworking/cni/pkg/types"
 	"github.com/vishvananda/netlink"
@@ -15,14 +14,7 @@ const (
 )
 
 // VlanProtoInt maps VLAN protocol strings to their integer values
-// TODO: Temporary workaround for netlink bug on big-endian systems.
-// Remove once netlink is updated to a version containing https://github.com/vishvananda/netlink/pull/1155
-var VlanProtoInt = func() map[string]int {
-	if runtime.GOARCH == "s390x" {
-		return map[string]int{Proto8021q: 0x81, Proto8021ad: 0xa888}
-	}
-	return map[string]int{Proto8021q: 0x8100, Proto8021ad: 0x88a8}
-}()
+var VlanProtoInt = map[string]int{Proto8021q: 0x8100, Proto8021ad: 0x88a8}
 
 // VfState represents the state of the VF
 type VfState struct {
