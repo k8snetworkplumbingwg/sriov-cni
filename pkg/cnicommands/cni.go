@@ -292,12 +292,14 @@ func CmdDel(args *skel.CmdArgs) error {
 			// if provided path does not exist (e.x. when node was restarted)
 			// plugin should silently return with success after releasing
 			// IPAM resources
-			_, ok := err.(ns.NSPathNotExistErr)
-			if ok {
-				logging.Debug("Exiting as the network namespace does not exists anymore",
+			_, notExist := err.(ns.NSPathNotExistErr)
+			_, notNS := err.(ns.NSPathNotNSErr)
+			if notExist || notNS {
+				logging.Debug("Exiting as the network namespace is not available",
 					"func", "cmdDel",
 					"netConf.DeviceID", netConf.DeviceID,
-					"args.Netns", args.Netns)
+					"args.Netns", args.Netns,
+					"reason", err.Error())
 				return nil
 			}
 
