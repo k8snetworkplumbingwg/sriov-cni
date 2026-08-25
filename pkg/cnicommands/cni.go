@@ -73,7 +73,7 @@ func CmdAdd(args *skel.CmdArgs) error {
 
 	netns, err := ns.GetNS(args.Netns)
 	if err != nil {
-		return fmt.Errorf("failed to open netns %q: %v", args.Netns, err)
+		return fmt.Errorf("failed to open netns %q: %w", args.Netns, err)
 	}
 	defer netns.Close()
 
@@ -261,11 +261,6 @@ func CmdDel(args *skel.CmdArgs) error {
 		}
 	}
 
-	// https://github.com/kubernetes/kubernetes/pull/35240
-	if args.Netns == "" {
-		return nil
-	}
-
 	// Verify VF ID existence.
 	if _, err := utils.GetVfid(netConf.DeviceID, netConf.Master); err != nil {
 		return fmt.Errorf("cmdDel() error obtaining VF ID: %q", err)
@@ -285,34 +280,55 @@ func CmdDel(args *skel.CmdArgs) error {
 	}
 
 	if !netConf.DPDKMode {
-		netns, err := ns.GetNS(args.Netns)
-		if err != nil {
-			// according to:
-			// https://github.com/kubernetes/kubernetes/issues/43014#issuecomment-287164444
-			// if provided path does not exist (e.x. when node was restarted)
-			// plugin should silently return with success after releasing
-			// IPAM resources
-			_, ok := err.(ns.NSPathNotExistErr)
-			if ok {
-				logging.Debug("Exiting as the network namespace does not exists anymore",
-					"func", "cmdDel",
-					"netConf.DeviceID", netConf.DeviceID,
-					"args.Netns", args.Netns)
-				return nil
+		// Empty Netns (https://github.com/kubernetes/kubernetes/pull/35240) and a
+		// vanished netns path both mean ReleaseVF cannot run; continue with FLR
+		// and PCI allocator cleanup below.
+		// https://github.com/kubernetes/kubernetes/issues/43014#issuecomment-287164444
+		if args.Netns == "" {
+			logging.Debug("Empty network namespace path, skipping ReleaseVF",
+				"func", "cmdDel",
+				"netConf.DeviceID", netConf.DeviceID)
+		} else if netns, err := ns.GetNS(args.Netns); err != nil {
+			if _, ok := err.(ns.NSPathNotExistErr); !ok {
+				return fmt.Errorf("failed to open netns %q: %w", args.Netns, err)
 			}
+			logging.Debug("Network namespace does not exist anymore, skipping ReleaseVF",
+				"func", "cmdDel",
+				"netConf.DeviceID", netConf.DeviceID,
+				"args.Netns", args.Netns)
+		} else {
+			defer func() {
+				if cerr := netns.Close(); cerr != nil {
+					if _, ok := cerr.(ns.NSPathNotExistErr); !ok {
+						logging.Warning("failed to close netns",
+							"func", "cmdDel",
+							"args.Netns", args.Netns,
+							"error", cerr)
+					}
+				}
+			}()
 
-			return fmt.Errorf("failed to open netns %q: %v", args.Netns, err)
+			logging.Debug("Release the VF",
+				"func", "cmdDel",
+				"netConf.DeviceID", netConf.DeviceID,
+				"args.Netns", args.Netns,
+				"args.IfName", args.IfName)
+			if err := sm.ReleaseVF(netConf, args.IfName, netns); err != nil {
+				return err
+			}
 		}
-		defer netns.Close()
+	}
 
-		logging.Debug("Release the VF",
+	// Issue a PCIe Function Level Reset to clear hardware state (flow rules,
+	// DMA mappings, queue configs) that kernel-level resets cannot reach.
+	logging.Debug("PCIe FLR on VF",
+		"func", "cmdDel",
+		"netConf.DeviceID", netConf.DeviceID)
+	if err := utils.PCIeFLR(netConf.DeviceID); err != nil {
+		logging.Warning("failed to perform PCIe FLR on VF, hardware state may be stale",
 			"func", "cmdDel",
-			"netConf.DeviceID", netConf.DeviceID,
-			"args.Netns", args.Netns,
-			"args.IfName", args.IfName)
-		if err := sm.ReleaseVF(netConf, args.IfName, netns); err != nil {
-			return err
-		}
+			"DeviceID", netConf.DeviceID,
+			"error", err)
 	}
 
 	// Mark the pci address as released

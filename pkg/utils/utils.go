@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -26,6 +27,8 @@ var (
 	SysV6NdiscNotify = "/proc/sys/net/ipv6/conf/"
 	// UserspaceDrivers is a list of driver names that don't have netlink representation for their devices
 	UserspaceDrivers = []string{"vfio-pci", "uio_pci_generic", "igb_uio"}
+	// pciBDFPattern matches a canonical sysfs PCI address (domain:bus:device.function).
+	pciBDFPattern = regexp.MustCompile(`(?i)^[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-9a-f]$`)
 )
 
 // EnableArpAndNdiscNotify enables IPv4 arp_notify and IPv6 ndisc_notify for netdev
@@ -228,6 +231,20 @@ func GetVFLinkNamesFromVFID(pfName string, vfID int) ([]string, error) {
 	}
 
 	return names, nil
+}
+
+// PCIeFLR triggers a PCIe Function Level Reset on the given PCI device.
+// This clears all VF hardware state (flow rules, DMA mappings, queues) that
+// persists across netns moves and kernel-level resets.
+func PCIeFLR(pciAddr string) error {
+	if !pciBDFPattern.MatchString(pciAddr) {
+		return fmt.Errorf("PCIE FLR: invalid PCI address %q", pciAddr)
+	}
+	resetPath := filepath.Join(SysBusPci, pciAddr, "reset")
+	if err := os.WriteFile(resetPath, []byte("1"), 0); err != nil {
+		return fmt.Errorf("PCIE FLR: %w", err)
+	}
+	return nil
 }
 
 // HasDpdkDriver checks if a device is attached to dpdk supported driver
