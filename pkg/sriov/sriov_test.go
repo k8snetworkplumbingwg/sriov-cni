@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"syscall"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -25,6 +26,59 @@ var _ = Describe("Sriov", func() {
 	)
 	BeforeEach(func() {
 		t = GinkgoT()
+	})
+
+	Context("Checking renameLink function", func() {
+		It("renames the device after clearing the target name from its alt names", func() {
+			mocked := &mocks_utils.NetlinkManager{}
+			linkObj := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
+				Name:     "enp175s6",
+				AltNames: []string{"net1"},
+			}}
+
+			mocked.On("LinkDelAltName", linkObj, "net1").Return(nil).Once()
+			mocked.On("LinkSetName", linkObj, "net1").Return(nil).Once()
+
+			sm := sriovManager{nLink: mocked}
+			Expect(sm.renameLink(linkObj, "enp175s6", "net1")).NotTo(HaveOccurred())
+			mocked.AssertExpectations(t)
+		})
+
+		It("refreshes the alt names and retries once when the rename reports EEXIST", func() {
+			mocked := &mocks_utils.NetlinkManager{}
+			// the cached object carries no alt names, so the cleanup before the
+			// rename finds nothing to remove and the rename reports EEXIST
+			cachedLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
+				Name: "enp175s6",
+			}}
+			// udev re-registered the name after the object was cached
+			refreshedLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{
+				Name:     "enp175s6",
+				AltNames: []string{"net1"},
+			}}
+
+			mocked.On("LinkSetName", cachedLink, "net1").Return(syscall.EEXIST).Once()
+			mocked.On("LinkByName", "enp175s6").Return(refreshedLink, nil).Once()
+			mocked.On("LinkDelAltName", refreshedLink, "net1").Return(nil).Once()
+			mocked.On("LinkSetName", cachedLink, "net1").Return(nil).Once()
+
+			sm := sriovManager{nLink: mocked}
+			Expect(sm.renameLink(cachedLink, "enp175s6", "net1")).NotTo(HaveOccurred())
+			mocked.AssertExpectations(t)
+		})
+
+		It("returns the rename error when it is not EEXIST", func() {
+			mocked := &mocks_utils.NetlinkManager{}
+			linkObj := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{Name: "enp175s6"}}
+
+			mocked.On("LinkSetName", linkObj, "net1").Return(errors.New("LinkSetName failed")).Once()
+
+			sm := sriovManager{nLink: mocked}
+			err := sm.renameLink(linkObj, "enp175s6", "net1")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("LinkSetName failed"))
+			mocked.AssertExpectations(t)
+		})
 	})
 
 	Context("Checking SetupVF function", func() {
@@ -502,9 +556,11 @@ var _ = Describe("Sriov", func() {
 			}()
 			Expect(err).NotTo(HaveOccurred())
 			fakeLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{Index: 1000, Name: "dummylink"}}
+			hostLink := &utils.FakeLink{LinkAttrs: netlink.LinkAttrs{Index: 1000, Name: "enp175s6"}}
 			mocked := &mocks_utils.NetlinkManager{}
 
 			mocked.On("LinkByName", podifName).Return(fakeLink, nil)
+			mocked.On("LinkByName", netconf.OrigVfState.HostIFName).Return(hostLink, nil)
 			mocked.On("LinkSetDown", fakeLink).Return(nil)
 			mocked.On("LinkSetName", fakeLink, netconf.OrigVfState.HostIFName).Return(nil)
 			mocked.On("LinkSetNsFd", fakeLink, mock.AnythingOfType("int")).Return(nil)
