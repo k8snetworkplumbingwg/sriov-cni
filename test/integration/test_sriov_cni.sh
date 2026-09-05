@@ -82,9 +82,11 @@ test_vlan_reset_on_invalid_mac() {
 EOM
 
   export CNI_COMMAND=ADD
+  : > "${DEFAULT_CNI_DIR}/enp175s0f1.calls"
   assert_fail invoke_sriov_cni
-  assert_file_contains "${DEFAULT_CNI_DIR}/enp175s0f1.calls" "LinkSetVfVlanQosProto enp175s0f1 0 1234 0 33024"
-  assert_file_contains "${DEFAULT_CNI_DIR}/enp175s0f1.calls" "LinkSetVfVlanQosProto enp175s0f1 0 0 0 33024"
+  assert_equals "LinkSetVfVlanQosProto enp175s0f1 0 1234 0 33024
+LinkSetVfVlanQosProto enp175s0f1 0 0 0 33024" \
+    "$(grep '^LinkSetVfVlanQosProto ' "${DEFAULT_CNI_DIR}/enp175s0f1.calls")"
 }
 
 test_mtu_reset() {
