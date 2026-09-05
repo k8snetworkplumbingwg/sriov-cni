@@ -36,7 +36,7 @@ func getEnvArgs(envArgsString string) (*envArgs, error) {
 	return nil, nil
 }
 
-func CmdAdd(args *skel.CmdArgs) error {
+func CmdAdd(args *skel.CmdArgs) (err error) {
 	if err := config.SetLogging(args.StdinData, args.ContainerID, args.Netns, args.IfName); err != nil {
 		return err
 	}
