@@ -3,6 +3,9 @@
 package logging
 
 import (
+	"fmt"
+	"os"
+
 	cnilog "github.com/k8snetworkplumbingwg/cni-log"
 )
 
@@ -15,6 +18,7 @@ const (
 )
 
 var (
+	logFileBaseDir  = "/var/log/cni-log/sriov-cni"
 	logLevelDefault = cnilog.InfoLevel
 	containerID     = ""
 	netNS           = ""
@@ -48,6 +52,12 @@ func setLogFile(fileName string) {
 		cnilog.SetLogFile("")
 		return
 	}
+	if err := os.MkdirAll(logFileBaseDir, 0o700); err != nil {
+		cnilog.SetLogStderr(true)
+		_ = cnilog.ErrorStructured(fmt.Sprintf("failed to create log directory %s, falling back to stderr: %v", logFileBaseDir, err))
+		return
+	}
+	cnilog.SetLogFileBaseDir(logFileBaseDir)
 	cnilog.SetLogFile(fileName)
 	cnilog.SetLogStderr(false)
 }
