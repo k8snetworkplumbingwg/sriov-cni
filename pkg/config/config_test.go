@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/plugins/pkg/testutils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -19,6 +20,22 @@ var _ = Describe("Config", func() {
 	})
 
 	Context("Checking LoadConf function", func() {
+		DescribeTable("Rejecting invalid DeviceID values",
+			func(deviceID string) {
+				conf := []byte(fmt.Sprintf(`{
+        "name": "mynet",
+        "type": "sriov",
+        "deviceID": %q
+}`, deviceID))
+
+				_, err := LoadConf(conf)
+				Expect(err).To(MatchError("LoadConf(): invalid PCI address format: " + deviceID))
+			},
+			Entry("path traversal", "../../0000:af:06.1"),
+			Entry("missing domain", "af:06.1"),
+			Entry("invalid function", "0000:af:06.8"),
+		)
+
 		It("Assuming correct config file - existing DeviceID", func() {
 			conf := []byte(`{
         "name": "mynet",
@@ -168,6 +185,21 @@ var _ = Describe("Config", func() {
 			Expect(err.Error()).To(ContainSubstring("pci address 0000:af:06.1 is already allocated"))
 		})
 
+	})
+	Context("Checking LoadConfFromCache function", func() {
+		DescribeTable("Rejecting invalid cache path components",
+			func(containerID, ifName string) {
+				args := &skel.CmdArgs{ContainerID: containerID, IfName: ifName}
+
+				_, _, err := LoadConfFromCache(args)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("cache path component"))
+			},
+			Entry("empty container ID", "", "net1"),
+			Entry("container ID path traversal", "../escape", "net1"),
+			Entry("empty interface name", "container-id", ""),
+			Entry("interface name path traversal", "container-id", "../escape"),
+		)
 	})
 	Context("Checking getVfInfo function", func() {
 		It("Assuming existing PF", func() {

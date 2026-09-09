@@ -15,7 +15,7 @@ import (
 	sriovtypes "github.com/k8snetworkplumbingwg/sriov-cni/pkg/types"
 )
 
-var pciBDFRegex = regexp.MustCompile(`^[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-1][0-9a-fA-F]\.[0-7]$`)
+var pciBDFRegex = regexp.MustCompile(`^[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[01][0-9a-fA-F]\.[0-7]$`)
 
 // ValidatePCIAddress checks that pciAddress is in standard BDF format (DDDD:BB:DD.F).
 func ValidatePCIAddress(pciAddress string) error {

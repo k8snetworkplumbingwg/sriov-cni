@@ -20,6 +20,56 @@ import (
 )
 
 var _ = Describe("Utils", func() {
+	Context("Checking ValidatePCIAddress function", func() {
+		DescribeTable("valid PCI addresses",
+			func(pciAddress string) {
+				Expect(ValidatePCIAddress(pciAddress)).To(Succeed())
+			},
+			Entry("lowercase address", "0000:af:06.0"),
+			Entry("uppercase address", "ABCD:EF:1F.7"),
+			Entry("numeric address", "1234:56:18.1"),
+		)
+
+		DescribeTable("invalid PCI addresses",
+			func(pciAddress string) {
+				Expect(ValidatePCIAddress(pciAddress)).To(MatchError("invalid PCI address format: " + pciAddress))
+			},
+			Entry("empty address", ""),
+			Entry("missing domain", "af:06.0"),
+			Entry("short domain", "000:af:06.0"),
+			Entry("short bus", "0000:a:06.0"),
+			Entry("short device", "0000:af:6.0"),
+			Entry("missing function", "0000:af:06"),
+			Entry("device outside the supported range", "0000:af:20.0"),
+			Entry("function outside the supported range", "0000:af:06.8"),
+			Entry("non-hexadecimal character", "0000:ag:06.0"),
+			Entry("path traversal", "../../0000:af:06.0"),
+			Entry("trailing data", "0000:af:06.0/driver"),
+		)
+	})
+
+	Context("Checking ValidateCachePathComponent function", func() {
+		DescribeTable("valid cache path components",
+			func(component string) {
+				Expect(ValidateCachePathComponent(component)).To(Succeed())
+			},
+			Entry("container ID", "85b3788e91c2"),
+			Entry("CNI interface name", "net1"),
+			Entry("component with a single dot", "eth0.100"),
+			Entry("interface name with embedded double dots", "eth..0"),
+		)
+
+		DescribeTable("invalid cache path components",
+			func(component, expectedError string) {
+				Expect(ValidateCachePathComponent(component)).To(MatchError(expectedError))
+			},
+			Entry("empty component", "", "cache path component must not be empty"),
+			Entry("absolute path", "/tmp/cache", "cache path component contains invalid characters: /tmp/cache"),
+			Entry("path separator", "container/id", "cache path component contains invalid characters: container/id"),
+			Entry("current directory", ".", "cache path component contains invalid characters: ."),
+			Entry("parent directory", "..", "cache path component contains invalid characters: .."),
+		)
+	})
 
 	Context("Checking GetSriovNumVfs function", func() {
 		It("Assuming existing interface", func() {
@@ -195,9 +245,7 @@ var _ = Describe("Utils", func() {
 		var tmpDir string
 
 		BeforeEach(func() {
-			var err error
-			tmpDir, err = os.MkdirTemp("", "sriov")
-			Expect(err).ToNot(HaveOccurred())
+			tmpDir = GinkgoT().TempDir()
 		})
 		It("should save all the netConf struct to the cache file without dns", func() {
 			netconf := &sriovtypes.NetConf{NetConf: cnitypes.NetConf{CNIVersion: "1.0.0"}, SriovNetConf: sriovtypes.SriovNetConf{DeviceID: "0000:af:06.0"}}
@@ -232,5 +280,21 @@ var _ = Describe("Utils", func() {
 			Expect(netconf.CNIVersion).To(Equal(newNetConf.CNIVersion))
 			Expect(netconf.DNS.Domain).To(Equal(newNetConf.DNS.Domain))
 		})
+
+		DescribeTable("should reject invalid cache path components",
+			func(containerID, podIfName string) {
+				netconf := &sriovtypes.NetConf{}
+				err := SaveNetConf(containerID, tmpDir, podIfName, netconf)
+				Expect(err).To(HaveOccurred())
+
+				entries, err := os.ReadDir(tmpDir)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(entries).To(BeEmpty())
+			},
+			Entry("empty container ID", "", "net1"),
+			Entry("container ID path traversal", "../escape", "net1"),
+			Entry("empty interface name", "container-id", ""),
+			Entry("interface name path traversal", "container-id", "../escape"),
+		)
 	})
 })
