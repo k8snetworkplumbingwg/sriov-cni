@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"path/filepath"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -17,6 +19,32 @@ var _ = Describe("PCIAllocator", func() {
 			targetNetNS.Close()
 			err = testutils.UnmountNS(targetNetNS)
 		}
+	})
+
+	Context("PCI address validation", func() {
+		DescribeTable("rejects invalid PCI addresses before accessing the filesystem",
+			func(operation func(*PCIAllocator, string) error) {
+				dataDir := GinkgoT().TempDir()
+				allocator := NewPCIAllocator(dataDir)
+
+				err := operation(allocator, "../escape")
+				Expect(err).To(MatchError("invalid PCI address format: ../escape"))
+				Expect(filepath.Join(dataDir, "pci")).ToNot(BeADirectory())
+			},
+			Entry("Lock", func(allocator *PCIAllocator, pciAddress string) error {
+				return allocator.Lock(pciAddress)
+			}),
+			Entry("SaveAllocatedPCI", func(allocator *PCIAllocator, pciAddress string) error {
+				return allocator.SaveAllocatedPCI(pciAddress, "/test/netns")
+			}),
+			Entry("DeleteAllocatedPCI", func(allocator *PCIAllocator, pciAddress string) error {
+				return allocator.DeleteAllocatedPCI(pciAddress)
+			}),
+			Entry("IsAllocated", func(allocator *PCIAllocator, pciAddress string) error {
+				_, err := allocator.IsAllocated(pciAddress)
+				return err
+			}),
+		)
 	})
 
 	Context("IsAllocated", func() {
