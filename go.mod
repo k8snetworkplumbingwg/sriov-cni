@@ -6,7 +6,7 @@ require (
 	github.com/containernetworking/cni v1.3.1
 	github.com/containernetworking/plugins v1.9.1
 	github.com/k8snetworkplumbingwg/cni-log v0.0.0-20260713133559-c473b802cf27
-	github.com/onsi/ginkgo/v2 v2.32.0
+	github.com/onsi/ginkgo/v2 v2.32.1
 	github.com/onsi/gomega v1.43.0
 	github.com/stretchr/testify v1.11.1
 	github.com/vishvananda/netlink v1.3.2-0.20260629151558-4e35dc940f49
