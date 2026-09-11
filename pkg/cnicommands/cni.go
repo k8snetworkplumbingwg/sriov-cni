@@ -36,7 +36,7 @@ func getEnvArgs(envArgsString string) (*envArgs, error) {
 	return nil, nil
 }
 
-func CmdAdd(args *skel.CmdArgs) (err error) {
+func CmdAdd(args *skel.CmdArgs) (returnErr error) {
 	if err := config.SetLogging(args.StdinData, args.ContainerID, args.Netns, args.IfName); err != nil {
 		return err
 	}
@@ -83,7 +83,7 @@ func CmdAdd(args *skel.CmdArgs) (err error) {
 		return fmt.Errorf("failed to get original vf information: %v", err)
 	}
 	defer func() {
-		if err != nil {
+		if returnErr != nil {
 			err := netns.Do(func(_ ns.NetNS) error {
 				_, err := netlink.LinkByName(args.IfName)
 				return err
@@ -130,7 +130,7 @@ func CmdAdd(args *skel.CmdArgs) (err error) {
 		}
 
 		defer func() {
-			if err != nil {
+			if returnErr != nil {
 				_ = ipam.ExecDel(netConf.IPAM.Type, args.StdinData)
 			}
 		}()
