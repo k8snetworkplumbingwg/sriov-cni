@@ -97,6 +97,16 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, netns
 		return fmt.Errorf("error: %v. Failed to get VF netdevice with name %s", err, linkName)
 	}
 
+	// Clear leftover promiscuity before handing the VF to the pod. CNI DEL is
+	// best-effort, so a previous allocation may have left the host VF promiscuous.
+	logging.Debug("Clear VF device promiscuous mode",
+		"func", "SetupVF",
+		"linkObj", linkObj,
+		"currentPromisc", linkObj.Attrs().Promisc)
+	if err = s.clearPromisc(linkObj); err != nil {
+		return fmt.Errorf("failed to clear promiscuous mode for link %s: %v", linkName, err)
+	}
+
 	// Save the original effective MAC address before overriding it
 	conf.OrigVfState.EffectiveMAC = linkObj.Attrs().HardwareAddr.String()
 
@@ -315,6 +325,18 @@ func (s *sriovManager) ReleaseVF(conf *sriovtypes.NetConf, podifName string, net
 			}
 		}
 
+		// Always clear promiscuity before returning the VF to the host. Restoring
+		// a previously saved count can preserve a leaked promisc state if an
+		// earlier CNI DEL never ran. The flag persists across netns moves.
+		logging.Debug("Clear VF device promiscuous mode",
+			"func", "ReleaseVF",
+			"linkObj", linkObj,
+			"conf.OrigVfState.HostIFName", conf.OrigVfState.HostIFName,
+			"currentPromisc", linkObj.Attrs().Promisc)
+		if err = s.clearPromisc(linkObj); err != nil {
+			return fmt.Errorf("failed to clear promiscuous mode for link %s: %v", conf.OrigVfState.HostIFName, err)
+		}
+
 		// move VF device to init netns
 		logging.Debug("Move VF device to init netns",
 			"func", "ReleaseVF",
@@ -444,7 +466,7 @@ func (s *sriovManager) FillOriginalVfInfo(conf *sriovtypes.NetConf) error {
 	}
 	conf.OrigVfState.FillFromVfInfo(vfState)
 
-	// add also MTU to the vf info in the vf is we have an interface name
+	// Capture netdev attributes (MTU, promiscuity) when the VF has an interface name
 	if conf.OrigVfState.HostIFName != "" {
 		vfLink, err := s.nLink.LinkByName(conf.OrigVfState.HostIFName)
 		if err != nil {
@@ -454,6 +476,17 @@ func (s *sriovManager) FillOriginalVfInfo(conf *sriovtypes.NetConf) error {
 	}
 
 	return err
+}
+
+// clearPromisc drives the netdev promiscuity reference count to zero.
+// Promiscuity is a reference count; SetPromiscOff decrements by one.
+func (s *sriovManager) clearPromisc(linkObj netlink.Link) error {
+	for current := linkObj.Attrs().Promisc; current > 0; current-- {
+		if err := s.nLink.SetPromiscOff(linkObj); err != nil {
+			return fmt.Errorf("failed to disable promiscuous mode for link %s: %q", linkObj.Attrs().Name, err)
+		}
+	}
+	return nil
 }
 
 // ResetVFConfig reset a VF to its original state

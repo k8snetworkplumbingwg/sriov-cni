@@ -295,6 +295,16 @@ func (p *pfMockNetlinkLib) LinkDelAltName(link netlink.Link, name string) error 
 	return netlink.LinkDelAltName(link, name)
 }
 
+func (p *pfMockNetlinkLib) SetPromiscOn(link netlink.Link) error {
+	p.recordMethodCallf("SetPromiscOn %s", link.Attrs().Name)
+	return netlink.SetPromiscOn(link)
+}
+
+func (p *pfMockNetlinkLib) SetPromiscOff(link netlink.Link) error {
+	p.recordMethodCallf("SetPromiscOff %s", link.Attrs().Name)
+	return netlink.SetPromiscOff(link)
+}
+
 func (p *pfMockNetlinkLib) recordMethodCallf(format string, a ...any) {
 	message := fmt.Sprintf(format+"\n", a...)
 	//nolint:gosec
