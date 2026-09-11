@@ -15,7 +15,7 @@ import (
 	sriovtypes "github.com/k8snetworkplumbingwg/sriov-cni/pkg/types"
 )
 
-var pciBDFRegex = regexp.MustCompile(`^[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-7]$`)
+var pciBDFRegex = regexp.MustCompile(`^[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-1][0-9a-fA-F]\.[0-7]$`)
 
 // ValidatePCIAddress checks that pciAddress is in standard BDF format (DDDD:BB:DD.F).
 func ValidatePCIAddress(pciAddress string) error {
@@ -31,7 +31,7 @@ func ValidateCachePathComponent(value string) error {
 	if value == "" {
 		return fmt.Errorf("cache path component must not be empty")
 	}
-	if strings.Contains(value, "/") || strings.Contains(value, "..") {
+	if strings.Contains(value, "/") || value == "." || value == ".." {
 		return fmt.Errorf("cache path component contains invalid characters: %s", value)
 	}
 	return nil
