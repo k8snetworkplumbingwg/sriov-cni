@@ -66,6 +66,29 @@ EOM
 }
 
 
+test_vlan_reset_on_invalid_mac() {
+  create_network_ns "container_1"
+  export CNI_IFNAME=net1
+
+  read -r -d '' CNI_INPUT <<- EOM
+  {
+    "type": "sriov",
+    "cniVersion": "0.3.1",
+    "name": "sriov-network",
+    "vlan": 1234,
+    "deviceID": "0000:af:06.0",
+    "mac": "invalid-mac"
+  }
+EOM
+
+  export CNI_COMMAND=ADD
+  : > "${DEFAULT_CNI_DIR}/enp175s0f1.calls"
+  assert_fail invoke_sriov_cni
+  assert_equals "LinkSetVfVlanQosProto enp175s0f1 0 1234 0 33024
+LinkSetVfVlanQosProto enp175s0f1 0 0 0 33024" \
+    "$(grep '^LinkSetVfVlanQosProto ' "${DEFAULT_CNI_DIR}/enp175s0f1.calls")"
+}
+
 test_mtu_reset() {
 
   create_network_ns "container_1"
