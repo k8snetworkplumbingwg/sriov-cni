@@ -24,6 +24,7 @@ type NetlinkManager interface {
 	LinkSetVfState(netlink.Link, int, uint32) error
 	LinkSetMTU(netlink.Link, int) error
 	LinkDelAltName(netlink.Link, string) error
+	SetPromiscOff(netlink.Link) error
 }
 
 // MyNetlink NetlinkManager
@@ -105,4 +106,9 @@ func (n *MyNetlink) LinkSetMTU(link netlink.Link, mtu int) error {
 // LinkDelAltName using NetlinkManager
 func (n *MyNetlink) LinkDelAltName(link netlink.Link, altName string) error {
 	return netlink.LinkDelAltName(link, altName)
+}
+
+// SetPromiscOff using NetlinkManager
+func (n *MyNetlink) SetPromiscOff(link netlink.Link) error {
+	return netlink.SetPromiscOff(link)
 }
