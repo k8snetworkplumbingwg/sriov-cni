@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/plugins/pkg/testutils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -19,6 +20,23 @@ var _ = Describe("Config", func() {
 	})
 
 	Context("Checking LoadConf function", func() {
+		DescribeTable("rejects invalid DeviceID values before sysfs access",
+			func(deviceID string) {
+				conf := []byte(fmt.Sprintf(`{
+        "name": "mynet",
+        "type": "sriov",
+        "deviceID": %q
+}`, deviceID))
+
+				_, err := LoadConf(conf)
+				Expect(err).To(MatchError("LoadConf(): invalid PCI address format: "+deviceID),
+					"LoadConf should reject invalid DeviceID %q before sysfs access", deviceID)
+			},
+			Entry("path traversal", "../../0000:af:06.1"),
+			Entry("missing domain", "af:06.1"),
+			Entry("invalid function", "0000:af:06.8"),
+		)
+
 		It("Assuming correct config file - existing DeviceID", func() {
 			conf := []byte(`{
         "name": "mynet",
@@ -169,6 +187,24 @@ var _ = Describe("Config", func() {
 		})
 
 	})
+	Context("Checking LoadConfFromCache function", func() {
+		DescribeTable("rejects invalid cache path components before cache reads",
+			func(containerID, ifName, invalidComponent string) {
+				args := &skel.CmdArgs{ContainerID: containerID, IfName: ifName}
+
+				_, _, err := LoadConfFromCache(args)
+				Expect(err).To(HaveOccurred(),
+					"LoadConfFromCache should reject invalid cache component %q before reading cache", invalidComponent)
+				Expect(err.Error()).To(ContainSubstring("cache path component"),
+					"error for invalid cache component %q should identify the validation failure", invalidComponent)
+			},
+			Entry("empty container ID", "", "net1", "container ID"),
+			Entry("container ID path traversal", "../escape", "net1", "container ID"),
+			Entry("empty interface name", "container-id", "", "interface name"),
+			Entry("interface name path traversal", "container-id", "../escape", "interface name"),
+		)
+	})
+
 	Context("Checking getVfInfo function", func() {
 		It("Assuming existing PF", func() {
 			_, _, err := getVfInfo("0000:af:06.0")
