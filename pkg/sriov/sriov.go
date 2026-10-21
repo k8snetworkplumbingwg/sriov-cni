@@ -1,7 +1,9 @@
 package sriov
 
 import (
+	"errors"
 	"fmt"
+	"syscall"
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
@@ -113,8 +115,15 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, netns
 		if err != nil {
 			return fmt.Errorf("failed to find %q in tempNS: %v", linkName, err)
 		}
-		// Rename the interface to pod interface name
-		if err = s.nLink.LinkSetName(tempNSLinkObj, podifName); err != nil {
+
+		// Rename the interface to pod interface name. A previous pod may have left
+		// the pod interface name behind as an alternative name of the VF (udev
+		// re-registers the previous name of a device as an alternative name on every
+		// rename), and the kernel rejects a rename to a name that is already
+		// registered as an alternative name, including one of the device being
+		// renamed. renameLink clears it first, so this does not fail with
+		// "file exists".
+		if err = s.renameLink(tempNSLinkObj, linkName, podifName); err != nil {
 			return fmt.Errorf("failed to rename host device %q to %q: %v", linkName, podifName, err)
 		}
 
@@ -123,12 +132,8 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, netns
 			"func", "SetupVF",
 			"tempNSObj", tempNSLinkObj,
 			"OriginalLinkName", linkName)
-		for _, altName := range tempNSLinkObj.Attrs().AltNames {
-			if altName == linkName {
-				if err = s.nLink.LinkDelAltName(tempNSLinkObj, linkName); err != nil {
-					return fmt.Errorf("error removing VF altname %s: %v", linkName, err)
-				}
-			}
+		if err := s.removeAltNameByIfName(podifName, linkName); err != nil {
+			return err
 		}
 
 		// 4. Change netns
@@ -201,6 +206,66 @@ func (s *sriovManager) SetupVF(conf *sriovtypes.NetConf, podifName string, netns
 	return nil
 }
 
+// removeAltName removes altName from the alternative names of the given link, if it is registered.
+// Renaming a netdevice to a name that is already one of its own alternative names fails with
+// EEXIST ("file exists"), so stale alternative names must be cleared before a rename.
+func (s *sriovManager) removeAltName(link netlink.Link, altName string) error {
+	for _, name := range link.Attrs().AltNames {
+		if name != altName {
+			continue
+		}
+		if err := s.nLink.LinkDelAltName(link, altName); err != nil {
+			return fmt.Errorf("error removing VF altname %s from device %s: %w", altName, link.Attrs().Name, err)
+		}
+		return nil
+	}
+	return nil
+}
+
+// removeAltNameByIfName looks the device up by its current name and removes altName from its
+// alternative names, if it is registered. The lookup is required after a rename because the
+// alternative names of a cached link object are the ones read before the rename happened.
+func (s *sriovManager) removeAltNameByIfName(ifName, altName string) error {
+	link, err := s.nLink.LinkByName(ifName)
+	if err != nil {
+		return fmt.Errorf("failed to get VF netdevice with name %s: %w", ifName, err)
+	}
+	return s.removeAltName(link, altName)
+}
+
+// renameLink renames the device currently called currentName to newName, clearing newName from
+// the alternative names of the device first so that the rename is not rejected with EEXIST.
+// The cleanup uses the alternative names of the cached link object, and udev re-registers the
+// previous name of a device as an alternative name on every rename, so newName can reappear
+// between the cleanup and the rename. On EEXIST the alternative names are read again and the
+// rename is retried once.
+func (s *sriovManager) renameLink(link netlink.Link, currentName, newName string) error {
+	// best effort: when this fails the rename below reports EEXIST and is retried
+	if err := s.removeAltName(link, newName); err != nil {
+		logging.Warning("failed to remove alt name before renaming",
+			"func", "renameLink",
+			"altName", newName,
+			"error", err)
+	}
+
+	err := s.nLink.LinkSetName(link, newName)
+	if err == nil || !errors.Is(err, syscall.EEXIST) {
+		return err
+	}
+
+	logging.Debug("rename reported EEXIST, removing alt name and retrying",
+		"func", "renameLink",
+		"currentName", currentName,
+		"newName", newName)
+	if aerr := s.removeAltNameByIfName(currentName, newName); aerr != nil {
+		return fmt.Errorf("rename to %s failed: %w; removing altname failed as well: %v", newName, err, aerr)
+	}
+	if rerr := s.nLink.LinkSetName(link, newName); rerr != nil {
+		return fmt.Errorf("retry rename %s to %s: %w", currentName, newName, rerr)
+	}
+	return nil
+}
+
 // renameAndMoveLink finds a link by iterating over possible names, renames it if needed, and moves it to target namespace
 func (s *sriovManager) renameAndMoveLink(source, target ns.NetNS, possibleIfNames []string, targetIfname string) error {
 	return source.Do(func(_ ns.NetNS) error {
@@ -230,7 +295,9 @@ func (s *sriovManager) renameAndMoveLink(source, target ns.NetNS, possibleIfName
 				"func", "renameAndMoveLink",
 				"from", currentName,
 				"to", targetIfname)
-			if err = s.nLink.LinkSetName(linkObj, targetIfname); err != nil {
+			// the rename fails with EEXIST if the target name is still registered as an
+			// alternative name of the device, so renameLink clears it first
+			if err = s.renameLink(linkObj, currentName, targetIfname); err != nil {
 				logging.Warning("LinkSetName failed when trying to rename", "error", err)
 				return fmt.Errorf("failed to rename interface from %q to %q: %v", currentName, targetIfname, err)
 			}
@@ -279,14 +346,31 @@ func (s *sriovManager) ReleaseVF(conf *sriovtypes.NetConf, podifName string, net
 			return fmt.Errorf("failed to set link %s down: %q", podifName, err)
 		}
 
-		// rename VF device
+		// rename VF device back to its host name. The host name may still be
+		// registered as an alternative name of the VF, which would make the rename
+		// fail with EEXIST, so renameLink clears it first.
 		logging.Debug("Rename VF device",
 			"func", "ReleaseVF",
 			"linkObj", linkObj,
 			"conf.OrigVfState.HostIFName", conf.OrigVfState.HostIFName)
-		err = s.nLink.LinkSetName(linkObj, conf.OrigVfState.HostIFName)
+		err = s.renameLink(linkObj, podifName, conf.OrigVfState.HostIFName)
 		if err != nil {
 			return fmt.Errorf("failed to rename link %s to host name %s: %q", podifName, conf.OrigVfState.HostIFName, err)
+		}
+
+		// remove the pod interface name from the alt names of the VF, so that the device
+		// is returned to the host without a leftover name that would make the next
+		// rename to the pod interface name fail with EEXIST.
+		// This is best effort: the VF must be returned to the host netns even if the
+		// cleanup fails, SetupVF clears the name again before renaming.
+		logging.Debug("Remove pod interface name from alt names",
+			"func", "ReleaseVF",
+			"podifName", podifName)
+		if err = s.removeAltNameByIfName(conf.OrigVfState.HostIFName, podifName); err != nil {
+			logging.Warning("failed to remove pod interface name from alt names",
+				"func", "ReleaseVF",
+				"podifName", podifName,
+				"error", err)
 		}
 
 		if conf.OrigVfState.EffectiveMAC != "" {
