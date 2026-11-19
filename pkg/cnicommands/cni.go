@@ -284,7 +284,12 @@ func CmdDel(args *skel.CmdArgs) error {
 		return fmt.Errorf("cmdDel() error reseting VF: %q", err)
 	}
 
-	if !netConf.DPDKMode {
+	hasDpdkDriver, err := utils.HasDpdkDriver(netConf.DeviceID)
+	if err != nil {
+		return fmt.Errorf("cmdDel() error checking DPDK driver: %q", err)
+	}
+
+	if !hasDpdkDriver {
 		netns, err := ns.GetNS(args.Netns)
 		if err != nil {
 			// according to:
